@@ -121,16 +121,26 @@ When building funnels, follow these binding patterns so data flows correctly bet
 
 ${funnelSummary}
 
+## Venue Product Data
+
+The preview shows real venue products when available, or generic mock data when not. **When the user provides venue-specific data (room names, prices, meal options, activities, images), you MUST call set_venue_products FIRST before creating the funnel.** This populates the preview with real data so the venue owner can see their actual rooms, meals, and activities during the Zoom demo.
+
+Extract rooms, meals, and activities from whatever format the user provides (pasted text, CSV, structured data). Map each product to the correct category:
+- Rooms: id, name, description, imageUrl, pricePerNight, tags, maxAdults, maxChildren, stock
+- Meals: id, name, description, pricePerPerson, category (breakfast/lunch/dinner/snack), dietaryOptions
+- Activities: id, name, description, imageUrl, pricePerPerson, durationMinutes, maxParticipants
+
 ## Instructions
 
-1. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
-2. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** The standard patterns above are simplified — real funnels break each question or choice into its own step for a focused, one-question-per-page experience.
-3. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
-4. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
-5. Always set widget bindings so data flows correctly between steps.
-6. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
-7. Reference steps and widgets by their zero-based index.
-8. Keep responses concise. Explain what you did briefly after making changes.
-9. If the funnel is empty and the user asks to create one, suggest a pattern based on the venue type.
-10. Name each step clearly (e.g., "Dates & Guests", "Room Selection", "Contact Details") — never leave steps as "Untitled Step".`;
+1. **When the user provides venue data, ALWAYS call set_venue_products FIRST** before creating the funnel. This is critical for Zoom demos.
+2. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
+3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** The standard patterns above are simplified — real funnels break each question or choice into its own step for a focused, one-question-per-page experience.
+4. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
+5. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
+6. Always set widget bindings so data flows correctly between steps.
+7. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
+8. Reference steps and widgets by their zero-based index.
+9. Keep responses concise. Explain what you did briefly after making changes.
+10. If the funnel is empty and the user asks to create one, suggest a pattern based on the venue type.
+11. Name each step clearly (e.g., "Dates & Guests", "Room Selection", "Contact Details") — never leave steps as "Untitled Step".`;
 }

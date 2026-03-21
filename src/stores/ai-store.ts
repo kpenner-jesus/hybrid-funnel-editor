@@ -5,6 +5,8 @@ import { defaultAccountContext, defaultFunnelContext, buildAiContext } from "@/l
 import { executeAiToolCall } from "@/lib/ai/ai-executor";
 import type { AiStreamChunk } from "@/lib/ai/ai-providers";
 import { useFunnelStore } from "@/stores/funnel-store";
+import { useVenueDataStore } from "@/stores/venue-data-store";
+import type { VenueData } from "@/stores/venue-data-store";
 
 // --- Message Types ---
 
@@ -355,10 +357,66 @@ export const useAiStore = create<AiStore>((set, get) => {
                 input: chunk.input || {},
               };
 
+              // Handle set_venue_products directly (it's a store-level op, not funnel)
+              let result;
+              if (chunk.name === "set_venue_products") {
+                try {
+                  const input = chunk.input || {};
+                  const venueData: VenueData = {
+                    venueName: (input.venueName as string) || "",
+                    currency: (input.currency as string) || "USD",
+                    taxRates: (input.taxRates as VenueData["taxRates"]) || [],
+                    rooms: ((input.rooms as Array<Record<string, unknown>>) || []).map((r) => ({
+                      id: (r.id as string) || `room-${Math.random().toString(36).slice(2, 8)}`,
+                      name: (r.name as string) || "Room",
+                      description: (r.description as string) || "",
+                      imageUrl: (r.imageUrl as string) || "",
+                      pricePerNight: (r.pricePerNight as number) || 0,
+                      currency: (input.currency as string) || "USD",
+                      tags: (r.tags as string[]) || [],
+                      maxAdults: (r.maxAdults as number) || 2,
+                      maxChildren: (r.maxChildren as number) || 0,
+                      stock: (r.stock as number) || 10,
+                    })),
+                    meals: ((input.meals as Array<Record<string, unknown>>) || []).map((m) => ({
+                      id: (m.id as string) || `meal-${Math.random().toString(36).slice(2, 8)}`,
+                      name: (m.name as string) || "Meal",
+                      description: (m.description as string) || "",
+                      pricePerPerson: (m.pricePerPerson as number) || 0,
+                      currency: (input.currency as string) || "USD",
+                      category: (m.category as "breakfast" | "lunch" | "dinner" | "snack") || "dinner",
+                      dietaryOptions: (m.dietaryOptions as string[]) || [],
+                    })),
+                    activities: ((input.activities as Array<Record<string, unknown>>) || []).map((a) => ({
+                      id: (a.id as string) || `act-${Math.random().toString(36).slice(2, 8)}`,
+                      name: (a.name as string) || "Activity",
+                      description: (a.description as string) || "",
+                      imageUrl: (a.imageUrl as string) || "",
+                      pricePerPerson: (a.pricePerPerson as number) || 0,
+                      currency: (input.currency as string) || "USD",
+                      durationMinutes: (a.durationMinutes as number) || 120,
+                      maxParticipants: (a.maxParticipants as number) || 20,
+                    })),
+                    genericProducts: {},
+                    categories: [],
+                  };
+                  useVenueDataStore.getState().setVenueData(venueData);
+                  const counts = [
+                    venueData.rooms.length > 0 ? `${venueData.rooms.length} rooms` : null,
+                    venueData.meals.length > 0 ? `${venueData.meals.length} meals` : null,
+                    venueData.activities.length > 0 ? `${venueData.activities.length} activities` : null,
+                  ].filter(Boolean).join(", ");
+                  result = { success: true, message: `Loaded venue data for "${venueData.venueName}": ${counts}. Preview now shows real products.` };
+                } catch (err) {
+                  result = { success: false, message: `Failed to set venue data: ${err instanceof Error ? err.message : "unknown error"}` };
+                }
+                toolCall.result = result;
+                streamToolCalls.push(toolCall);
+              } else {
               // Execute the tool call against the funnel store
               // IMPORTANT: use lambda wrappers that call getState() fresh each time
               // to avoid stale closures when multiple tool calls execute in sequence
-              const result = executeAiToolCall(chunk.name, chunk.input || {}, {
+              result = executeAiToolCall(chunk.name, chunk.input || {}, {
                 getFunnel: () => useFunnelStore.getState().funnel,
                 setFunnel: (f) => {
                   useFunnelStore.setState({ funnel: f, isDirty: true });
@@ -377,6 +435,7 @@ export const useAiStore = create<AiStore>((set, get) => {
 
               toolCall.result = result;
               streamToolCalls.push(toolCall);
+              } // end else (non-venue-data tool calls)
 
               // Update or create assistant message with tool calls
               const currentMessages = get().messages;

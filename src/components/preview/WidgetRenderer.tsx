@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import type { WidgetInstance, ThemeConfig } from "@/lib/types";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { mockRooms, mockMeals, mockActivities } from "@/lib/mock-data";
+import { useVenueDataStore } from "@/stores/venue-data-store";
 
 interface WidgetRendererProps {
   widget: WidgetInstance;
@@ -236,7 +237,8 @@ function RoomSelectionPreview({
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
   const showImages = config.showImages !== false;
-  const rooms = mockRooms.slice(0, 4);
+  const venueData = useVenueDataStore((s) => s.venueData);
+  const rooms = venueData?.rooms && venueData.rooms.length > 0 ? venueData.rooms : mockRooms.slice(0, 4);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const checkIn = resolvedInputs?.checkIn as string | undefined;
@@ -361,7 +363,7 @@ function RoomSelectionPreview({
                     className="font-semibold text-sm"
                     style={{ color: theme.primaryColor }}
                   >
-                    CHF {room.pricePerNight}
+                    {room.currency || "CAD"} {room.pricePerNight}
                   </span>
                   <span className="text-[10px] text-gray-400">per night</span>
                 </div>
@@ -388,6 +390,8 @@ function MealPickerPreview({
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const venueData = useVenueDataStore((s) => s.venueData);
+  const allMeals = venueData?.meals && venueData.meals.length > 0 ? venueData.meals : mockMeals;
 
   const guests = resolvedInputs?.guests as
     | { adults: number; children: number }
@@ -395,7 +399,7 @@ function MealPickerPreview({
   const guestCount = guests ? guests.adults + guests.children : 2;
 
   useEffect(() => {
-    const selected = mockMeals.filter((m) => selectedIds.has(m.id));
+    const selected = allMeals.filter((m) => selectedIds.has(m.id));
     const mealTotal = selected.reduce(
       (sum, m) => sum + m.pricePerPerson * guestCount,
       0
@@ -408,7 +412,7 @@ function MealPickerPreview({
       })),
       mealTotal,
     });
-  }, [selectedIds, guestCount, onOutput]);
+  }, [selectedIds, guestCount, onOutput, allMeals]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -428,7 +432,7 @@ function MealPickerPreview({
         {(config.title as string) || "Meal Packages"}
       </h3>
       {["breakfast", "lunch", "dinner", "snack"].map((cat) => {
-        const meals = mockMeals.filter((m) => m.category === cat);
+        const meals = allMeals.filter((m) => m.category === cat);
         if (meals.length === 0) return null;
         return (
           <div key={cat}>
@@ -475,7 +479,7 @@ function MealPickerPreview({
                       className="text-sm font-semibold whitespace-nowrap"
                       style={{ color: theme.primaryColor }}
                     >
-                      CHF {meal.pricePerPerson}
+                      {meal.currency || "CAD"} {meal.pricePerPerson}
                     </span>
                   </div>
                 );
@@ -501,7 +505,8 @@ function ActivityPickerPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  const activities = mockActivities.slice(0, 4);
+  const venueData = useVenueDataStore((s) => s.venueData);
+  const activities = venueData?.activities && venueData.activities.length > 0 ? venueData.activities : mockActivities.slice(0, 4);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const guests = resolvedInputs?.guests as
@@ -600,7 +605,7 @@ function ActivityPickerPreview({
                     className="font-semibold text-sm"
                     style={{ color: theme.primaryColor }}
                   >
-                    CHF {act.pricePerPerson}
+                    {act.currency || "CAD"} {act.pricePerPerson}
                   </span>
                   <span className="text-[10px] text-gray-400">per person</span>
                 </div>

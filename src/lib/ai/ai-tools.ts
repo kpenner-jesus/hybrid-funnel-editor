@@ -301,4 +301,81 @@ export const aiTools: AiToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "set_venue_products",
+    description:
+      "Populates the venue product catalog with real data (rooms, meals, activities) so the preview shows actual venue products instead of generic mock data. Call this FIRST when the user provides venue-specific product information (room names, prices, meal options, activities, images). This data persists across sessions. IMPORTANT: Always call this when the user provides venue inventory data — without it, the preview shows fake placeholder products.",
+    input_schema: {
+      type: "object",
+      properties: {
+        venueName: { type: "string", description: "Venue name" },
+        currency: { type: "string", description: "Currency code (e.g., CAD, USD, EUR)" },
+        taxRates: {
+          type: "array",
+          description: "Tax rates to apply",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Tax name (e.g., GST, PST)" },
+              rate: { type: "number", description: "Tax rate as percentage (e.g., 5 for 5%)" },
+            },
+            required: ["name", "rate"],
+          },
+        },
+        rooms: {
+          type: "array",
+          description: "Room/accommodation products",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string" },
+              imageUrl: { type: "string" },
+              pricePerNight: { type: "number" },
+              tags: { type: "array", items: { type: "string" } },
+              maxAdults: { type: "number" },
+              maxChildren: { type: "number" },
+              stock: { type: "number" },
+            },
+            required: ["id", "name", "pricePerNight"],
+          },
+        },
+        meals: {
+          type: "array",
+          description: "Meal products",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string" },
+              pricePerPerson: { type: "number" },
+              category: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] },
+              dietaryOptions: { type: "array", items: { type: "string" } },
+            },
+            required: ["id", "name", "pricePerPerson", "category"],
+          },
+        },
+        activities: {
+          type: "array",
+          description: "Activity products",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string" },
+              imageUrl: { type: "string" },
+              pricePerPerson: { type: "number" },
+              durationMinutes: { type: "number" },
+              maxParticipants: { type: "number" },
+            },
+            required: ["id", "name", "pricePerPerson"],
+          },
+        },
+      },
+      required: ["venueName", "currency"],
+    },
+  },
 ];
