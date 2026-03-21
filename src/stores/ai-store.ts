@@ -23,12 +23,15 @@ export interface AiMessage {
 
 // --- Store Interface ---
 
-export type ClaudeModel = "claude-sonnet-4-20250514" | "claude-opus-4-20250514" | "claude-haiku-4-20250514";
+export type ClaudeModel =
+  | "claude-sonnet-4-20250514"
+  | "claude-opus-4-20250514"
+  | "claude-haiku-4-20250514";
 
 export const CLAUDE_MODELS: { id: ClaudeModel; label: string; description: string }[] = [
-  { id: "claude-sonnet-4-20250514", label: "Sonnet 4", description: "Fast & capable" },
-  { id: "claude-opus-4-20250514", label: "Opus 4", description: "Most powerful" },
-  { id: "claude-haiku-4-20250514", label: "Haiku 4", description: "Fastest & cheapest" },
+  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4.6", description: "Fast & capable — best balance" },
+  { id: "claude-opus-4-20250514", label: "Claude Opus 4.6", description: "Most powerful — complex tasks" },
+  { id: "claude-haiku-4-20250514", label: "Claude Haiku 4.5", description: "Fastest — simple edits" },
 ];
 
 interface AiStore {
