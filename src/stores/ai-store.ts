@@ -248,107 +248,126 @@ export const useAiStore = create<AiStore>((set, get) => {
         return;
       }
 
-      // Read SSE stream
-      const reader = response.body.getReader();
+      // --- Helper: read an SSE response stream and return parsed content + tool calls ---
       const decoder = new TextDecoder();
-      let buffer = "";
 
-      let assistantContent = "";
-      const toolCalls: ToolCallInfo[] = [];
+      async function readStream(
+        body: ReadableStream<Uint8Array>
+      ): Promise<{ content: string; toolCalls: ToolCallInfo[] }> {
+        const reader = body.getReader();
+        let buffer = "";
+        let assistantContent = "";
+        const streamToolCalls: ToolCallInfo[] = [];
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (!data) continue;
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (!data) continue;
 
-          let chunk: AiStreamChunk;
-          try {
-            chunk = JSON.parse(data);
-          } catch {
-            continue;
-          }
+            let chunk: AiStreamChunk;
+            try {
+              chunk = JSON.parse(data);
+            } catch {
+              continue;
+            }
 
-          if (chunk.type === "text" && chunk.content) {
-            assistantContent += chunk.content;
-            // Update the assistant message in real-time
-            const currentMessages = get().messages;
-            const lastMsg = currentMessages[currentMessages.length - 1];
-            if (lastMsg?.role === "assistant") {
-              const updated = [...currentMessages];
-              updated[updated.length - 1] = {
-                ...lastMsg,
-                content: assistantContent,
-                toolCalls: [...toolCalls],
+            if (chunk.type === "text" && chunk.content) {
+              assistantContent += chunk.content;
+              // Update the assistant message in real-time
+              const currentMessages = get().messages;
+              const lastMsg = currentMessages[currentMessages.length - 1];
+              if (lastMsg?.role === "assistant") {
+                const updated = [...currentMessages];
+                updated[updated.length - 1] = {
+                  ...lastMsg,
+                  content: assistantContent,
+                  toolCalls: [...streamToolCalls],
+                };
+                set({ messages: updated });
+              } else {
+                set({
+                  messages: [
+                    ...currentMessages,
+                    { role: "assistant", content: assistantContent, toolCalls: [...streamToolCalls] },
+                  ],
+                });
+              }
+            } else if (chunk.type === "tool_use" && chunk.name) {
+              // Skip duplicate tool_use IDs (SSE dedup)
+              if (chunk.id && streamToolCalls.some(tc => tc.id === chunk.id)) continue;
+
+              const toolCall: ToolCallInfo = {
+                id: chunk.id || "",
+                name: chunk.name,
+                input: chunk.input || {},
               };
-              set({ messages: updated });
-            } else {
-              set({
-                messages: [
-                  ...currentMessages,
-                  { role: "assistant", content: assistantContent, toolCalls: [...toolCalls] },
-                ],
+
+              // Execute the tool call against the funnel store
+              const funnelStore = useFunnelStore.getState();
+              const result = executeAiToolCall(chunk.name, chunk.input || {}, {
+                getFunnel: () => funnelStore.funnel,
+                setFunnel: (f) => {
+                  useFunnelStore.setState({ funnel: f, isDirty: true });
+                },
+                addStep: funnelStore.addStep,
+                removeStep: funnelStore.removeStep,
+                reorderSteps: funnelStore.reorderSteps,
+                updateStep: funnelStore.updateStep,
+                addWidget: funnelStore.addWidget,
+                removeWidget: funnelStore.removeWidget,
+                updateWidgetConfig: funnelStore.updateWidgetConfig,
+                updateWidgetBindings: funnelStore.updateWidgetBindings,
+                updateWidgetVariant: funnelStore.updateWidgetVariant,
+                setTheme: funnelStore.setTheme,
               });
+
+              toolCall.result = result;
+              streamToolCalls.push(toolCall);
+
+              // Update assistant message with tool calls
+              const currentMessages = get().messages;
+              const lastMsg = currentMessages[currentMessages.length - 1];
+              if (lastMsg?.role === "assistant") {
+                const updated = [...currentMessages];
+                updated[updated.length - 1] = {
+                  ...lastMsg,
+                  content: assistantContent,
+                  toolCalls: [...streamToolCalls],
+                };
+                set({ messages: updated });
+              }
+            } else if (chunk.type === "error") {
+              set({ error: chunk.message || "Unknown error" });
             }
-          } else if (chunk.type === "tool_use" && chunk.name) {
-            const toolCall: ToolCallInfo = {
-              id: chunk.id || "",
-              name: chunk.name,
-              input: chunk.input || {},
-            };
-
-            // Execute the tool call against the funnel store
-            const funnelStore = useFunnelStore.getState();
-            const result = executeAiToolCall(chunk.name, chunk.input || {}, {
-              getFunnel: () => funnelStore.funnel,
-              setFunnel: (f) => {
-                // Directly update the funnel in the store
-                useFunnelStore.setState({ funnel: f, isDirty: true });
-              },
-              addStep: funnelStore.addStep,
-              removeStep: funnelStore.removeStep,
-              reorderSteps: funnelStore.reorderSteps,
-              updateStep: funnelStore.updateStep,
-              addWidget: funnelStore.addWidget,
-              removeWidget: funnelStore.removeWidget,
-              updateWidgetConfig: funnelStore.updateWidgetConfig,
-              updateWidgetBindings: funnelStore.updateWidgetBindings,
-              updateWidgetVariant: funnelStore.updateWidgetVariant,
-              setTheme: funnelStore.setTheme,
-            });
-
-            toolCall.result = result;
-            toolCalls.push(toolCall);
-
-            // Update assistant message with tool calls
-            const currentMessages = get().messages;
-            const lastMsg = currentMessages[currentMessages.length - 1];
-            if (lastMsg?.role === "assistant") {
-              const updated = [...currentMessages];
-              updated[updated.length - 1] = {
-                ...lastMsg,
-                content: assistantContent,
-                toolCalls: [...toolCalls],
-              };
-              set({ messages: updated });
-            }
-          } else if (chunk.type === "error") {
-            set({ error: chunk.message || "Unknown error" });
           }
         }
+
+        return { content: assistantContent, toolCalls: streamToolCalls };
       }
 
-      // If there were tool calls, we need to send tool results back to continue the conversation
-      if (toolCalls.length > 0) {
-        // Add ONE combined tool_result message carrying all results
-        // Attach the toolCalls info so buildApiMessages can pair each result to its tool_use_id
+      // --- Main stream + multi-turn tool call loop ---
+      // After each response, if there are tool calls, send results back and continue.
+      // Loop up to 5 rounds to prevent infinite loops.
+      let currentResponse = response;
+      const MAX_TOOL_ROUNDS = 5;
+
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        if (!currentResponse.body) break;
+
+        const { toolCalls } = await readStream(currentResponse.body);
+
+        // No tool calls — conversation turn is complete
+        if (toolCalls.length === 0) break;
+
+        // Add tool_result message with all results from this round
         const toolResultMessage: AiMessage = {
           role: "tool_result",
           content: toolCalls
@@ -358,7 +377,7 @@ export const useAiStore = create<AiStore>((set, get) => {
                 : `${tc.name}: executed`
             )
             .join("\n"),
-          toolCalls: [...toolCalls], // carry the full info for buildApiMessages
+          toolCalls: [...toolCalls],
         };
 
         const allMessages = [...get().messages, toolResultMessage];
@@ -379,48 +398,8 @@ export const useAiStore = create<AiStore>((set, get) => {
           }),
         });
 
-        if (contResponse.ok && contResponse.body) {
-          const contReader = contResponse.body.getReader();
-          let contBuffer = "";
-          let contContent = "";
-
-          while (true) {
-            const { done, value } = await contReader.read();
-            if (done) break;
-
-            contBuffer += decoder.decode(value, { stream: true });
-            const contLines = contBuffer.split("\n");
-            contBuffer = contLines.pop() || "";
-
-            for (const line of contLines) {
-              if (!line.startsWith("data: ")) continue;
-              const data = line.slice(6).trim();
-              if (!data) continue;
-
-              let chunk: AiStreamChunk;
-              try {
-                chunk = JSON.parse(data);
-              } catch {
-                continue;
-              }
-
-              if (chunk.type === "text" && chunk.content) {
-                contContent += chunk.content;
-                const currentMessages = get().messages;
-                const lastMsg = currentMessages[currentMessages.length - 1];
-                if (lastMsg?.role === "assistant" && !lastMsg.toolCalls?.length) {
-                  const updated = [...currentMessages];
-                  updated[updated.length - 1] = { ...lastMsg, content: contContent };
-                  set({ messages: updated });
-                } else {
-                  set({
-                    messages: [...currentMessages, { role: "assistant", content: contContent }],
-                  });
-                }
-              }
-            }
-          }
-        }
+        if (!contResponse.ok || !contResponse.body) break;
+        currentResponse = contResponse;
       }
 
       set({ isStreaming: false });
@@ -516,27 +495,36 @@ function buildApiMessages(
     } else if (msg.role === "tool_result") {
       // The tool_result message carries toolCalls[] with id + result from the preceding assistant turn.
       // Each tool_use_id must appear exactly once as a tool_result block.
-      const tcs = msg.toolCalls;
+      let tcs = msg.toolCalls;
+
+      // Legacy fallback: if no toolCalls attached, look at the immediately preceding assistant message
+      if (!tcs || tcs.length === 0) {
+        for (let j = i - 1; j >= 0; j--) {
+          if (messages[j].role === "assistant" && messages[j].toolCalls?.length) {
+            tcs = messages[j].toolCalls;
+            break;
+          }
+          // Stop searching if we hit another user/tool_result — don't cross conversation turns
+          if (messages[j].role === "user" || messages[j].role === "tool_result") break;
+        }
+      }
+
       if (tcs && tcs.length > 0) {
-        const toolResults = tcs.map((tc) => ({
-          type: "tool_result",
-          tool_use_id: tc.id,
-          content: tc.result
-            ? `${tc.result.success ? "Success" : "Failed"}: ${tc.result.message}`
-            : "Tool executed.",
-        }));
-        apiMessages.push({ role: "user", content: toolResults });
-      } else {
-        // Legacy: if no toolCalls attached, look at preceding assistant
-        const prevAssistant = [...messages].slice(0, i).reverse().find((m) => m.role === "assistant" && m.toolCalls?.length);
-        if (prevAssistant?.toolCalls) {
-          const toolResults = prevAssistant.toolCalls.map((tc) => ({
+        // Deduplicate by tool_use_id — Claude requires exactly one result per tool_use
+        const seen = new Set<string>();
+        const toolResults: Array<Record<string, unknown>> = [];
+        for (const tc of tcs) {
+          if (seen.has(tc.id)) continue;
+          seen.add(tc.id);
+          toolResults.push({
             type: "tool_result",
             tool_use_id: tc.id,
             content: tc.result
               ? `${tc.result.success ? "Success" : "Failed"}: ${tc.result.message}`
               : "Tool executed.",
-          }));
+          });
+        }
+        if (toolResults.length > 0) {
           apiMessages.push({ role: "user", content: toolResults });
         }
       }
