@@ -311,22 +311,23 @@ export const useAiStore = create<AiStore>((set, get) => {
               };
 
               // Execute the tool call against the funnel store
-              const funnelStore = useFunnelStore.getState();
+              // IMPORTANT: use lambda wrappers that call getState() fresh each time
+              // to avoid stale closures when multiple tool calls execute in sequence
               const result = executeAiToolCall(chunk.name, chunk.input || {}, {
-                getFunnel: () => funnelStore.funnel,
+                getFunnel: () => useFunnelStore.getState().funnel,
                 setFunnel: (f) => {
                   useFunnelStore.setState({ funnel: f, isDirty: true });
                 },
-                addStep: funnelStore.addStep,
-                removeStep: funnelStore.removeStep,
-                reorderSteps: funnelStore.reorderSteps,
-                updateStep: funnelStore.updateStep,
-                addWidget: funnelStore.addWidget,
-                removeWidget: funnelStore.removeWidget,
-                updateWidgetConfig: funnelStore.updateWidgetConfig,
-                updateWidgetBindings: funnelStore.updateWidgetBindings,
-                updateWidgetVariant: funnelStore.updateWidgetVariant,
-                setTheme: funnelStore.setTheme,
+                addStep: (...a) => useFunnelStore.getState().addStep(...a),
+                removeStep: (...a) => useFunnelStore.getState().removeStep(...a),
+                reorderSteps: (...a) => useFunnelStore.getState().reorderSteps(...a),
+                updateStep: (...a) => useFunnelStore.getState().updateStep(...a),
+                addWidget: (...a) => useFunnelStore.getState().addWidget(...a),
+                removeWidget: (...a) => useFunnelStore.getState().removeWidget(...a),
+                updateWidgetConfig: (...a) => useFunnelStore.getState().updateWidgetConfig(...a),
+                updateWidgetBindings: (...a) => useFunnelStore.getState().updateWidgetBindings(...a),
+                updateWidgetVariant: (...a) => useFunnelStore.getState().updateWidgetVariant(...a),
+                setTheme: (...a) => useFunnelStore.getState().setTheme(...a),
               });
 
               toolCall.result = result;

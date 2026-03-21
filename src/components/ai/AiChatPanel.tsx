@@ -585,29 +585,47 @@ export function AiChatPanel() {
         />
       ))}
 
-      {/* Streaming indicator when no assistant message yet */}
-      {isStreaming &&
-        messages.length > 0 &&
-        messages[messages.length - 1].role === "user" && (
+      {/* Streaming / working indicator — shows whenever AI is processing */}
+      {isStreaming && (() => {
+        const lastMsg = messages[messages.length - 1];
+        const lastIsAssistantStreaming = lastMsg?.role === "assistant" && lastMsg.content;
+        // Determine status text based on what's happening
+        let statusText = "Thinking...";
+        if (lastMsg?.role === "tool_result") {
+          const toolCount = lastMsg.toolCalls?.length || 0;
+          statusText = toolCount > 1
+            ? `Executed ${toolCount} actions, continuing...`
+            : "Executed action, continuing...";
+        } else if (lastMsg?.role === "assistant" && lastMsg.toolCalls?.length) {
+          statusText = `Running ${lastMsg.toolCalls.length} action${lastMsg.toolCalls.length > 1 ? "s" : ""}...`;
+        } else if (lastIsAssistantStreaming) {
+          statusText = ""; // text is actively streaming, no extra indicator needed
+        }
+
+        if (!statusText) return null;
+
+        return (
           <div className="flex justify-start">
-            <div className="bg-surface-dim px-3.5 py-2.5 rounded-2xl rounded-bl-md">
+            <div className="bg-surface-dim px-3.5 py-2.5 rounded-2xl rounded-bl-md flex items-center gap-2">
               <span className="inline-flex gap-1">
                 <span
-                  className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
                   style={{ animationDelay: "0ms" }}
                 />
                 <span
-                  className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
                   style={{ animationDelay: "150ms" }}
                 />
                 <span
-                  className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
                   style={{ animationDelay: "300ms" }}
                 />
               </span>
+              <span className="text-xs text-on-surface-variant">{statusText}</span>
             </div>
           </div>
-        )}
+        );
+      })()}
 
       {/* Error */}
       {error && (
