@@ -188,7 +188,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   selectedStepId: null,
   selectedWidgetId: null,
   previewStep: null,
-  dataMode: "mock",
+  dataMode: "live",
   widgetOutputs: {},
   isDirty: false,
   initialized: false,
