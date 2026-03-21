@@ -43,7 +43,15 @@ interface AiStore {
   error: string | null;
   aiPanelOpen: boolean;
 
+  // Undocked (floating window) state
+  isUndocked: boolean;
+  undockedPosition: { x: number; y: number };
+  undockedSize: { width: number; height: number };
+
   togglePanel: () => void;
+  toggleDock: () => void;
+  setUndockedPosition: (pos: { x: number; y: number }) => void;
+  setUndockedSize: (size: { width: number; height: number }) => void;
   setModel: (model: ClaudeModel) => void;
   sendMessage: (content: string, funnel: FunnelDefinition | null) => Promise<void>;
   clearChat: () => void;
@@ -77,7 +85,56 @@ function loadSelectedModel(): ClaudeModel {
   return "claude-sonnet-4-20250514";
 }
 
-export const useAiStore = create<AiStore>((set, get) => ({
+// --- Undocked state persistence ---
+
+const DEFAULT_UNDOCKED_POSITION = { x: 100, y: 100 };
+const DEFAULT_UNDOCKED_SIZE = { width: 400, height: 600 };
+
+function loadUndockedState(): {
+  isUndocked: boolean;
+  undockedPosition: { x: number; y: number };
+  undockedSize: { width: number; height: number };
+} {
+  if (typeof window === "undefined") {
+    return {
+      isUndocked: false,
+      undockedPosition: DEFAULT_UNDOCKED_POSITION,
+      undockedSize: DEFAULT_UNDOCKED_SIZE,
+    };
+  }
+  try {
+    const raw = localStorage.getItem("ai-undocked-state");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        isUndocked: !!parsed.isUndocked,
+        undockedPosition: parsed.undockedPosition ?? DEFAULT_UNDOCKED_POSITION,
+        undockedSize: parsed.undockedSize ?? DEFAULT_UNDOCKED_SIZE,
+      };
+    }
+  } catch { /* ignore */ }
+  return {
+    isUndocked: false,
+    undockedPosition: DEFAULT_UNDOCKED_POSITION,
+    undockedSize: DEFAULT_UNDOCKED_SIZE,
+  };
+}
+
+function saveUndockedState(
+  isUndocked: boolean,
+  undockedPosition: { x: number; y: number },
+  undockedSize: { width: number; height: number }
+) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(
+    "ai-undocked-state",
+    JSON.stringify({ isUndocked, undockedPosition, undockedSize })
+  );
+}
+
+export const useAiStore = create<AiStore>((set, get) => {
+  const undockedInit = loadUndockedState();
+  return {
   messages: [],
   isStreaming: false,
   selectedModel: loadSelectedModel(),
@@ -86,7 +143,31 @@ export const useAiStore = create<AiStore>((set, get) => ({
   error: null,
   aiPanelOpen: false,
 
+  // Undocked state
+  isUndocked: undockedInit.isUndocked,
+  undockedPosition: undockedInit.undockedPosition,
+  undockedSize: undockedInit.undockedSize,
+
   togglePanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
+
+  toggleDock: () => {
+    const s = get();
+    const next = !s.isUndocked;
+    saveUndockedState(next, s.undockedPosition, s.undockedSize);
+    set({ isUndocked: next, aiPanelOpen: true });
+  },
+
+  setUndockedPosition: (pos) => {
+    const s = get();
+    saveUndockedState(s.isUndocked, pos, s.undockedSize);
+    set({ undockedPosition: pos });
+  },
+
+  setUndockedSize: (size) => {
+    const s = get();
+    saveUndockedState(s.isUndocked, s.undockedPosition, size);
+    set({ undockedSize: size });
+  },
 
   setModel: (model) => {
     if (typeof window !== "undefined") localStorage.setItem("ai-selected-model", model);
@@ -321,7 +402,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
       set({ isStreaming: false, error: `Connection failed: ${errorMessage}` });
     }
   },
-}));
+};});
 
 // Build API message format from our internal messages
 function buildApiMessages(
