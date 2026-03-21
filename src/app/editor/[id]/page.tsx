@@ -10,6 +10,8 @@ import { WidgetConfig } from "@/components/editor/WidgetConfig";
 import { ThemeEditor } from "@/components/editor/ThemeEditor";
 import { VariableFlow } from "@/components/editor/VariableFlow";
 import { FunnelPreview } from "@/components/preview/FunnelPreview";
+import { PublishModal } from "@/components/editor/PublishModal";
+import { generateFunnelJSX } from "@/lib/jsx-generator";
 
 type EditorTab = "steps" | "theme" | "variables";
 
@@ -31,6 +33,8 @@ export default function EditorPage() {
 
   const [activeTab, setActiveTab] = useState<EditorTab>("steps");
   const [saveFlash, setSaveFlash] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [generatedJSX, setGeneratedJSX] = useState("");
 
   useEffect(() => {
     if (!initialized) {
@@ -48,6 +52,13 @@ export default function EditorPage() {
     saveFunnel();
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 1500);
+  };
+
+  const handlePublish = () => {
+    if (!funnel) return;
+    const jsx = generateFunnelJSX(funnel);
+    setGeneratedJSX(jsx);
+    setPublishModalOpen(true);
   };
 
   if (!initialized) {
@@ -132,7 +143,7 @@ export default function EditorPage() {
             </Button>
 
             {/* Publish */}
-            <Button size="sm">Publish</Button>
+            <Button size="sm" onClick={handlePublish}>Publish</Button>
           </div>
         }
       />
@@ -200,6 +211,15 @@ export default function EditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Publish Modal */}
+      {publishModalOpen && (
+        <PublishModal
+          jsxCode={generatedJSX}
+          funnelName={funnel.name}
+          onClose={() => setPublishModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
