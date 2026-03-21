@@ -7,12 +7,14 @@ import { mealPickerTemplate } from "./meal-picker";
 import { activityPickerTemplate } from "./activity-picker";
 import { contactFormTemplate } from "./contact-form";
 import { invoiceTemplate } from "./invoice";
+import { segmentPickerTemplate } from "./segment-picker";
 
 export const widgetTemplateRegistry: Record<string, WidgetTemplate> = {
   "guest-rooms": guestRoomsTemplate,
   "date-picker": datePickerTemplate,
   "guest-counter": guestCounterTemplate,
   "option-picker": optionPickerTemplate,
+  "segment-picker": segmentPickerTemplate,
   "meal-picker": mealPickerTemplate,
   "activity-picker": activityPickerTemplate,
   "contact-form": contactFormTemplate,
@@ -38,6 +40,7 @@ export {
   datePickerTemplate,
   guestCounterTemplate,
   optionPickerTemplate,
+  segmentPickerTemplate,
   mealPickerTemplate,
   activityPickerTemplate,
   contactFormTemplate,

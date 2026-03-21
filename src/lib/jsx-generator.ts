@@ -58,6 +58,10 @@ export function generateFunnelJSX(funnel: FunnelDefinition): string {
     lines.push(generateGuestRoomsComponents());
     lines.push(``);
   }
+  if (usedTemplates.has("segment-picker")) {
+    lines.push(generateSegmentPickerComponent());
+    lines.push(``);
+  }
 
   // --- Main funnel component ---
   lines.push(generateMainFunnel(funnel, catInfo, usedTemplates));
@@ -592,6 +596,51 @@ function RoomCard({ product, selection, onSelectionChange, availability }) {
 }
 
 // ────────────────────────────────────────────────────────────
+// SegmentPicker — M3-styled option cards with branching
+// ────────────────────────────────────────────────────────────
+
+function generateSegmentPickerComponent(): string {
+  return `function SegmentPicker({ options = [], selected, onSelect, allowMultiple = false, selectedMulti = [], onSelectMulti }) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const handleClick = (opt) => {
+    if (allowMultiple && onSelectMulti) {
+      const exists = selectedMulti.includes(opt.id);
+      onSelectMulti(exists ? selectedMulti.filter(id => id !== opt.id) : [...selectedMulti, opt.id]);
+    } else {
+      onSelect(opt);
+    }
+  };
+  return (
+    <div className="space-y-2.5">
+      {options.map((opt, idx) => {
+        const isSel = allowMultiple ? selectedMulti.includes(opt.id) : selected === opt.id;
+        return (
+          <button key={opt.id} type="button" onClick={() => handleClick(opt)}
+            className="w-full flex items-center gap-3.5 p-4 rounded-[1.5rem] text-left transition-all hover:shadow-md active:scale-[0.99]"
+            style={{
+              background: isSel ? \`\${THEME.primary}08\` : THEME.surfaceContainerLowest,
+              border: \`2px solid \${isSel ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`,
+              boxShadow: isSel ? '0 8px 32px rgba(0,0,0,0.08)' : '0 2px 8px rgba(0,0,0,0.03)',
+            }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ background: isSel ? THEME.primary : \`\${THEME.primary}12\`, color: isSel ? '#fff' : THEME.primary }}>
+              {letters[idx] || idx + 1}
+            </div>
+            {opt.icon && <span className="text-2xl shrink-0">{opt.icon}</span>}
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm" style={{ color: isSel ? THEME.primary : THEME.onSurface, fontFamily: THEME.serif }}>{opt.label}</div>
+              {opt.description && <div className="text-xs mt-0.5" style={{ color: THEME.outline }}>{opt.description}</div>}
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isSel ? THEME.primary : THEME.outlineVariant} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        );
+      })}
+    </div>
+  );
+}`;
+}
+
+// ────────────────────────────────────────────────────────────
 // Main funnel component
 // ────────────────────────────────────────────────────────────
 
@@ -661,6 +710,10 @@ function generateMainFunnel(
   }
   if (hasContactForm) {
     lines.push(`  const [contact, setContact] = useState({ first_name: '', last_name: '', email: '', phone: '', notes: '' });`);
+  }
+  if (usedTemplates.has("segment-picker")) {
+    lines.push(`  const [selectedSegment, setSelectedSegment] = useState(null);`);
+    lines.push(`  const [selectedSegments, setSelectedSegments] = useState([]);`);
   }
   lines.push(``);
 
@@ -904,6 +957,8 @@ function generateMainFunnel(
             lines.push(`              onNext={() => { if (selRoomCount === 0) { setError('Select at least one room.'); return; } goTo('${nextStepId}'); }}`);
           } else if (widgetTemplates.includes("date-picker")) {
             lines.push(`              onNext={() => { if (!startDate || !endDate) { setError('Please select both dates.'); return; } goTo('${nextStepId}'); }}`);
+          } else if (widgetTemplates.includes("segment-picker")) {
+            lines.push(`              onNext={() => { if (!selectedSegment) { setError('Please select an option.'); return; } goTo('${nextStepId}'); }}`);
           } else {
             lines.push(`              onNext={() => goTo('${nextStepId}')}`);
           }
@@ -1032,6 +1087,49 @@ function generateWidgetInStep(
         .join("\n");
     }
 
+    case "segment-picker": {
+      // Parse options from config
+      let parsedOptions: Array<{ id: string; label: string; description?: string; icon?: string; nextStep?: string }> = [];
+      try {
+        const raw = cfg.options;
+        if (typeof raw === "string") parsedOptions = JSON.parse(raw as string);
+        else if (Array.isArray(raw)) parsedOptions = raw as typeof parsedOptions;
+      } catch {
+        parsedOptions = [];
+      }
+
+      const isMulti = !!cfg.allowMultiple;
+      const optionsJson = JSON.stringify(parsedOptions);
+
+      // Determine the default next step (used when an option has no specific nextStep)
+      const defaultNext = _nextStepId ? `'${_nextStepId}'` : "null";
+
+      const segmentLines: string[] = [];
+
+      if (isMulti) {
+        segmentLines.push(`            <SegmentPicker`);
+        segmentLines.push(`              options={${optionsJson}}`);
+        segmentLines.push(`              allowMultiple`);
+        segmentLines.push(`              selectedMulti={selectedSegments}`);
+        segmentLines.push(`              onSelectMulti={ids => { setSelectedSegments(ids); setSelectedSegment(ids[0] || null); }}`);
+        segmentLines.push(`            />`);
+      } else {
+        // Single select — on click, set segment and optionally branch
+        segmentLines.push(`            <SegmentPicker`);
+        segmentLines.push(`              options={${optionsJson}}`);
+        segmentLines.push(`              selected={selectedSegment}`);
+        segmentLines.push(`              onSelect={opt => {`);
+        segmentLines.push(`                setSelectedSegment(opt.id);`);
+        segmentLines.push(`                setSelectedSegments([opt.id]);`);
+        segmentLines.push(`                const target = opt.nextStep || ${defaultNext};`);
+        segmentLines.push(`                if (target) setTimeout(() => goTo(target), 250);`);
+        segmentLines.push(`              }}`);
+        segmentLines.push(`            />`);
+      }
+
+      return segmentLines.join("\n");
+    }
+
     case "invoice":
       // Handled at step level
       return "";
@@ -1083,6 +1181,7 @@ function deriveStepLabel(step: Step): string {
   if (templates.includes("contact-form")) return "Details";
   if (templates.includes("invoice")) return "Quote";
   if (templates.includes("option-picker")) return "Options";
+  if (templates.includes("segment-picker")) return "Welcome";
   return step.title.slice(0, 12);
 }
 
@@ -1096,7 +1195,8 @@ function buildTitleParts(title: string): string {
   const emphasisWords = [
     "rooms", "room", "meals", "meal", "dates", "date", "guests", "guest",
     "activities", "activity", "details", "stay", "quote", "started",
-    "done", "party", "event", "attendees", "experiences",
+    "done", "party", "event", "attendees", "experiences", "welcome",
+    "segment", "type", "journey",
   ];
   const lower = title.toLowerCase();
   for (const word of emphasisWords) {

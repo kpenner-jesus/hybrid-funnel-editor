@@ -107,19 +107,21 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
                     }
                     setIsEditingTitle(false);
                   }}
+                  onFocus={(e) => e.target.select()}
                   onClick={(e) => e.stopPropagation()}
                   className="text-sm font-medium w-full bg-white border border-primary rounded px-1.5 py-0.5 focus:outline-none"
                   autoFocus
                 />
               ) : (
                 <div
-                  className="text-sm font-medium truncate cursor-text hover:text-primary/80"
-                  onDoubleClick={(e) => {
+                  className="text-sm font-medium truncate cursor-text border-b border-transparent hover:border-primary/30 hover:text-primary/80 transition-colors"
+                  onClick={(e) => {
                     e.stopPropagation();
+                    selectStep(step.id);
                     setEditTitle(step.title);
                     setIsEditingTitle(true);
                   }}
-                  title="Double-click to edit title"
+                  title="Click to edit title"
                 >
                   {step.title}
                 </div>
