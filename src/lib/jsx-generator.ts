@@ -8,6 +8,8 @@ import type { FunnelDefinition, Step, WidgetInstance, ThemeConfig } from "./type
  * apiRef, correct clampQuantity(value, param) signature, initQuantities,
  * buildParameterTree, syncBooking with products array, and InvoiceWidget
  * with sessionId + currencyId props.
+ *
+ * Default mode: live (connects to real Everybooking API).
  */
 export function generateFunnelJSX(funnel: FunnelDefinition): string {
   const lines: string[] = [];
@@ -152,6 +154,7 @@ function adjustColor(hex: string, _factor: number): string {
 
 // ────────────────────────────────────────────────────────────
 // Helper functions (price, currency, product entries)
+// Matches the working wilderness-edge-funnel.jsx pattern
 // ────────────────────────────────────────────────────────────
 
 function generateHelperFunctions(): string {
@@ -161,6 +164,30 @@ function generateHelperFunctions(): string {
   return e.length ? (parseFloat(e[0]?.base_price) || 0) : 0;
 }
 
+function getMaxPrice(p) {
+  if (p.max_price != null) return parseFloat(p.max_price) || 0;
+  let m = 0;
+  for (const e of Object.values(p.price || {})) {
+    const b = parseFloat(e?.base_price) || 0;
+    if (b > m) m = b;
+  }
+  return m;
+}
+
+function calculateGroupPrice(pe, q) {
+  if (!pe) return 0;
+  const b = parseFloat(pe.base_price) || 0;
+  if (pe.group_price) {
+    for (const t of Object.values(pe.group_price)) {
+      if (q >= (parseInt(t.from) || 0) && q <= (parseInt(t.to) || Infinity)) {
+        const a = parseFloat(t.amount) || 0;
+        return t.type === 'quantity' ? a * q : a;
+      }
+    }
+  }
+  return b;
+}
+
 function fmtCurrency(v) {
   return new Intl.NumberFormat('en-CA', {
     style: 'currency', currency: 'CAD',
@@ -168,15 +195,21 @@ function fmtCurrency(v) {
   }).format(v);
 }
 
-function buildProductEntries(product, qty, startDate, endDate) {
+function buildProductEntries(product, qty, startDate, endDate, childAges = []) {
   const params = product.parameters || [];
+  if (params.some(p => p.report_id === 'childage')) {
+    return childAges.slice(0, qty).map(age => ({
+      sku: product.sku, startDate, endDate: startDate,
+      quantities: { childage: age, qty: 1 },
+    }));
+  }
   const k = params[0]?.report_id || 'qty';
   return [{ sku: product.sku, startDate, endDate, quantities: { [k]: qty } }];
 }`;
 }
 
 // ────────────────────────────────────────────────────────────
-// Shared UI — StepShell, BottomNav, CompactQtyPicker
+// Shared UI — StepShell, BottomNav, CompactQtyPicker, etc.
 // ────────────────────────────────────────────────────────────
 
 function generateSharedUI(): string {
@@ -380,7 +413,8 @@ function generateGuestCounterComponent(): string {
 }
 
 // ────────────────────────────────────────────────────────────
-// GuestRooms — RoomCard, ImageCarousel, UniqueInventoryPicker
+// GuestRooms — ImageCarousel, UniqueInventoryPicker, RoomCard
+// Full implementation matching wilderness-edge-funnel.jsx
 // ────────────────────────────────────────────────────────────
 
 function generateGuestRoomsComponents(): string {
@@ -409,24 +443,134 @@ function generateGuestRoomsComponents(): string {
   );
 }
 
+function UniqueInventoryPicker({ unitIndex, unit, uniqueStockItems = [], selectedUnitIds = new Set(), childParams = [], priceObj = {}, onChange }) {
+  const ap = childParams.find(p => /adult/i.test(p.report_id) || /adult/i.test(p.name));
+  const cp = childParams.find(p => /child/i.test(p.report_id) || /child/i.test(p.name));
+  const adults = unit?.adults || [], kids = unit?.children || [];
+  const aSurcharge = ap && priceObj[ap.report_id] ? calculateGroupPrice(priceObj[ap.report_id], adults.length) : 0;
+  const cSurcharge = cp && priceObj[cp.report_id] ? calculateGroupPrice(priceObj[cp.report_id], kids.length) : 0;
+  const iCls = "flex-1 min-w-0 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 border-none";
+  return (
+    <div className="space-y-4">
+      {uniqueStockItems.length > 0 && (
+        <select value={unit?.unitId || ''} onChange={e => onChange(unitIndex, { ...unit, unitId: e.target.value })}
+          className="w-full rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 border-none"
+          style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }}>
+          <option value="">Select room...</option>
+          {uniqueStockItems.map(item => (
+            <option key={item.id} value={item.id} disabled={selectedUnitIds.has(item.id) && unit?.unitId !== item.id}>{item.name}</option>
+          ))}
+        </select>
+      )}
+      {ap && (<div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: THEME.outline }}>
+          {adults.length} / {ap.max || '∞'} {ap.name || 'Adults'}
+          {aSurcharge > 0 && <span className="ml-1 normal-case font-normal" style={{ color: THEME.secondary }}>+{fmtCurrency(aSurcharge)}</span>}
+        </div>
+        <div className="space-y-2">
+          {adults.map((a, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input type="text" value={a.name} onChange={e => { const n = adults.map((x, j) => j === i ? { ...x, name: e.target.value } : x); onChange(unitIndex, { ...unit, adults: n }); }}
+                placeholder="Enter name" className={iCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} />
+              {adults.length > (ap.min || 0) && (
+                <button type="button" onClick={() => onChange(unitIndex, { ...unit, adults: adults.filter((_, j) => j !== i) })}
+                  className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-50" style={{ color: THEME.outline }}>×</button>
+              )}
+            </div>
+          ))}
+        </div>
+        {adults.length < (ap.max || 99) && (
+          <button type="button" onClick={() => onChange(unitIndex, { ...unit, adults: [...adults, { name: '' }] })}
+            className="mt-2 w-full py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full text-white hover:opacity-90 active:scale-[0.99]"
+            style={{ background: THEME.primary }}>+ ADD {(ap.name || 'ADULT').toUpperCase()} TO QTY</button>
+        )}
+      </div>)}
+      {cp && (<div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: THEME.outline }}>
+          {kids.length} / {cp.max || '∞'} {cp.name || 'Children'}
+          {cSurcharge > 0 && <span className="ml-1 normal-case font-normal" style={{ color: THEME.secondary }}>+{fmtCurrency(cSurcharge)}</span>}
+        </div>
+        <div className="space-y-2">
+          {kids.map((c, i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <input type="text" value={c.name} onChange={e => { const n = kids.map((x, j) => j === i ? { ...x, name: e.target.value } : x); onChange(unitIndex, { ...unit, children: n }); }}
+                  placeholder="Enter child name" className={iCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} />
+                <input type="number" value={c.age || ''} onChange={e => { const n = kids.map((x, j) => j === i ? { ...x, age: parseInt(e.target.value) || 0 } : x); onChange(unitIndex, { ...unit, children: n }); }}
+                  placeholder="Age" min={0} max={17}
+                  className="w-14 sm:w-16 rounded-lg px-2 py-3 text-sm text-center focus:outline-none focus:ring-2 border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} />
+                {kids.length > (cp.min || 0) && (
+                  <button type="button" onClick={() => onChange(unitIndex, { ...unit, children: kids.filter((_, j) => j !== i) })}
+                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-red-50" style={{ color: THEME.outline }}>×</button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 pl-0.5">
+                <input type="range" min={0} max={17} value={c.age || 0}
+                  onChange={e => { const n = kids.map((x, j) => j === i ? { ...x, age: parseInt(e.target.value) || 0 } : x); onChange(unitIndex, { ...unit, children: n }); }}
+                  className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                  style={{ background: \`linear-gradient(to right, \${THEME.primary} \${((c.age || 0) / 17) * 100}%, \${THEME.outlineVariant} \${((c.age || 0) / 17) * 100}%)\` }} />
+                <span className="text-xs w-8 text-right font-medium" style={{ color: THEME.outline }}>{c.age || 0}yr</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {kids.length < (cp.max || 99) && (
+          <button type="button" onClick={() => onChange(unitIndex, { ...unit, children: [...kids, { name: '', age: 0 }] })}
+            className="mt-2 w-full py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full text-white hover:opacity-90 active:scale-[0.99]"
+            style={{ background: THEME.primary }}>+ ADD {(cp.name || 'CHILD').toUpperCase()} TO QTY</button>
+        )}
+      </div>)}
+    </div>
+  );
+}
+
 function RoomCard({ product, selection, onSelectionChange, availability }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showInventory, setShowInventory] = useState(true);
   const tree = buildParameterTree(product);
   const invParam = (product.parameters || []).find(p => p.controls_inventory) || tree.roots[0];
-  const qty = selection?.qty || 0;
+  const childParams = invParam ? (tree.childrenOf[invParam.id] || []) : [];
+  const qty = selection?.qty || 0, quantities = selection?.quantities || initQuantities(product), units = selection?.units || [];
   const maxQty = availability?.available_quantity ?? product.stock ?? (invParam?.max || 10);
   const totalAvail = availability?.total_available ?? product.stock ?? maxQty;
   const isUnavail = availability && availability.available === false;
+  const hasUnique = !!(product.unique_inventory && product.unique_stock_items?.length > 0);
+  const hasAC = childParams.some(p => (p.fields && p.fields.length > 0) || /adult/i.test(p.report_id) || /adult/i.test(p.name) || /child/i.test(p.report_id) || /child/i.test(p.name));
+  const needsUnits = hasUnique || hasAC;
   const curPrice = availability?.price_for_dates != null ? parseFloat(availability.price_for_dates) : getBasePrice(product);
+  const regPrice = getMaxPrice(product);
+  const isSale = curPrice > 0 && regPrice > 0 && curPrice < regPrice;
   const images = product.images?.length > 0 ? product.images : (product.image ? [{ url: product.image }] : []);
   const tags = product.tags || [];
+  const selUnitIds = new Set(units.filter(u => u?.unitId).map(u => u.unitId));
   const isSel = qty > 0;
 
   function handleQty(nq) {
     if (nq <= 0) { onSelectionChange(product.id, null); return; }
     const nQuant = { ...initQuantities(product) };
     if (invParam) nQuant[invParam.report_id] = clampQuantity(nq, invParam);
-    onSelectionChange(product.id, { qty: nq, quantities: nQuant, units: [] });
+    if (selection?.quantities) { for (const c of childParams) { if (selection.quantities[c.report_id] != null) nQuant[c.report_id] = selection.quantities[c.report_id]; } }
+    let nu = [...(selection?.units || [])];
+    if (needsUnits) {
+      while (nu.length < nq) {
+        const ap = childParams.find(p => /adult/i.test(p.report_id) || /adult/i.test(p.name));
+        const cp = childParams.find(p => /child/i.test(p.report_id) || /child/i.test(p.name));
+        nu.push({ unitId: '', adults: ap ? Array.from({ length: ap.min || 1 }, () => ({ name: '' })) : [], children: cp ? Array.from({ length: cp.min || 0 }, () => ({ name: '', age: 0 })) : [] });
+      }
+      while (nu.length > nq) nu.pop();
+    }
+    onSelectionChange(product.id, { qty: nq, quantities: nQuant, units: nu });
+  }
+
+  function handleUnit(idx, u) {
+    const nu = units.map((x, i) => i === idx ? u : x);
+    const nq = { ...quantities };
+    for (const c of childParams) {
+      if (/adult/i.test(c.report_id) || /adult/i.test(c.name)) nq[c.report_id] = nu.reduce((s, x) => s + (x.adults?.length || 0), 0);
+      if (/child/i.test(c.report_id) || /child/i.test(c.name)) nq[c.report_id] = nu.reduce((s, x) => s + (x.children?.length || 0), 0);
+    }
+    onSelectionChange(product.id, { ...selection, quantities: nq, units: nu });
   }
 
   return (
@@ -441,13 +585,21 @@ function RoomCard({ product, selection, onSelectionChange, availability }) {
         {curPrice != null && (
           <div className="absolute top-3 right-3 px-3 py-1.5 rounded-xl font-bold text-sm text-white"
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
-            {fmtCurrency(curPrice)} <span className="font-normal text-xs opacity-80">/ night</span>
+            {fmtCurrency(curPrice)} <span className="font-normal text-xs opacity-80">CAD/night</span>
           </div>
         )}
         {isSel && (
-          <div className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: THEME.primary }}>
+          <div className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: THEME.primary, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
           </div>
+        )}
+        {isSale && (
+          <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold"
+            style={{ background: THEME.secondaryContainer, color: THEME.secondary }}>SALE — was {fmtCurrency(regPrice)}</div>
+        )}
+        {!isUnavail && totalAvail > 0 && totalAvail <= 5 && (
+          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold"
+            style={{ background: THEME.secondaryContainer, color: THEME.secondary }}>Only {totalAvail} left!</div>
         )}
       </div>
       <div className="p-4" style={{ background: isSel ? THEME.primary + '08' : 'transparent' }}>
@@ -455,14 +607,14 @@ function RoomCard({ product, selection, onSelectionChange, availability }) {
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {tags.slice(0, 5).map(t => (
-              <span key={t.id || t.name || t} className="text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider"
+              <span key={t.id || t.name || t} className="text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider"
                 style={{ background: THEME.surfaceContainerHigh, color: THEME.primary }}>{t.name || t}</span>
             ))}
           </div>
         )}
         {(product.details || product.description) && (
           <button type="button" onClick={() => setShowDetails(!showDetails)}
-            className="text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1" style={{ color: THEME.secondary }}>
+            className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2 flex items-center gap-1" style={{ color: THEME.secondary }}>
             Details {showDetails ? '▾' : '›'}
           </button>
         )}
@@ -478,10 +630,32 @@ function RoomCard({ product, selection, onSelectionChange, availability }) {
         )}
         {isUnavail && <div className="text-xs font-medium py-1 mb-2" style={{ color: THEME.error }}>Not available for selected dates</div>}
         <div className="pt-3" style={{ borderTop: \`1px solid \${THEME.outlineVariant}40\` }}>
-          <p className="text-xs font-bold uppercase tracking-widest mb-3 text-center" style={{ color: THEME.outline }}>Rooms</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-3 text-center" style={{ color: THEME.outline }}>Rooms</p>
           <CompactQtyPicker value={qty} onChange={handleQty} min={0} max={isUnavail ? 0 : maxQty} />
         </div>
       </div>
+      {qty > 0 && needsUnits && (
+        <div className="px-4 pb-2">
+          <button type="button" onClick={() => setShowInventory(!showInventory)}
+            className="w-full py-2 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-50 transition-colors"
+            style={{ border: \`1px solid \${THEME.outlineVariant}\`, color: THEME.outline }}>
+            {showInventory ? 'Hide Inventory' : 'Show Inventory'}
+          </button>
+        </div>
+      )}
+      {qty > 0 && needsUnits && showInventory && (
+        <div style={{ borderTop: \`1px solid \${THEME.outlineVariant}40\` }}>
+          {units.map((u, i) => (
+            <div key={i} className="p-4" style={{ borderBottom: i < units.length - 1 ? \`1px solid \${THEME.surfaceContainerHigh}\` : 'none' }}>
+              {units.length > 1 && <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-3" style={{ color: THEME.outline }}>Room {i + 1} of {units.length}</div>}
+              <UniqueInventoryPicker unitIndex={i} unit={u}
+                uniqueStockItems={hasUnique ? (product.unique_stock_items || []) : []}
+                selectedUnitIds={selUnitIds} childParams={childParams}
+                priceObj={product.price || {}} onChange={handleUnit} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }`;
@@ -713,6 +887,7 @@ function generateMainFunnel(
   if (hasGuestCounter) {
     lines.push(`  const [adults, setAdults] = useState(2);`);
     lines.push(`  const [children, setChildren] = useState(0);`);
+    lines.push(`  const [childAges, setChildAges] = useState([]);`);
   }
   if (hasContactForm) {
     lines.push(`  const [contact, setContact] = useState({ first_name: '', last_name: '', email: '', phone: '', notes: '' });`);
@@ -732,8 +907,14 @@ function generateMainFunnel(
   lines.push(`  useEffect(() => () => { if (animRef.current) clearTimeout(animRef.current); }, []);`);
   lines.push(``);
 
+  // --- childAges sync effect ---
+  if (hasGuestCounter) {
+    lines.push(`  useEffect(() => { setChildAges(p => { const n = [...p]; while (n.length < children) n.push(8); return n.slice(0, children); }); }, [children]);`);
+    lines.push(``);
+  }
+
   // --- SDK init effect ---
-  lines.push(`  // ── Everybooking API init ──`);
+  lines.push(`  // ── Everybooking API init (live mode) ──`);
   lines.push(`  useEffect(() => {`);
   lines.push(`    (async () => {`);
   lines.push(`      if (!window.__EverybookingAPI) { setError('Booking system unavailable.'); setLoading(false); return; }`);
@@ -742,13 +923,17 @@ function generateMainFunnel(
   lines.push(`        await apiRef.current.ready();`);
   lines.push(`        const cats = await apiRef.current.getCategories();`);
 
+  // Category-based product fetching — always use .find(c => c.id === ID)?.products
+  // Never fall back to positional indexing (cats[0], cats[1], etc.)
   if (hasRooms) {
     if (catInfo.roomCatIds.length === 1) {
       lines.push(`        setRoomProducts(cats.find(c => c.id === ${catInfo.roomCatIds[0]})?.products || []);`);
     } else if (catInfo.roomCatIds.length > 1) {
       lines.push(`        setRoomProducts(ROOM_CAT_IDS.flatMap(id => cats.find(c => c.id === id)?.products || []));`);
     } else {
-      lines.push(`        setRoomProducts(cats[0]?.products || []);`);
+      // No categoryId configured — warn but use empty array; user must configure categoryId
+      lines.push(`        // WARNING: No categoryId configured for rooms. Set categoryId in widget config.`);
+      lines.push(`        setRoomProducts([]);`);
     }
   }
   if (hasMeals) {
@@ -757,7 +942,8 @@ function generateMainFunnel(
     } else if (catInfo.mealCatIds.length > 1) {
       lines.push(`        setMealProducts(MEAL_CAT_IDS.flatMap(id => cats.find(c => c.id === id)?.products || []));`);
     } else {
-      lines.push(`        setMealProducts(cats[1]?.products || []);`);
+      lines.push(`        // WARNING: No categoryId configured for meals. Set categoryId in widget config.`);
+      lines.push(`        setMealProducts([]);`);
     }
   }
   if (hasActivities) {
@@ -766,7 +952,8 @@ function generateMainFunnel(
     } else if (catInfo.activityCatIds.length > 1) {
       lines.push(`        setActivityProducts(ACTIVITY_CAT_IDS.flatMap(id => cats.find(c => c.id === id)?.products || []));`);
     } else {
-      lines.push(`        setActivityProducts(cats[2]?.products || []);`);
+      lines.push(`        // WARNING: No categoryId configured for activities. Set categoryId in widget config.`);
+      lines.push(`        setActivityProducts([]);`);
     }
   }
 
@@ -837,24 +1024,34 @@ function generateMainFunnel(
       lines.push(`        });`);
       lines.push(`        const hi = (product.parameters || []).some(p => p.controls_inventory);`);
       lines.push(`        if (!hi) { buildParameterTree(product).roots.forEach(r => { q[r.report_id] = sel.qty; }); }`);
-      lines.push(`        products.push({`);
+      lines.push(`        const e = {`);
       lines.push(`          sku: product.sku, startDate, endDate: endDate || startDate,`);
       lines.push(`          quantities: q, bookingUnit: product.booking_unit,`);
-      lines.push(`        });`);
+      lines.push(`        };`);
+      lines.push(`        if (sel.units?.length > 0) e.units = sel.units.map(u => ({ unitId: u.unitId, adults: u.adults || [], children: u.children || [] }));`);
+      lines.push(`        products.push(e);`);
       lines.push(`      });`);
     }
     if (hasMeals) {
       lines.push(`      Object.entries(selectedMeals).forEach(([id, qty]) => {`);
       lines.push(`        if (qty <= 0) return;`);
       lines.push(`        const p = mealProducts.find(m => m.id === parseInt(id));`);
-      lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate));`);
+      if (hasGuestCounter) {
+        lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate, childAges));`);
+      } else {
+        lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate));`);
+      }
       lines.push(`      });`);
     }
     if (hasActivities) {
       lines.push(`      Object.entries(selectedActivities).forEach(([id, qty]) => {`);
       lines.push(`        if (qty <= 0) return;`);
       lines.push(`        const p = activityProducts.find(a => a.id === parseInt(id));`);
-      lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate));`);
+      if (hasGuestCounter) {
+        lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate, childAges));`);
+      } else {
+        lines.push(`        if (p) products.push(...buildProductEntries(p, qty, startDate, endDate));`);
+      }
       lines.push(`      });`);
     }
     lines.push(`      if (products.length === 0) { setError('Please select at least one item.'); setSubmitting(false); return; }`);
