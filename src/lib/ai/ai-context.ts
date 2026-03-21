@@ -118,15 +118,12 @@ export function buildAiContext(
     })),
   }));
 
-  // Don't send the full raw funnel state — the system prompt already builds a compact
-  // text summary of all steps/widgets. Sending the raw JSON doubles the token cost
-  // and caused 210k token overflows with large funnels.
   return {
     account: accountContext,
     funnel: funnelContext,
     steps: steps.slice(0, 60),
     widgets: widgets.slice(0, 180),
-    currentFunnelState: null,
+    currentFunnelState: funnel,
     availableTemplates,
   };
 }

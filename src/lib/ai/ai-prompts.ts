@@ -31,22 +31,26 @@ ${variantsSummary}`;
     })
     .join("\n\n");
 
-  // Build current funnel summary
+  // Build current funnel summary (capped at 60 steps to prevent token overflow)
   let funnelSummary = "No funnel loaded.";
   if (currentFunnelState) {
-    const stepsSummary = currentFunnelState.steps
+    const stepsToShow = currentFunnelState.steps.slice(0, 60);
+    const totalSteps = currentFunnelState.steps.length;
+    const stepsSummary = stepsToShow
       .map((s, i) => {
         const widgetList = s.widgets
-          .map((w, wi) => `      [${wi}] ${w.templateId} (variant: ${w.variant})`)
+          .map((w, wi) => `      [${wi}] ${w.templateId}`)
           .join("\n");
-        return `    [${i}] "${s.title}" (${s.layout} layout)
+        return `    [${i}] "${s.title}" (${s.layout})
 ${widgetList || "      (no widgets)"}`;
       })
       .join("\n");
 
+    const truncNote = totalSteps > 60 ? `\n    ... and ${totalSteps - 60} more steps (truncated)` : "";
+
     funnelSummary = `Name: ${currentFunnelState.name}
-  Steps (${currentFunnelState.steps.length}):
-${stepsSummary || "    (no steps)"}
+  Steps (${totalSteps}):
+${stepsSummary || "    (no steps)"}${truncNote}
   Theme: primary=${currentFunnelState.theme.primaryColor}, secondary=${currentFunnelState.theme.secondaryColor}, cardStyle=${currentFunnelState.theme.cardStyle}`;
   }
 
