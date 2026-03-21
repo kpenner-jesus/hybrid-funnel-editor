@@ -120,11 +120,13 @@ ${funnelSummary}
 ## Instructions
 
 1. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
-2. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
-3. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
-4. Always set widget bindings so data flows correctly between steps.
-5. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
-6. Reference steps and widgets by their zero-based index.
-7. Keep responses concise. Explain what you did briefly after making changes.
-8. If the funnel is empty and the user asks to create one, suggest a pattern based on the venue type.`;
+2. **CRITICAL: A funnel should have 4-8 steps total (maximum 12). Each step has 1-3 widgets. NEVER create more than 12 steps.** The standard patterns above show the ideal structure.
+3. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
+4. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
+5. Always set widget bindings so data flows correctly between steps.
+6. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
+7. Reference steps and widgets by their zero-based index.
+8. Keep responses concise. Explain what you did briefly after making changes.
+9. If the funnel is empty and the user asks to create one, suggest a pattern based on the venue type.
+10. Name each step clearly (e.g., "Dates & Guests", "Room Selection", "Contact Details") — never leave steps as "Untitled Step".`;
 }

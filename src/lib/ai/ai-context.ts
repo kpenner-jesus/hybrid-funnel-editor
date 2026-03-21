@@ -118,12 +118,22 @@ export function buildAiContext(
     })),
   }));
 
+  // Cap funnel state to prevent token overflow — if funnel is huge, send a trimmed version
+  let funnelState = funnel;
+  if (funnel && funnel.steps.length > 20) {
+    // Send only the first 20 steps to keep context manageable
+    funnelState = {
+      ...funnel,
+      steps: funnel.steps.slice(0, 20),
+    };
+  }
+
   return {
     account: accountContext,
     funnel: funnelContext,
-    steps,
-    widgets,
-    currentFunnelState: funnel,
+    steps: steps.slice(0, 20),
+    widgets: widgets.slice(0, 60),
+    currentFunnelState: funnelState,
     availableTemplates,
   };
 }
