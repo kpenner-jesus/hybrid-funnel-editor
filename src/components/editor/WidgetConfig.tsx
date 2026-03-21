@@ -201,8 +201,16 @@ function BindingsEditor({
 }
 
 export function WidgetConfig() {
+  const configRef = React.useRef<HTMLDivElement>(null);
   const { funnel, selectedStepId, selectedWidgetId, updateWidgetConfig, updateWidgetVariant } =
     useFunnelStore();
+
+  // Auto-scroll config panel into view when a widget is selected
+  React.useEffect(() => {
+    if (selectedWidgetId && configRef.current) {
+      configRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedWidgetId]);
 
   if (!funnel || !selectedStepId || !selectedWidgetId) {
     return (
@@ -233,7 +241,7 @@ export function WidgetConfig() {
   }
 
   return (
-    <div className="space-y-5">
+    <div ref={configRef} className="space-y-5">
       {/* Template header */}
       <div className="flex items-center gap-3 pb-3 border-b border-outline-variant">
         <span className="text-2xl">{template.icon}</span>
