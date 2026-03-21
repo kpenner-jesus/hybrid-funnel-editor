@@ -4,7 +4,7 @@ export const activityPickerTemplate: WidgetTemplate = {
   id: "activity-picker",
   name: "Activity Picker",
   category: "selection",
-  description: "Browse and select available activities and excursions with scheduling.",
+  description: "Activity and excursion selection with images, duration badges, and scheduling. Fetches from Everybooking via categoryId. Requires checkIn, checkOut, and guests as inputs. Outputs selectedActivities and activityTotal.",
   icon: "🏔️",
   inputs: [
     { name: "checkIn", type: "date", label: "Check-in Date", required: true },

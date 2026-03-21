@@ -4,7 +4,7 @@ export const guestCounterTemplate: WidgetTemplate = {
   id: "guest-counter",
   name: "Guest Counter",
   category: "input",
-  description: "Counter controls for selecting number of adults, children, and infants.",
+  description: "Counter controls for adults, children, and infants. Outputs a guests object used by room/meal/activity widgets for pricing and capacity checks. Pair with date-picker on the same step or an adjacent early step.",
   icon: "👥",
   inputs: [
     { name: "maxGuests", type: "number", label: "Maximum Total Guests", defaultValue: 20 },

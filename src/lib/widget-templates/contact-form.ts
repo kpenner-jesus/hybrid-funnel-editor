@@ -4,7 +4,7 @@ export const contactFormTemplate: WidgetTemplate = {
   id: "contact-form",
   name: "Contact Form",
   category: "form",
-  description: "Collects guest contact information for booking confirmation.",
+  description: "Contact information form (name, email, phone, company, notes). Place near end of funnel before invoice. Outputs contactInfo object. Supports GDPR consent checkbox and optional company/organization fields.",
   icon: "📋",
   inputs: [
     { name: "prefillData", type: "object", label: "Pre-fill Data", description: "Optional pre-fill values for returning guests" },

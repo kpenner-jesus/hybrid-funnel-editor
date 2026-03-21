@@ -4,7 +4,7 @@ export const guestRoomsTemplate: WidgetTemplate = {
   id: "guest-rooms",
   name: "Guest Rooms",
   category: "selection",
-  description: "Displays available room products with filtering, selection, and quantity controls.",
+  description: "Room product selection with images, pricing, availability, and quantity controls. Fetches live inventory from Everybooking via categoryId. Requires checkIn, checkOut, and guests as inputs. Outputs selectedRooms and roomTotal.",
   icon: "🛏️",
   inputs: [
     { name: "checkIn", type: "date", label: "Check-in Date", required: true },

@@ -2,9 +2,9 @@ import type { WidgetTemplate } from "../types";
 
 export const optionPickerTemplate: WidgetTemplate = {
   id: "option-picker",
-  name: "Segment/Option Picker",
+  name: "Option Picker",
   category: "selection",
-  description: "Allows users to pick from a set of options or segments (e.g. room type filters, package tiers).",
+  description: "MID-FUNNEL filter or preference widget. Lets users pick from options like room type filters, package tiers, or add-on categories. Options come from an external data input (not self-contained). No step branching support. Use this for inline filtering within a step — NOT for top-of-funnel event type routing (use segment-picker for that).",
   icon: "🔘",
   inputs: [
     { name: "options", type: "array", label: "Available Options", required: true, description: "Array of option objects with id, label, description" },

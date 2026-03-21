@@ -4,7 +4,7 @@ export const invoiceTemplate: WidgetTemplate = {
   id: "invoice",
   name: "Invoice / Summary",
   category: "display",
-  description: "Displays a booking summary with line items, subtotals, and a grand total.",
+  description: "FINAL STEP widget. Displays booking/quote summary with line items, subtotals, tax, and grand total. Bind all upstream selections (rooms, meals, activities, contact) as inputs. Outputs totalPrice. Always place as the last step in the funnel.",
   icon: "🧾",
   inputs: [
     { name: "checkIn", type: "date", label: "Check-in Date", required: true },

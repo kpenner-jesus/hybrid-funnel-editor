@@ -15,9 +15,26 @@ export interface ToolCallInfo {
   result?: { success: boolean; message: string };
 }
 
+export interface ImageAttachment {
+  base64: string;       // data URL (data:image/png;base64,...)
+  mediaType: string;    // "image/png", "image/jpeg", etc.
+  thumbnailUrl: string; // same as base64 for display
+}
+
+export interface FileAttachment {
+  name: string;           // original filename
+  type: "text" | "pdf";   // how to send to Claude
+  mediaType: string;       // MIME type (text/csv, application/pdf, etc.)
+  textContent?: string;    // for text/csv/json/txt — the raw text
+  base64?: string;         // for PDFs — raw base64 data (no data: prefix)
+  size: number;            // file size in bytes
+}
+
 export interface AiMessage {
   role: "user" | "assistant" | "tool_result";
   content: string;
+  images?: ImageAttachment[];
+  files?: FileAttachment[];
   toolCalls?: ToolCallInfo[];
 }
 
@@ -53,7 +70,7 @@ interface AiStore {
   setUndockedPosition: (pos: { x: number; y: number }) => void;
   setUndockedSize: (size: { width: number; height: number }) => void;
   setModel: (model: ClaudeModel) => void;
-  sendMessage: (content: string, funnel: FunnelDefinition | null) => Promise<void>;
+  sendMessage: (content: string, funnel: FunnelDefinition | null, images?: ImageAttachment[], files?: FileAttachment[]) => Promise<void>;
   clearChat: () => void;
   setAccountContext: (ctx: Partial<AccountContext>) => void;
   setFunnelContext: (ctx: Partial<FunnelContext>) => void;
@@ -186,12 +203,17 @@ export const useAiStore = create<AiStore>((set, get) => {
     set({ funnelContext: { ...get().funnelContext, ...ctx } });
   },
 
-  sendMessage: async (content: string, funnel: FunnelDefinition | null) => {
+  sendMessage: async (content: string, funnel: FunnelDefinition | null, images?: ImageAttachment[], files?: FileAttachment[]) => {
     const state = get();
     if (state.isStreaming) return;
 
-    // Add user message
-    const userMessage: AiMessage = { role: "user", content };
+    // Add user message (with optional images and files)
+    const userMessage: AiMessage = {
+      role: "user",
+      content,
+      ...(images && images.length > 0 ? { images } : {}),
+      ...(files && files.length > 0 ? { files } : {}),
+    };
     const updatedMessages = [...state.messages, userMessage];
     set({ messages: updatedMessages, isStreaming: true, error: null });
 
@@ -325,17 +347,21 @@ export const useAiStore = create<AiStore>((set, get) => {
 
       // If there were tool calls, we need to send tool results back to continue the conversation
       if (toolCalls.length > 0) {
-        // Add the tool results as follow-up and continue the conversation
-        const toolResultMessages = toolCalls.map((tc) => ({
-          role: "tool_result" as const,
-          content: tc.result
-            ? `${tc.result.success ? "Success" : "Failed"}: ${tc.result.message}`
-            : "Tool executed.",
-          toolCalls: undefined,
-        }));
+        // Add ONE combined tool_result message carrying all results
+        // Attach the toolCalls info so buildApiMessages can pair each result to its tool_use_id
+        const toolResultMessage: AiMessage = {
+          role: "tool_result",
+          content: toolCalls
+            .map((tc) =>
+              tc.result
+                ? `${tc.name}: ${tc.result.success ? "✓" : "✗"} ${tc.result.message}`
+                : `${tc.name}: executed`
+            )
+            .join("\n"),
+          toolCalls: [...toolCalls], // carry the full info for buildApiMessages
+        };
 
-        // Build a continuation request with tool results
-        const allMessages = [...get().messages, ...toolResultMessages];
+        const allMessages = [...get().messages, toolResultMessage];
         set({ messages: allMessages });
 
         // Continue the conversation with tool results
@@ -349,6 +375,7 @@ export const useAiStore = create<AiStore>((set, get) => {
           body: JSON.stringify({
             messages: continuationApiMessages,
             context: continuationContext,
+            model: get().selectedModel,
           }),
         });
 
@@ -414,7 +441,59 @@ function buildApiMessages(
     const msg = messages[i];
 
     if (msg.role === "user") {
-      apiMessages.push({ role: "user", content: msg.content });
+      const hasImages = msg.images && msg.images.length > 0;
+      const hasFiles = msg.files && msg.files.length > 0;
+
+      if (hasImages || hasFiles) {
+        // Build multi-part content with files, images, and text
+        const blocks: Array<Record<string, unknown>> = [];
+
+        // Add file content blocks first
+        if (msg.files) {
+          for (const file of msg.files) {
+            if (file.type === "pdf" && file.base64) {
+              // PDFs sent as document blocks (Claude native PDF support)
+              blocks.push({
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: file.base64,
+                },
+              });
+            } else if (file.type === "text" && file.textContent) {
+              // Text/CSV/JSON — inject as labeled text block
+              blocks.push({
+                type: "text",
+                text: `--- File: ${file.name} ---\n${file.textContent}\n--- End of ${file.name} ---`,
+              });
+            }
+          }
+        }
+
+        // Add image blocks
+        if (msg.images) {
+          for (const img of msg.images) {
+            const base64Data = img.base64.includes(",")
+              ? img.base64.split(",")[1]
+              : img.base64;
+            blocks.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: img.mediaType,
+                data: base64Data,
+              },
+            });
+          }
+        }
+
+        // Add the user's text message last
+        blocks.push({ type: "text", text: msg.content || "Please review the attached files." });
+        apiMessages.push({ role: "user", content: blocks });
+      } else {
+        apiMessages.push({ role: "user", content: msg.content });
+      }
     } else if (msg.role === "assistant") {
       // Build assistant content blocks
       const blocks: Array<Record<string, unknown>> = [];
@@ -435,10 +514,11 @@ function buildApiMessages(
         apiMessages.push({ role: "assistant", content: blocks });
       }
     } else if (msg.role === "tool_result") {
-      // Find the preceding assistant message's tool calls to get the tool_use_id
-      const prevAssistant = [...messages].slice(0, i).reverse().find((m) => m.role === "assistant" && m.toolCalls?.length);
-      if (prevAssistant?.toolCalls) {
-        const toolResults = prevAssistant.toolCalls.map((tc) => ({
+      // The tool_result message carries toolCalls[] with id + result from the preceding assistant turn.
+      // Each tool_use_id must appear exactly once as a tool_result block.
+      const tcs = msg.toolCalls;
+      if (tcs && tcs.length > 0) {
+        const toolResults = tcs.map((tc) => ({
           type: "tool_result",
           tool_use_id: tc.id,
           content: tc.result
@@ -446,6 +526,19 @@ function buildApiMessages(
             : "Tool executed.",
         }));
         apiMessages.push({ role: "user", content: toolResults });
+      } else {
+        // Legacy: if no toolCalls attached, look at preceding assistant
+        const prevAssistant = [...messages].slice(0, i).reverse().find((m) => m.role === "assistant" && m.toolCalls?.length);
+        if (prevAssistant?.toolCalls) {
+          const toolResults = prevAssistant.toolCalls.map((tc) => ({
+            type: "tool_result",
+            tool_use_id: tc.id,
+            content: tc.result
+              ? `${tc.result.success ? "Success" : "Failed"}: ${tc.result.message}`
+              : "Tool executed.",
+          }));
+          apiMessages.push({ role: "user", content: toolResults });
+        }
       }
     }
   }

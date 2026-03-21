@@ -1,6 +1,6 @@
 "use client";
 
-import type { AiMessage, ToolCallInfo } from "@/stores/ai-store";
+import type { AiMessage, ToolCallInfo, FileAttachment } from "@/stores/ai-store";
 
 interface AiChatMessageProps {
   message: AiMessage;
@@ -65,12 +65,52 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }) {
   );
 }
 
+function FileChip({ file }: { file: FileAttachment }) {
+  const icon = file.type === "pdf" ? "📄" : file.name.match(/\.(csv|tsv)$/) ? "📊" : "📝";
+  const sizeStr = file.size < 1024
+    ? `${file.size}B`
+    : file.size < 1024 * 1024
+      ? `${Math.round(file.size / 1024)}KB`
+      : `${(file.size / (1024 * 1024)).toFixed(1)}MB`;
+
+  return (
+    <div className="inline-flex items-center gap-1 px-2 py-1 bg-white/15 rounded-lg text-xs">
+      <span>{icon}</span>
+      <span className="truncate max-w-[100px]" title={file.name}>{file.name}</span>
+      <span className="text-white/60">{sizeStr}</span>
+    </div>
+  );
+}
+
 export function AiChatMessage({ message, isStreaming }: AiChatMessageProps) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] bg-primary text-white px-3.5 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed">
-          {message.content}
+        <div className="max-w-[85%]">
+          {/* Show attached images */}
+          {message.images && message.images.length > 0 && (
+            <div className="flex gap-1.5 justify-end mb-1.5 flex-wrap">
+              {message.images.map((img, i) => (
+                <img
+                  key={i}
+                  src={img.thumbnailUrl}
+                  alt={`Attached ${i + 1}`}
+                  className="w-24 h-24 object-cover rounded-xl border border-white/20"
+                />
+              ))}
+            </div>
+          )}
+          {/* Show attached files */}
+          {message.files && message.files.length > 0 && (
+            <div className="flex gap-1.5 justify-end mb-1.5 flex-wrap">
+              {message.files.map((file, i) => (
+                <FileChip key={i} file={file} />
+              ))}
+            </div>
+          )}
+          <div className="bg-primary text-white px-3.5 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed">
+            {message.content}
+          </div>
         </div>
       </div>
     );

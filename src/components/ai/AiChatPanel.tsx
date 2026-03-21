@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useAiStore, CLAUDE_MODELS } from "@/stores/ai-store";
-import type { ClaudeModel } from "@/stores/ai-store";
+import type { ClaudeModel, ImageAttachment, FileAttachment } from "@/stores/ai-store";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { AiChatMessage } from "./AiChatMessage";
 
@@ -39,8 +39,11 @@ export function AiChatPanel() {
   const funnel = useFunnelStore((s) => s.funnel);
 
   const [input, setInput] = useState("");
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Drag state
@@ -49,7 +52,8 @@ export function AiChatPanel() {
 
   // Resize state
   const isResizing = useRef(false);
-  const resizeStart = useRef({ mouseX: 0, mouseY: 0, width: 0, height: 0 });
+  const resizeEdge = useRef<string>(""); // e.g. "n", "se", "w", etc.
+  const resizeStart = useRef({ mouseX: 0, mouseY: 0, width: 0, height: 0, posX: 0, posY: 0 });
 
   // Live position/size during drag/resize for smooth updates
   const [livePos, setLivePos] = useState(undockedPosition);
@@ -77,10 +81,18 @@ export function AiChatPanel() {
 
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
-    if (!trimmed || isStreaming) return;
+    const hasAttachments = pendingImages.length > 0 || pendingFiles.length > 0;
+    if ((!trimmed && !hasAttachments) || isStreaming) return;
+    const imagesToSend = pendingImages.length > 0 ? [...pendingImages] : undefined;
+    const filesToSend = pendingFiles.length > 0 ? [...pendingFiles] : undefined;
     setInput("");
-    sendMessage(trimmed, funnel);
-  }, [input, isStreaming, sendMessage, funnel]);
+    setPendingImages([]);
+    setPendingFiles([]);
+    const defaultText = pendingFiles.length > 0
+      ? "(see attached files)"
+      : "(see attached image)";
+    sendMessage(trimmed || defaultText, funnel, imagesToSend, filesToSend);
+  }, [input, pendingImages, pendingFiles, isStreaming, sendMessage, funnel]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -91,6 +103,190 @@ export function AiChatPanel() {
     },
     [handleSend]
   );
+
+  // --- Image paste handler ---
+  const processImageFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      if (!base64) return;
+      setPendingImages((prev) => {
+        if (prev.length >= 5) return prev; // cap check inside updater to avoid stale closure
+        return [
+          ...prev,
+          {
+            base64,
+            mediaType: file.type,
+            thumbnailUrl: base64,
+          },
+        ];
+      });
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // Extract image from clipboard data (checks both items and files APIs)
+  const extractPastedImage = useCallback(
+    (clipboardData: DataTransfer): boolean => {
+      // Method 1: Check clipboardData.items (Chrome, Edge, modern Firefox)
+      if (clipboardData.items) {
+        for (const item of Array.from(clipboardData.items)) {
+          if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (file) {
+              processImageFile(file);
+              return true;
+            }
+          }
+        }
+      }
+      // Method 2: Check clipboardData.files (Safari, some Firefox versions)
+      if (clipboardData.files && clipboardData.files.length > 0) {
+        for (const file of Array.from(clipboardData.files)) {
+          if (file.type.startsWith("image/")) {
+            processImageFile(file);
+            return true;
+          }
+        }
+      }
+      return false;
+    },
+    [processImageFile]
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (!e.clipboardData) return;
+      if (extractPastedImage(e.clipboardData)) {
+        e.preventDefault();
+      }
+      // If no image found, let normal text paste happen
+    },
+    [extractPastedImage]
+  );
+
+  // Global paste listener — when the AI panel is open, catch image pastes
+  // even if focus isn't in the textarea (e.g. user clicked somewhere in the panel)
+  useEffect(() => {
+    if (!aiPanelOpen) return;
+    const handler = (e: ClipboardEvent) => {
+      // Skip if user is focused on an input/textarea outside our panel
+      const active = document.activeElement;
+      const isInOurPanel = panelRef.current?.contains(active);
+      const isInExternalInput = (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA") && !isInOurPanel;
+      if (isInExternalInput) return;
+
+      if (!e.clipboardData) return;
+
+      // Check if clipboard has an image
+      let hasImage = false;
+      if (e.clipboardData.items) {
+        for (const item of Array.from(e.clipboardData.items)) {
+          if (item.type.startsWith("image/")) { hasImage = true; break; }
+        }
+      }
+      if (!hasImage && e.clipboardData.files) {
+        for (const file of Array.from(e.clipboardData.files)) {
+          if (file.type.startsWith("image/")) { hasImage = true; break; }
+        }
+      }
+
+      if (hasImage) {
+        e.preventDefault();
+        extractPastedImage(e.clipboardData);
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("paste", handler);
+    return () => window.removeEventListener("paste", handler);
+  }, [aiPanelOpen, extractPastedImage]);
+
+  const removeImage = useCallback((index: number) => {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // --- File attachment handler ---
+  const ACCEPTED_FILE_TYPES = ".csv,.txt,.json,.xml,.md,.pdf,.tsv,.log";
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_TEXT_SIZE = 500 * 1024; // 500KB for text files (token budget)
+
+  const processFile = useCallback((file: File) => {
+    if (pendingFiles.length >= 5) return;
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File "${file.name}" is too large (max 10MB).`);
+      return;
+    }
+
+    const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
+
+    if (isPdf) {
+      // Read PDF as base64 for Claude's native document support
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        if (!dataUrl) return;
+        const base64Data = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+        setPendingFiles((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            type: "pdf",
+            mediaType: "application/pdf",
+            base64: base64Data,
+            size: file.size,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // Read as text (CSV, TXT, JSON, XML, MD, TSV, LOG)
+      if (file.size > MAX_TEXT_SIZE) {
+        alert(`Text file "${file.name}" is too large (max 500KB). Consider splitting it.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        if (!text) return;
+        setPendingFiles((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            type: "text",
+            mediaType: file.type || "text/plain",
+            textContent: text,
+            size: file.size,
+          },
+        ]);
+      };
+      reader.readAsText(file);
+    }
+  }, [pendingFiles.length]);
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+      for (const file of Array.from(files)) {
+        processFile(file);
+      }
+      // Reset input so same file can be selected again
+      e.target.value = "";
+    },
+    [processFile]
+  );
+
+  const removeFile = useCallback((index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
 
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
@@ -147,31 +343,72 @@ export function AiChatPanel() {
     [livePos, liveSize.width, liveSize.height, setUndockedPosition]
   );
 
-  // --- Resize handlers ---
-  const onResizeStart = useCallback(
-    (e: React.MouseEvent) => {
+  // --- Resize handlers (all edges & corners) ---
+  const onEdgeResizeStart = useCallback(
+    (edge: string) => (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       isResizing.current = true;
+      resizeEdge.current = edge;
       resizeStart.current = {
         mouseX: e.clientX,
         mouseY: e.clientY,
         width: liveSize.width,
         height: liveSize.height,
+        posX: livePos.x,
+        posY: livePos.y,
       };
 
       const onMouseMove = (ev: MouseEvent) => {
         if (!isResizing.current) return;
         const dx = ev.clientX - resizeStart.current.mouseX;
         const dy = ev.clientY - resizeStart.current.mouseY;
-        let newW = resizeStart.current.width + dx;
-        let newH = resizeStart.current.height + dy;
-        // Enforce min/max
-        const maxW = window.innerWidth - livePos.x;
-        const maxH = window.innerHeight - livePos.y;
-        newW = Math.max(MIN_WIDTH, Math.min(newW, maxW));
-        newH = Math.max(MIN_HEIGHT, Math.min(newH, maxH));
+        const dir = resizeEdge.current;
+
+        let newW = resizeStart.current.width;
+        let newH = resizeStart.current.height;
+        let newX = resizeStart.current.posX;
+        let newY = resizeStart.current.posY;
+
+        // East side: grow width rightward
+        if (dir.includes("e")) {
+          newW = resizeStart.current.width + dx;
+        }
+        // West side: grow width leftward (move x, shrink from left)
+        if (dir.includes("w")) {
+          newW = resizeStart.current.width - dx;
+          newX = resizeStart.current.posX + dx;
+        }
+        // South side: grow height downward
+        if (dir.includes("s")) {
+          newH = resizeStart.current.height + dy;
+        }
+        // North side: grow height upward (move y, shrink from top)
+        if (dir.includes("n")) {
+          newH = resizeStart.current.height - dy;
+          newY = resizeStart.current.posY + dy;
+        }
+
+        // Enforce minimums — if clamped, don't move position past the edge
+        if (newW < MIN_WIDTH) {
+          if (dir.includes("w")) newX = resizeStart.current.posX + resizeStart.current.width - MIN_WIDTH;
+          newW = MIN_WIDTH;
+        }
+        if (newH < MIN_HEIGHT) {
+          if (dir.includes("n")) newY = resizeStart.current.posY + resizeStart.current.height - MIN_HEIGHT;
+          newH = MIN_HEIGHT;
+        }
+
+        // Enforce viewport bounds
+        const maxW = window.innerWidth - newX;
+        const maxH = window.innerHeight - newY;
+        newW = Math.min(newW, maxW);
+        newH = Math.min(newH, maxH);
+        newX = Math.max(0, newX);
+        newY = Math.max(0, newY);
+
         setLiveSize({ width: newW, height: newH });
+        setLivePos({ x: newX, y: newY });
       };
 
       const onMouseUp = () => {
@@ -181,6 +418,10 @@ export function AiChatPanel() {
             setUndockedSize(size);
             return size;
           });
+          setLivePos((pos) => {
+            setUndockedPosition(pos);
+            return pos;
+          });
         }
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
@@ -189,7 +430,7 @@ export function AiChatPanel() {
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
     },
-    [liveSize, livePos.x, livePos.y, setUndockedSize]
+    [liveSize, livePos, setUndockedSize, setUndockedPosition]
   );
 
   // --- Shared sub-components ---
@@ -402,13 +643,93 @@ export function AiChatPanel() {
 
   const inputArea = (
     <div className="border-t border-outline-variant p-3 shrink-0">
-      <div className="flex items-end gap-2">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_FILE_TYPES}
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Attachment preview strip (images + files) */}
+      {(pendingImages.length > 0 || pendingFiles.length > 0) && (
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {/* Image thumbnails */}
+          {pendingImages.map((img, i) => (
+            <div key={`img-${i}`} className="relative group/img">
+              <img
+                src={img.thumbnailUrl}
+                alt={`Attached ${i + 1}`}
+                className="w-16 h-16 object-cover rounded-lg border border-outline-variant"
+              />
+              <button
+                onClick={() => removeImage(i)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-error text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover/img:opacity-100 transition-opacity shadow-sm"
+                title="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {/* File chips */}
+          {pendingFiles.map((file, i) => (
+            <div
+              key={`file-${i}`}
+              className="relative group/file flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-dim rounded-lg border border-outline-variant"
+            >
+              <span className="text-sm">
+                {file.type === "pdf" ? "📄" : file.name.endsWith(".csv") || file.name.endsWith(".tsv") ? "📊" : "📝"}
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-on-surface truncate max-w-[120px]" title={file.name}>
+                  {file.name}
+                </div>
+                <div className="text-[10px] text-outline">{formatFileSize(file.size)}</div>
+              </div>
+              <button
+                onClick={() => removeFile(i)}
+                className="w-4 h-4 bg-error text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover/file:opacity-100 transition-opacity shadow-sm shrink-0"
+                title="Remove file"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-1.5">
+        {/* Paperclip / attach button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isStreaming}
+          className="shrink-0 w-9 h-9 rounded-xl text-on-surface-variant hover:bg-surface-dim flex items-center justify-center transition-colors disabled:opacity-40"
+          title="Attach file (CSV, PDF, TXT...)"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path
+              d="M15.18 8.94l-6.18 6.18a4.25 4.25 0 01-6.01-6.01l6.18-6.18a2.83 2.83 0 014.01 4.01l-6.19 6.18a1.42 1.42 0 01-2-2l5.71-5.72"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
         <textarea
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Describe what you want to build..."
+          onPaste={handlePaste}
+          placeholder={
+            pendingFiles.length > 0
+              ? "Add context about the attached files..."
+              : pendingImages.length > 0
+                ? "Describe what's in the image..."
+                : "Message... (paste images or attach files)"
+          }
           rows={1}
           className="flex-1 resize-none bg-surface-dim rounded-xl px-3.5 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-[120px] overflow-y-auto"
           style={{ minHeight: "40px" }}
@@ -416,15 +737,10 @@ export function AiChatPanel() {
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || isStreaming}
+          disabled={(!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0) || isStreaming}
           className="shrink-0 w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:hover:bg-primary"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
               d="M14 2L7 9M14 2l-5 12-2-5-5-2 12-5z"
               stroke="currentColor"
@@ -447,7 +763,7 @@ export function AiChatPanel() {
     return (
       <div
         ref={panelRef}
-        className="fixed z-50 flex flex-col bg-white rounded-2xl overflow-hidden"
+        className="fixed z-50 flex flex-col bg-white rounded-2xl overflow-hidden group/panel"
         style={{
           left: livePos.x,
           top: livePos.y,
@@ -478,27 +794,16 @@ export function AiChatPanel() {
         {/* Input */}
         {inputArea}
 
-        {/* Resize handle (bottom-right corner) */}
-        <div
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize flex items-end justify-end p-0.5"
-          onMouseDown={onResizeStart}
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            className="text-outline-variant"
-          >
-            <path
-              d="M10 2v8H2M6 2v8M10 6H2"
-              stroke="currentColor"
-              strokeWidth="1"
-              strokeLinecap="round"
-              opacity="0.5"
-            />
-          </svg>
-        </div>
+        {/* Resize edges — invisible 6px hit zones along each side */}
+        <div className="absolute top-0 left-2 right-2 h-1.5 cursor-n-resize" onMouseDown={onEdgeResizeStart("n")} />
+        <div className="absolute bottom-0 left-2 right-2 h-1.5 cursor-s-resize" onMouseDown={onEdgeResizeStart("s")} />
+        <div className="absolute left-0 top-2 bottom-2 w-1.5 cursor-w-resize" onMouseDown={onEdgeResizeStart("w")} />
+        <div className="absolute right-0 top-2 bottom-2 w-1.5 cursor-e-resize" onMouseDown={onEdgeResizeStart("e")} />
+        {/* Resize corners — 12px hit zones at each corner */}
+        <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize" onMouseDown={onEdgeResizeStart("nw")} />
+        <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize" onMouseDown={onEdgeResizeStart("ne")} />
+        <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize" onMouseDown={onEdgeResizeStart("sw")} />
+        <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize" onMouseDown={onEdgeResizeStart("se")} />
       </div>
     );
   }
@@ -518,6 +823,7 @@ export function AiChatPanel() {
 
       {/* Panel */}
       <div
+        ref={panelRef}
         className={`fixed top-0 right-0 h-full w-[360px] bg-white border-l border-outline-variant z-50 flex flex-col shadow-xl transition-transform duration-300 ease-in-out ${
           aiPanelOpen ? "translate-x-0" : "translate-x-full"
         }`}

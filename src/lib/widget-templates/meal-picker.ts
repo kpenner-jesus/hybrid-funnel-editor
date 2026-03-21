@@ -4,7 +4,7 @@ export const mealPickerTemplate: WidgetTemplate = {
   id: "meal-picker",
   name: "Meal Picker",
   category: "selection",
-  description: "Meal package selection with per-person pricing and dietary option filters.",
+  description: "Meal package selection (breakfast, lunch, dinner) with per-person pricing and dietary filters. Fetches from Everybooking via categoryId. Requires guests and nightCount as inputs. Outputs selectedMeals and mealTotal.",
   icon: "🍽️",
   inputs: [
     { name: "guests", type: "object", label: "Guest Count", required: true },

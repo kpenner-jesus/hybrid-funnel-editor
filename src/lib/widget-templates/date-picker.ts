@@ -4,7 +4,7 @@ export const datePickerTemplate: WidgetTemplate = {
   id: "date-picker",
   name: "Date Range Picker",
   category: "input",
-  description: "A calendar-based date range selector for check-in and check-out dates.",
+  description: "Calendar-based date range selector for check-in and check-out dates. Outputs checkIn, checkOut, and nightCount. Place early in funnel — room/meal/activity widgets need dates to fetch availability.",
   icon: "📅",
   inputs: [
     { name: "minDate", type: "date", label: "Minimum Date", description: "Earliest selectable date" },

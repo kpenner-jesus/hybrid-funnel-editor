@@ -5,7 +5,7 @@ export const segmentPickerTemplate: WidgetTemplate = {
   name: "Segment Picker",
   category: "selection",
   description:
-    "Presents clickable segment options (e.g. Group Retreat, Conference) with optional branching to specific steps.",
+    "TOP-OF-FUNNEL routing widget. Presents clickable event/guest type options (e.g. Group Retreat, Conference, Family Reunion) with optional step branching per option. Options are self-contained in config JSON — no external data source needed. Use this as the FIRST step when the funnel serves multiple guest segments. NOT for mid-funnel filtering.",
   icon: "🧭",
   inputs: [],
   outputs: [
