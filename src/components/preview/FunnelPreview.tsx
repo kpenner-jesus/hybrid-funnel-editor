@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { WidgetRenderer } from "./WidgetRenderer";
 
@@ -54,50 +54,79 @@ export function FunnelPreview() {
     }
   };
 
+  const stepBarRef = useRef<HTMLDivElement>(null);
+  const activeStepRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-scroll the active step into view
+  useEffect(() => {
+    if (activeStepRef.current && stepBarRef.current) {
+      activeStepRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+  }, [currentStepIndex]);
+
+  const manySteps = funnel.steps.length > 8;
+
   return (
     <div className="h-full flex flex-col">
-      {/* Step progress indicator */}
-      <div className="flex items-center gap-1 px-6 pt-5 pb-3">
-        {funnel.steps.map((step, i) => (
-          <React.Fragment key={step.id}>
-            <button
-              onClick={() => {
-                setPreviewStep(step.id);
-                selectStep(step.id);
-              }}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                step.id === currentStep.id
-                  ? "text-white"
-                  : i < currentStepIndex
-                  ? "text-white/80"
-                  : "text-gray-400 bg-gray-100"
-              }`}
-              style={
-                step.id === currentStep.id
-                  ? { backgroundColor: funnel.theme.primaryColor }
-                  : i < currentStepIndex
-                  ? { backgroundColor: `${funnel.theme.primaryColor}99` }
-                  : {}
-              }
-            >
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border border-current/20">
-                {i + 1}
-              </span>
-              <span className="hidden sm:inline">{step.title}</span>
-            </button>
-            {i < funnel.steps.length - 1 && (
-              <div
-                className="flex-1 h-0.5 rounded"
-                style={{
-                  backgroundColor:
-                    i < currentStepIndex
-                      ? funnel.theme.primaryColor
-                      : "#e5e7eb",
+      {/* Step progress indicator — scrollable for large funnels */}
+      <div
+        ref={stepBarRef}
+        className="flex items-center gap-1 px-4 pt-4 pb-3 overflow-x-auto scrollbar-thin"
+        style={{ scrollbarWidth: "thin" }}
+      >
+        {funnel.steps.map((step, i) => {
+          const isActive = step.id === currentStep.id;
+          const isPast = i < currentStepIndex;
+          return (
+            <React.Fragment key={step.id}>
+              <button
+                ref={isActive ? activeStepRef : undefined}
+                onClick={() => {
+                  setPreviewStep(step.id);
+                  selectStep(step.id);
                 }}
-              />
-            )}
-          </React.Fragment>
-        ))}
+                title={step.title}
+                className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                  isActive
+                    ? "text-white"
+                    : isPast
+                    ? "text-white/80"
+                    : "text-gray-400 bg-gray-100"
+                }`}
+                style={
+                  isActive
+                    ? { backgroundColor: funnel.theme.primaryColor }
+                    : isPast
+                    ? { backgroundColor: `${funnel.theme.primaryColor}99` }
+                    : {}
+                }
+              >
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border border-current/20">
+                  {i + 1}
+                </span>
+                {/* Show title only when few steps; truncate for many */}
+                {!manySteps && (
+                  <span className="hidden sm:inline truncate max-w-[80px]">{step.title}</span>
+                )}
+                {manySteps && isActive && (
+                  <span className="inline truncate max-w-[100px]">{step.title}</span>
+                )}
+              </button>
+              {i < funnel.steps.length - 1 && (
+                <div
+                  className="shrink-0 w-4 h-0.5 rounded"
+                  style={{
+                    backgroundColor: isPast ? funnel.theme.primaryColor : "#e5e7eb",
+                  }}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       {/* Step content */}
