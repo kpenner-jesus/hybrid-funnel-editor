@@ -14,7 +14,7 @@ export const aiTools: AiToolDefinition[] = [
   {
     name: "create_complete_funnel",
     description:
-      "Creates an entire funnel from scratch, replacing any existing steps. Provide the funnel name, theme overrides, and an array of steps each containing widgets with their templateId, config, bindings, and variant. This is the primary tool for building a full funnel in one shot. IMPORTANT: A typical funnel has 4-8 steps (max 20). Each step should contain 1-3 widgets. Do NOT create more than 12 steps.",
+      "Creates an entire funnel from scratch, replacing any existing steps. Provide the funnel name, theme overrides, and an array of steps each containing widgets with their templateId, config, bindings, and variant. This is the primary tool for building a full funnel in one shot. Most funnels have 20-30 steps (max 60). Each step should contain 1-3 widgets.",
     input_schema: {
       type: "object",
       properties: {

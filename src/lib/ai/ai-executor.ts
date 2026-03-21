@@ -46,11 +46,11 @@ export function executeAiToolCall(
         const themeOverrides = (args.theme as Partial<ThemeConfig>) || {};
         const stepsData = (args.steps as Array<Record<string, unknown>>) || [];
 
-        // Guard: cap at 20 steps max to prevent runaway funnel creation
-        if (stepsData.length > 20) {
+        // Guard: cap at 60 steps max to prevent runaway funnel creation
+        if (stepsData.length > 60) {
           return {
             success: false,
-            message: `Too many steps (${stepsData.length}). Maximum is 20. A typical funnel has 4-8 steps. Please reduce the number of steps and try again.`,
+            message: `Too many steps (${stepsData.length}). Maximum is 60. Most funnels have 20-30 steps. Please reduce the number of steps and try again.`,
           };
         }
 

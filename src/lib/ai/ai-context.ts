@@ -118,22 +118,15 @@ export function buildAiContext(
     })),
   }));
 
-  // Cap funnel state to prevent token overflow — if funnel is huge, send a trimmed version
-  let funnelState = funnel;
-  if (funnel && funnel.steps.length > 20) {
-    // Send only the first 20 steps to keep context manageable
-    funnelState = {
-      ...funnel,
-      steps: funnel.steps.slice(0, 20),
-    };
-  }
-
+  // Don't send the full raw funnel state — the system prompt already builds a compact
+  // text summary of all steps/widgets. Sending the raw JSON doubles the token cost
+  // and caused 210k token overflows with large funnels.
   return {
     account: accountContext,
     funnel: funnelContext,
-    steps: steps.slice(0, 20),
-    widgets: widgets.slice(0, 60),
-    currentFunnelState: funnelState,
+    steps: steps.slice(0, 60),
+    widgets: widgets.slice(0, 180),
+    currentFunnelState: null,
     availableTemplates,
   };
 }

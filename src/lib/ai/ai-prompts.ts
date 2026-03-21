@@ -120,7 +120,7 @@ ${funnelSummary}
 ## Instructions
 
 1. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
-2. **CRITICAL: A funnel should have 4-8 steps total (maximum 12). Each step has 1-3 widgets. NEVER create more than 12 steps.** The standard patterns above show the ideal structure.
+2. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** The standard patterns above are simplified — real funnels break each question or choice into its own step for a focused, one-question-per-page experience.
 3. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
 4. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
 5. Always set widget bindings so data flows correctly between steps.
