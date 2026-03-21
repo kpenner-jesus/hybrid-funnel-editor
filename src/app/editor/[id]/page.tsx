@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { Header } from "@/components/shared/Header";
@@ -38,6 +38,43 @@ export default function EditorPage() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [generatedJSX, setGeneratedJSX] = useState("");
+
+  // Resizable panel divider
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window === "undefined") return 40;
+    try {
+      const saved = localStorage.getItem("editor-panel-width");
+      if (saved) { const n = parseFloat(saved); if (n >= 20 && n <= 70) return n; }
+    } catch {}
+    return 40;
+  });
+  const isDraggingRef = useRef(false);
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+    const containerWidth = (e.currentTarget.parentElement?.clientWidth || window.innerWidth);
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const delta = ev.clientX - startX;
+      const newPct = Math.min(70, Math.max(20, startWidth + (delta / containerWidth) * 100));
+      setPanelWidth(newPct);
+    };
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Persist
+      setPanelWidth(prev => { localStorage.setItem("editor-panel-width", String(prev)); return prev; });
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [panelWidth]);
 
   useEffect(() => {
     if (!initialized) {
@@ -168,8 +205,11 @@ export default function EditorPage() {
 
       {/* Editor Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Editor (40%) */}
-        <div className="w-[40%] min-w-[360px] border-r border-outline-variant flex flex-col bg-white">
+        {/* Left Panel - Editor */}
+        <div
+          style={{ width: `${panelWidth}%`, minWidth: '300px', maxWidth: '70%' }}
+          className="border-r border-outline-variant flex flex-col bg-white shrink-0"
+        >
           {/* Tab bar */}
           <div className="flex border-b border-outline-variant">
             {tabs.map((tab) => (
@@ -210,7 +250,16 @@ export default function EditorPage() {
           </div>
         </div>
 
-        {/* Right Panel - Preview (60%) */}
+        {/* Resizable divider */}
+        <div
+          onMouseDown={handleDividerMouseDown}
+          className="w-1.5 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors shrink-0 relative group"
+          title="Drag to resize panels"
+        >
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-outline-variant group-hover:bg-primary/40 group-active:bg-primary transition-colors" />
+        </div>
+
+        {/* Right Panel - Preview */}
         <div className="flex-1 flex flex-col bg-gray-50">
           {/* Preview header */}
           <div className="px-4 py-2 border-b border-gray-200 bg-white flex items-center justify-between">
