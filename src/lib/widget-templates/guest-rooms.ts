@@ -24,6 +24,7 @@ export const guestRoomsTemplate: WidgetTemplate = {
   ],
   configFields: [
     { name: "title", type: "text", label: "Section Title", defaultValue: "Select Your Rooms" },
+    { name: "categoryId", type: "number", label: "Room Category ID", defaultValue: 33, description: "Everybooking category ID for room products" },
     { name: "showImages", type: "boolean", label: "Show Room Images", defaultValue: true },
     { name: "showTags", type: "boolean", label: "Show Tags", defaultValue: true },
     { name: "maxSelections", type: "number", label: "Max Selections", defaultValue: 0, description: "0 = unlimited" },

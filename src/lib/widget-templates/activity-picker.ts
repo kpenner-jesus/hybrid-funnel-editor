@@ -24,6 +24,7 @@ export const activityPickerTemplate: WidgetTemplate = {
   ],
   configFields: [
     { name: "title", type: "text", label: "Section Title", defaultValue: "Activities & Excursions" },
+    { name: "categoryId", type: "number", label: "Activity Category ID", defaultValue: 40, description: "Everybooking category ID for activity products" },
     { name: "showImages", type: "boolean", label: "Show Activity Images", defaultValue: true },
     { name: "showDuration", type: "boolean", label: "Show Duration", defaultValue: true },
     { name: "maxSelections", type: "number", label: "Max Selections", defaultValue: 0, description: "0 = unlimited" },

@@ -103,12 +103,7 @@ function collectCategoryInfo(funnel: FunnelDefinition): CategoryInfo {
     }
   }
 
-  // Fallback to Wilderness Edge defaults if no category IDs configured
-  // This ensures the generator always produces working code
-  if (roomCatIds.length === 0) roomCatIds.push(33);
-  if (mealCatIds.length === 0) mealCatIds.push(34);
-  if (activityCatIds.length === 0) activityCatIds.push(40);
-
+  // No fallbacks — each venue has its own category IDs set via widget config
   return { roomCatIds, mealCatIds, activityCatIds };
 }
 

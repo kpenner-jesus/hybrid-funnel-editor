@@ -22,6 +22,8 @@ export const mealPickerTemplate: WidgetTemplate = {
   ],
   configFields: [
     { name: "title", type: "text", label: "Section Title", defaultValue: "Meal Packages" },
+    { name: "categoryId", type: "number", label: "Meal Category ID", defaultValue: 34, description: "Everybooking category ID for meal products" },
+    { name: "meetingMealCategoryId", type: "number", label: "Meeting Meal Category ID", defaultValue: 39, description: "Everybooking category ID for meeting+meal combos (optional)" },
     { name: "showDietaryFilters", type: "boolean", label: "Show Dietary Filters", defaultValue: true },
     { name: "groupByCategory", type: "boolean", label: "Group by Meal Category", defaultValue: true },
     { name: "priceDisplay", type: "select", label: "Price Display", defaultValue: "per-person", options: [
