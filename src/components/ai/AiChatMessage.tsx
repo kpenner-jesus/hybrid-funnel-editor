@@ -8,7 +8,6 @@ interface AiChatMessageProps {
 }
 
 function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }) {
-  const success = toolCall.result?.success ?? true;
   const toolLabels: Record<string, string> = {
     create_complete_funnel: "Create Funnel",
     add_step: "Add Step",
@@ -21,6 +20,29 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }) {
     configure_segment_picker: "Configure Segments",
     suggest_improvements: "Suggestions",
   };
+
+  const label = toolLabels[toolCall.name] || toolCall.name;
+
+  // Generating state — tool input JSON is still being built by Claude
+  if (toolCall.generating) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs mt-1.5 bg-amber-50 text-amber-800 border border-amber-200">
+        <span className="shrink-0 animate-spin">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20 10" />
+          </svg>
+        </span>
+        <div>
+          <div className="font-medium">{label}</div>
+          <div className="opacity-70">
+            Generating{toolCall.progress ? ` (${Math.round(toolCall.progress / 1000)}k chars)` : "..."}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const success = toolCall.result?.success ?? true;
 
   return (
     <div
@@ -54,9 +76,7 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }) {
         )}
       </span>
       <div>
-        <div className="font-medium">
-          {toolLabels[toolCall.name] || toolCall.name}
-        </div>
+        <div className="font-medium">{label}</div>
         {toolCall.result?.message && (
           <div className="opacity-80 mt-0.5">{toolCall.result.message}</div>
         )}

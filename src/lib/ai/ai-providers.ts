@@ -1,12 +1,13 @@
 // Anthropic streaming provider
 
 export interface AiStreamChunk {
-  type: "text" | "tool_use" | "error" | "done";
+  type: "text" | "tool_use" | "tool_generating" | "error" | "done";
   content?: string;
   id?: string;
   name?: string;
   input?: Record<string, unknown>;
   message?: string;
+  progress?: number; // approximate chars generated for tool input
 }
 
 export interface AnthropicMessage {
@@ -114,6 +115,13 @@ export class AnthropicProvider {
               currentToolId = (block.id as string) || "";
               currentToolName = (block.name as string) || "";
               toolInputJson = "";
+              // Immediately notify that a tool is being generated
+              yield {
+                type: "tool_generating",
+                name: currentToolName,
+                id: currentToolId,
+                progress: 0,
+              };
             }
           } else if (eventType === "content_block_delta") {
             const delta = event.delta as Record<string, unknown>;
@@ -121,6 +129,15 @@ export class AnthropicProvider {
               yield { type: "text", content: delta.text as string };
             } else if (delta?.type === "input_json_delta") {
               toolInputJson += (delta.partial_json as string) || "";
+              // Emit progress every ~2000 chars so the UI knows it's alive
+              if (toolInputJson.length % 2000 < 100) {
+                yield {
+                  type: "tool_generating",
+                  name: currentToolName,
+                  id: currentToolId,
+                  progress: toolInputJson.length,
+                };
+              }
             }
           } else if (eventType === "content_block_stop") {
             if (currentToolName) {

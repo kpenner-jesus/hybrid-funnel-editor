@@ -13,6 +13,8 @@ export interface ToolCallInfo {
   name: string;
   input: Record<string, unknown>;
   result?: { success: boolean; message: string };
+  generating?: boolean; // true while Claude is still building the tool input JSON
+  progress?: number;    // approximate chars generated so far
 }
 
 export interface ImageAttachment {
@@ -300,7 +302,50 @@ export const useAiStore = create<AiStore>((set, get) => {
                   ],
                 });
               }
+            } else if (chunk.type === "tool_generating" && chunk.name) {
+              // Show a "generating" placeholder so the user sees activity
+              const existingIdx = streamToolCalls.findIndex(tc => tc.id === chunk.id && tc.generating);
+              const genToolCall: ToolCallInfo = {
+                id: chunk.id || "",
+                name: chunk.name,
+                input: {},
+                generating: true,
+                progress: chunk.progress || 0,
+              };
+
+              const updatedCalls = [...streamToolCalls];
+              if (existingIdx >= 0) {
+                updatedCalls[existingIdx] = genToolCall;
+              } else if (!streamToolCalls.some(tc => tc.id === chunk.id)) {
+                updatedCalls.push(genToolCall);
+              }
+
+              // Update assistant message to show the generating card
+              const currentMessages = get().messages;
+              const lastMsg = currentMessages[currentMessages.length - 1];
+              if (lastMsg?.role === "assistant") {
+                const updated = [...currentMessages];
+                updated[updated.length - 1] = {
+                  ...lastMsg,
+                  content: assistantContent,
+                  toolCalls: updatedCalls,
+                };
+                set({ messages: updated });
+              } else {
+                set({
+                  messages: [
+                    ...currentMessages,
+                    { role: "assistant", content: assistantContent, toolCalls: updatedCalls },
+                  ],
+                });
+              }
+
             } else if (chunk.type === "tool_use" && chunk.name) {
+              // Remove any "generating" placeholder for this tool
+              const genIdx = streamToolCalls.findIndex(tc => tc.id === chunk.id && tc.generating);
+              if (genIdx >= 0) {
+                streamToolCalls.splice(genIdx, 1);
+              }
               // Skip duplicate tool_use IDs (SSE dedup)
               if (chunk.id && streamToolCalls.some(tc => tc.id === chunk.id)) continue;
 
