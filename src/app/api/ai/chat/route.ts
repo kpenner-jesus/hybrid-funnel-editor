@@ -4,6 +4,9 @@ import { buildSystemPrompt } from "@/lib/ai/ai-prompts";
 import { buildAiContext } from "@/lib/ai/ai-context";
 import type { AiContext } from "@/lib/ai/ai-context";
 
+// Allow up to 60 seconds for AI responses (Vercel Pro required for >10s)
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

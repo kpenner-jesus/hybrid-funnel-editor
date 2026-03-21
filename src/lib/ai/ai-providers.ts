@@ -28,7 +28,7 @@ export class AnthropicProvider {
     const {
       apiKey,
       model = "claude-sonnet-4-20250514",
-      maxTokens = 4096,
+      maxTokens = 16384,
       systemPrompt,
       messages,
       tools,
@@ -130,7 +130,16 @@ export class AnthropicProvider {
                   input = JSON.parse(toolInputJson);
                 }
               } catch {
-                // If JSON is malformed, use empty object
+                // JSON was truncated (likely hit max_tokens limit)
+                console.error(`[AI] Tool "${currentToolName}" input JSON was truncated (${toolInputJson.length} chars). Likely hit max_tokens limit.`);
+                yield {
+                  type: "error",
+                  message: `Tool call "${currentToolName}" was cut off — the funnel definition was too large. Try asking for fewer steps.`,
+                };
+                currentToolId = "";
+                currentToolName = "";
+                toolInputJson = "";
+                continue;
               }
               yield {
                 type: "tool_use",
