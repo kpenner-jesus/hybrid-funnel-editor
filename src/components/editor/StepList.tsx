@@ -25,10 +25,12 @@ import { Button } from "@/components/shared/Button";
 import { TemplateGallery } from "./TemplateGallery";
 
 function SortableStep({ step }: { step: { id: string; title: string; widgets: { instanceId: string; templateId: string }[] } }) {
-  const { selectedStepId, selectStep, selectedWidgetId, selectWidget, removeStep, removeWidget } = useFunnelStore();
+  const { selectedStepId, selectStep, selectedWidgetId, selectWidget, removeStep, removeWidget, updateStep } = useFunnelStore();
   const isSelected = selectedStepId === step.id;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showAddWidget, setShowAddWidget] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState(step.title);
   const addWidget = useFunnelStore((s) => s.addWidget);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -82,7 +84,46 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
             </button>
 
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{step.title}</div>
+              {isEditingTitle ? (
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (editTitle.trim()) {
+                        updateStep(step.id, { title: editTitle.trim() });
+                      }
+                      setIsEditingTitle(false);
+                    }
+                    if (e.key === "Escape") {
+                      setEditTitle(step.title);
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (editTitle.trim()) {
+                      updateStep(step.id, { title: editTitle.trim() });
+                    }
+                    setIsEditingTitle(false);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm font-medium w-full bg-white border border-primary rounded px-1.5 py-0.5 focus:outline-none"
+                  autoFocus
+                />
+              ) : (
+                <div
+                  className="text-sm font-medium truncate cursor-text hover:text-primary/80"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditTitle(step.title);
+                    setIsEditingTitle(true);
+                  }}
+                  title="Double-click to edit title"
+                >
+                  {step.title}
+                </div>
+              )}
               <div className="flex gap-2 mt-0.5 text-[10px] text-on-surface-variant">
                 <span>{step.widgets.length} widget{step.widgets.length !== 1 ? "s" : ""}</span>
                 {inputCount > 0 && <span className="text-primary">&#8592; {inputCount}</span>}

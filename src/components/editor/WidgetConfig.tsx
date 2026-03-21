@@ -300,6 +300,51 @@ export function WidgetConfig() {
         <div className="text-xs font-medium text-on-surface-variant mb-3">Variable Bindings</div>
         <BindingsEditor template={template} bindings={widget.bindings} funnel={funnel} />
       </div>
+
+      {/* Step Navigation Labels */}
+      <StepNavigationEditor stepId={selectedStepId} step={step} />
+    </div>
+  );
+}
+
+function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("@/lib/types").Step }) {
+  const { updateStep } = useFunnelStore();
+
+  return (
+    <div className="pt-2 border-t border-outline-variant space-y-3">
+      <div className="text-xs font-medium text-on-surface-variant">Step Navigation</div>
+      <div>
+        <label className="block text-xs text-on-surface-variant mb-1">
+          Next Button Label
+        </label>
+        <input
+          type="text"
+          value={step.navigation.nextLabel || ""}
+          onChange={(e) =>
+            updateStep(stepId, {
+              navigation: { ...step.navigation, nextLabel: e.target.value },
+            })
+          }
+          placeholder="Continue"
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-on-surface-variant mb-1">
+          Back Button Label
+        </label>
+        <input
+          type="text"
+          value={step.navigation.backLabel || ""}
+          onChange={(e) =>
+            updateStep(stepId, {
+              navigation: { ...step.navigation, backLabel: e.target.value },
+            })
+          }
+          placeholder="Back"
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white"
+        />
+      </div>
     </div>
   );
 }

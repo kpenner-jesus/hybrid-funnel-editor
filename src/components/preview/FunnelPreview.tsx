@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { WidgetRenderer } from "./WidgetRenderer";
 
@@ -12,6 +12,8 @@ export function FunnelPreview() {
     selectedWidgetId,
     selectWidget,
     selectStep,
+    setWidgetOutput,
+    resolveWidgetInputs,
   } = useFunnelStore();
 
   if (!funnel) {
@@ -122,7 +124,7 @@ export function FunnelPreview() {
             </div>
           ) : (
             currentStep.widgets.map((widget) => (
-              <WidgetRenderer
+              <WidgetRendererWithBindings
                 key={widget.instanceId}
                 widget={widget}
                 theme={funnel.theme}
@@ -131,6 +133,8 @@ export function FunnelPreview() {
                   selectStep(currentStep.id);
                   selectWidget(widget.instanceId);
                 }}
+                resolveWidgetInputs={resolveWidgetInputs}
+                setWidgetOutput={setWidgetOutput}
               />
             ))
           )}
@@ -165,5 +169,42 @@ export function FunnelPreview() {
         </button>
       </div>
     </div>
+  );
+}
+
+// Wrapper component that resolves inputs and wires output capture
+function WidgetRendererWithBindings({
+  widget,
+  theme,
+  isSelected,
+  onClick,
+  resolveWidgetInputs,
+  setWidgetOutput,
+}: {
+  widget: import("@/lib/types").WidgetInstance;
+  theme: import("@/lib/types").ThemeConfig;
+  isSelected: boolean;
+  onClick: () => void;
+  resolveWidgetInputs: (widget: import("@/lib/types").WidgetInstance) => Record<string, unknown>;
+  setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
+}) {
+  const resolvedInputs = resolveWidgetInputs(widget);
+
+  const handleOutput = useCallback(
+    (outputs: Record<string, unknown>) => {
+      setWidgetOutput(widget.instanceId, outputs);
+    },
+    [widget.instanceId, setWidgetOutput]
+  );
+
+  return (
+    <WidgetRenderer
+      widget={widget}
+      theme={theme}
+      isSelected={isSelected}
+      onClick={onClick}
+      resolvedInputs={resolvedInputs}
+      onOutput={handleOutput}
+    />
   );
 }

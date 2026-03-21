@@ -180,6 +180,10 @@ interface FunnelStore {
 
   // Widget outputs (from preview interactions)
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
+
+  // Computed funnel variables (aggregated from widget outputs via bindings)
+  getFunnelVariables: () => Record<string, unknown>;
+  resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
 }
 
 export const useFunnelStore = create<FunnelStore>((set, get) => ({
@@ -383,5 +387,49 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   setPreviewStep: (id) => set({ previewStep: id }),
   setDataMode: (mode) => set({ dataMode: mode }),
   setWidgetOutput: (key, outputs) =>
-    set((state) => ({ widgetOutputs: { ...state.widgetOutputs, [key]: outputs } })),
+    set((state) => ({
+      widgetOutputs: {
+        ...state.widgetOutputs,
+        [key]: { ...(state.widgetOutputs[key] || {}), ...outputs },
+      },
+    })),
+
+  getFunnelVariables: () => {
+    const { funnel, widgetOutputs } = get();
+    if (!funnel) return {};
+
+    // Start with variable defaults
+    const vars: Record<string, unknown> = {};
+    for (const v of funnel.variables) {
+      if (v.defaultValue !== undefined) {
+        vars[v.name] = v.defaultValue;
+      }
+    }
+
+    // Override with widget outputs mapped through bindings
+    for (const step of funnel.steps) {
+      for (const widget of step.widgets) {
+        const outputs = widgetOutputs[widget.instanceId];
+        if (!outputs) continue;
+        for (const [outputKey, variableName] of Object.entries(widget.bindings.outputs)) {
+          if (outputs[outputKey] !== undefined) {
+            vars[variableName] = outputs[outputKey];
+          }
+        }
+      }
+    }
+
+    return vars;
+  },
+
+  resolveWidgetInputs: (widget) => {
+    const funnelVars = get().getFunnelVariables();
+    const resolved: Record<string, unknown> = {};
+    for (const [inputKey, variableName] of Object.entries(widget.bindings.inputs)) {
+      if (variableName in funnelVars) {
+        resolved[inputKey] = funnelVars[variableName];
+      }
+    }
+    return resolved;
+  },
 }));

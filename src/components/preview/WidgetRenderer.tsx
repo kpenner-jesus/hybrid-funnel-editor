@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type { WidgetInstance, ThemeConfig } from "@/lib/types";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { mockRooms, mockMeals, mockActivities } from "@/lib/mock-data";
@@ -10,120 +10,421 @@ interface WidgetRendererProps {
   theme: ThemeConfig;
   isSelected?: boolean;
   onClick?: () => void;
+  resolvedInputs?: Record<string, unknown>;
+  onOutput?: (outputs: Record<string, unknown>) => void;
 }
 
-function DatePickerPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Date Picker ──────────────────────────────────────────────
+
+function DatePickerPreview({
+  config,
+  theme,
+  resolvedInputs,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
+  const today = new Date();
+  const defaultCheckIn = new Date(today);
+  defaultCheckIn.setDate(today.getDate() + 7);
+  const defaultCheckOut = new Date(defaultCheckIn);
+  defaultCheckOut.setDate(defaultCheckIn.getDate() + 4);
+
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const [checkIn, setCheckIn] = useState<string>(
+    (resolvedInputs?.checkIn as string) || fmt(defaultCheckIn)
+  );
+  const [checkOut, setCheckOut] = useState<string>(
+    (resolvedInputs?.checkOut as string) || fmt(defaultCheckOut)
+  );
+
+  const nightCount = Math.max(
+    0,
+    Math.round(
+      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+        (1000 * 60 * 60 * 24)
+    )
+  );
+
+  // Emit on mount and on change
+  useEffect(() => {
+    onOutput({ checkIn, checkOut, nightCount });
+  }, [checkIn, checkOut, nightCount, onOutput]);
+
+  const formatDisplay = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Select Your Dates"}
       </h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Check-in</label>
-          <div className="px-3 py-2 border rounded-lg text-sm" style={{ borderRadius: `${theme.borderRadius / 2}px` }}>
-            Mar 25, 2026
-          </div>
+          <input
+            type="date"
+            value={checkIn}
+            onChange={(e) => {
+              setCheckIn(e.target.value);
+              // Ensure checkout is after checkin
+              if (e.target.value >= checkOut) {
+                const next = new Date(e.target.value + "T00:00:00");
+                next.setDate(next.getDate() + 1);
+                setCheckOut(fmt(next));
+              }
+            }}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            style={{
+              borderRadius: `${theme.borderRadius / 2}px`,
+              borderColor: theme.primaryColor + "40",
+            }}
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Check-out</label>
-          <div className="px-3 py-2 border rounded-lg text-sm" style={{ borderRadius: `${theme.borderRadius / 2}px` }}>
-            Mar 29, 2026
-          </div>
+          <input
+            type="date"
+            value={checkOut}
+            min={checkIn}
+            onChange={(e) => setCheckOut(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            style={{
+              borderRadius: `${theme.borderRadius / 2}px`,
+              borderColor: theme.primaryColor + "40",
+            }}
+          />
         </div>
       </div>
-      <div className="text-xs text-gray-500 text-center">4 nights</div>
+      <div className="text-xs text-gray-500 text-center">
+        {nightCount} night{nightCount !== 1 ? "s" : ""}
+      </div>
     </div>
   );
 }
 
-function GuestCounterPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Guest Counter ────────────────────────────────────────────
+
+function GuestCounterPreview({
+  config,
+  theme,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+
+  const maxAdults = (config.maxAdults as number) || 10;
+  const maxChildren = (config.maxChildren as number) || 10;
+  const maxInfants = (config.maxInfants as number) || 5;
+  const minAdults = (config.minAdults as number) || 1;
+
+  useEffect(() => {
+    onOutput({
+      guests: { adults, children, infants },
+      totalGuests: adults + children,
+    });
+  }, [adults, children, infants, onOutput]);
+
+  const CounterRow = ({
+    label,
+    value,
+    min,
+    max,
+    onChange,
+  }: {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    onChange: (v: number) => void;
+  }) => (
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+      <span className="text-sm">{label}</span>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (value > min) onChange(value - 1);
+          }}
+          disabled={value <= min}
+          className="w-7 h-7 rounded-full border flex items-center justify-center text-sm disabled:opacity-30"
+          style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
+        >
+          -
+        </button>
+        <span className="text-sm font-medium w-4 text-center">{value}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (value < max) onChange(value + 1);
+          }}
+          disabled={value >= max}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm disabled:opacity-50"
+          style={{ backgroundColor: theme.primaryColor }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Number of Guests"}
       </h3>
-      {["Adults", "Children (Ages 2-12)", ...(config.showInfants !== false ? ["Infants (Under 2)"] : [])].map(
-        (label, i) => (
-          <div key={label} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-            <span className="text-sm">{label}</span>
-            <div className="flex items-center gap-3">
-              <button
-                className="w-7 h-7 rounded-full border flex items-center justify-center text-sm"
-                style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
-              >
-                -
-              </button>
-              <span className="text-sm font-medium w-4 text-center">{i === 0 ? 2 : 0}</span>
-              <button
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm"
-                style={{ backgroundColor: theme.primaryColor }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        )
+      <CounterRow
+        label="Adults"
+        value={adults}
+        min={minAdults}
+        max={maxAdults}
+        onChange={setAdults}
+      />
+      <CounterRow
+        label={`Children (${(config.childAgeLabel as string) || "Ages 2-12"})`}
+        value={children}
+        min={0}
+        max={maxChildren}
+        onChange={setChildren}
+      />
+      {config.showInfants !== false && (
+        <CounterRow
+          label="Infants (Under 2)"
+          value={infants}
+          min={0}
+          max={maxInfants}
+          onChange={setInfants}
+        />
       )}
     </div>
   );
 }
 
-function RoomSelectionPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Room Selection ───────────────────────────────────────────
+
+function RoomSelectionPreview({
+  config,
+  theme,
+  resolvedInputs,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
   const showImages = config.showImages !== false;
   const rooms = mockRooms.slice(0, 4);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const checkIn = resolvedInputs?.checkIn as string | undefined;
+  const checkOut = resolvedInputs?.checkOut as string | undefined;
+  const guests = resolvedInputs?.guests as
+    | { adults: number; children: number }
+    | undefined;
+
+  let nightCount = 4;
+  if (checkIn && checkOut) {
+    nightCount = Math.max(
+      1,
+      Math.round(
+        (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    );
+  }
+
+  useEffect(() => {
+    const selected = rooms.filter((r) => selectedIds.has(r.id));
+    const roomTotal = selected.reduce(
+      (sum, r) => sum + r.pricePerNight * nightCount,
+      0
+    );
+    onOutput({
+      selectedRooms: selected.map((r) => ({
+        ...r,
+        quantity: 1,
+        nights: nightCount,
+        lineTotal: r.pricePerNight * nightCount,
+      })),
+      roomTotal,
+    });
+  }, [selectedIds, nightCount, onOutput]);
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Select Your Rooms"}
       </h3>
-      <div className={config.layout === "list" ? "space-y-2" : "grid grid-cols-2 gap-3"}>
-        {rooms.map((room, i) => (
-          <div
-            key={room.id}
-            className="border overflow-hidden transition-shadow hover:shadow-md"
-            style={{
-              borderRadius: `${theme.borderRadius}px`,
-              borderColor: i === 0 ? theme.primaryColor : "#e5e7eb",
-              backgroundColor: i === 0 ? `${theme.primaryColor}08` : "#fff",
-            }}
-          >
-            {showImages && (
-              <div className="h-28 bg-gray-200 relative overflow-hidden">
-                <img src={room.imageUrl} alt={room.name} className="w-full h-full object-cover" />
-              </div>
-            )}
-            <div className="p-3">
-              <div className="font-medium text-sm">{room.name}</div>
-              <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{room.description}</div>
-              {config.showTags !== false && (
-                <div className="flex gap-1 mt-2 flex-wrap">
-                  {room.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600">
-                      {tag}
-                    </span>
-                  ))}
+      {guests && (
+        <div className="text-xs text-gray-500">
+          {guests.adults} adult{guests.adults !== 1 ? "s" : ""}
+          {guests.children > 0 &&
+            `, ${guests.children} child${guests.children !== 1 ? "ren" : ""}`}
+          {checkIn && checkOut && ` | ${nightCount} night${nightCount !== 1 ? "s" : ""}`}
+        </div>
+      )}
+      <div
+        className={
+          config.layout === "list" ? "space-y-2" : "grid grid-cols-2 gap-3"
+        }
+      >
+        {rooms.map((room) => {
+          const isSelected = selectedIds.has(room.id);
+          return (
+            <div
+              key={room.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(room.id);
+              }}
+              className="border overflow-hidden transition-shadow hover:shadow-md cursor-pointer"
+              style={{
+                borderRadius: `${theme.borderRadius}px`,
+                borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
+                borderWidth: isSelected ? "2px" : "1px",
+                backgroundColor: isSelected
+                  ? `${theme.primaryColor}08`
+                  : "#fff",
+              }}
+            >
+              {showImages && (
+                <div className="h-28 bg-gray-200 relative overflow-hidden">
+                  <img
+                    src={room.imageUrl}
+                    alt={room.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {isSelected && (
+                    <div
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
+                      style={{ backgroundColor: theme.primaryColor }}
+                    >
+                      ✓
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="flex items-center justify-between mt-2">
-                <span className="font-semibold text-sm" style={{ color: theme.primaryColor }}>
-                  CHF {room.pricePerNight}
-                </span>
-                <span className="text-[10px] text-gray-400">per night</span>
+              <div className="p-3">
+                <div className="font-medium text-sm">{room.name}</div>
+                <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                  {room.description}
+                </div>
+                {config.showTags !== false && (
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {room.tags.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between mt-2">
+                  <span
+                    className="font-semibold text-sm"
+                    style={{ color: theme.primaryColor }}
+                  >
+                    CHF {room.pricePerNight}
+                  </span>
+                  <span className="text-[10px] text-gray-400">per night</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function MealPickerPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Meal Picker ──────────────────────────────────────────────
+
+function MealPickerPreview({
+  config,
+  theme,
+  resolvedInputs,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const guests = resolvedInputs?.guests as
+    | { adults: number; children: number }
+    | undefined;
+  const guestCount = guests ? guests.adults + guests.children : 2;
+
+  useEffect(() => {
+    const selected = mockMeals.filter((m) => selectedIds.has(m.id));
+    const mealTotal = selected.reduce(
+      (sum, m) => sum + m.pricePerPerson * guestCount,
+      0
+    );
+    onOutput({
+      selectedMeals: selected.map((m) => ({
+        ...m,
+        quantity: guestCount,
+        lineTotal: m.pricePerPerson * guestCount,
+      })),
+      mealTotal,
+    });
+  }, [selectedIds, guestCount, onOutput]);
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Meal Packages"}
       </h3>
       {["breakfast", "lunch", "dinner", "snack"].map((cat) => {
@@ -137,22 +438,48 @@ function MealPickerPreview({ config, theme }: { config: Record<string, unknown>;
               </div>
             )}
             <div className="space-y-1.5">
-              {meals.map((meal) => (
-                <div
-                  key={meal.id}
-                  className="flex items-center gap-3 p-2.5 border rounded-lg"
-                  style={{ borderRadius: `${theme.borderRadius / 2}px` }}
-                >
-                  <input type="checkbox" className="accent-current" style={{ accentColor: theme.primaryColor }} readOnly />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{meal.name}</div>
-                    <div className="text-[10px] text-gray-500 truncate">{meal.description}</div>
+              {meals.map((meal) => {
+                const isSelected = selectedIds.has(meal.id);
+                return (
+                  <div
+                    key={meal.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggle(meal.id);
+                    }}
+                    className="flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors"
+                    style={{
+                      borderRadius: `${theme.borderRadius / 2}px`,
+                      borderColor: isSelected
+                        ? theme.primaryColor
+                        : "#e5e7eb",
+                      backgroundColor: isSelected
+                        ? `${theme.primaryColor}08`
+                        : "#fff",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      readOnly
+                      className="accent-current"
+                      style={{ accentColor: theme.primaryColor }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{meal.name}</div>
+                      <div className="text-[10px] text-gray-500 truncate">
+                        {meal.description}
+                      </div>
+                    </div>
+                    <span
+                      className="text-sm font-semibold whitespace-nowrap"
+                      style={{ color: theme.primaryColor }}
+                    >
+                      CHF {meal.pricePerPerson}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold whitespace-nowrap" style={{ color: theme.primaryColor }}>
-                    CHF {meal.pricePerPerson}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -161,132 +488,451 @@ function MealPickerPreview({ config, theme }: { config: Record<string, unknown>;
   );
 }
 
-function ActivityPickerPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Activity Picker ──────────────────────────────────────────
+
+function ActivityPickerPreview({
+  config,
+  theme,
+  resolvedInputs,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
   const activities = mockActivities.slice(0, 4);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const guests = resolvedInputs?.guests as
+    | { adults: number; children: number }
+    | undefined;
+  const guestCount = guests ? guests.adults + guests.children : 2;
+
+  useEffect(() => {
+    const selected = activities.filter((a) => selectedIds.has(a.id));
+    const activityTotal = selected.reduce(
+      (sum, a) => sum + a.pricePerPerson * guestCount,
+      0
+    );
+    onOutput({
+      selectedActivities: selected.map((a) => ({
+        ...a,
+        quantity: guestCount,
+        lineTotal: a.pricePerPerson * guestCount,
+      })),
+      activityTotal,
+    });
+  }, [selectedIds, guestCount, onOutput]);
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Activities & Excursions"}
       </h3>
       <div className="grid grid-cols-2 gap-3">
-        {activities.map((act) => (
-          <div
-            key={act.id}
-            className="border overflow-hidden hover:shadow-md transition-shadow"
-            style={{ borderRadius: `${theme.borderRadius}px` }}
-          >
-            {config.showImages !== false && (
-              <div className="h-24 bg-gray-200 overflow-hidden">
-                <img src={act.imageUrl} alt={act.name} className="w-full h-full object-cover" />
-              </div>
-            )}
-            <div className="p-2.5">
-              <div className="font-medium text-sm">{act.name}</div>
-              {config.showDuration !== false && (
-                <div className="inline-block px-1.5 py-0.5 rounded text-[10px] mt-1" style={{ backgroundColor: `${theme.primaryColor}15`, color: theme.primaryColor }}>
-                  {Math.floor(act.durationMinutes / 60)}h {act.durationMinutes % 60 > 0 ? `${act.durationMinutes % 60}m` : ""}
+        {activities.map((act) => {
+          const isSelected = selectedIds.has(act.id);
+          return (
+            <div
+              key={act.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(act.id);
+              }}
+              className="border overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+              style={{
+                borderRadius: `${theme.borderRadius}px`,
+                borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
+                borderWidth: isSelected ? "2px" : "1px",
+                backgroundColor: isSelected
+                  ? `${theme.primaryColor}08`
+                  : "#fff",
+              }}
+            >
+              {config.showImages !== false && (
+                <div className="h-24 bg-gray-200 overflow-hidden relative">
+                  <img
+                    src={act.imageUrl}
+                    alt={act.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {isSelected && (
+                    <div
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
+                      style={{ backgroundColor: theme.primaryColor }}
+                    >
+                      ✓
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="flex items-center justify-between mt-2">
-                <span className="font-semibold text-sm" style={{ color: theme.primaryColor }}>
-                  CHF {act.pricePerPerson}
-                </span>
-                <span className="text-[10px] text-gray-400">per person</span>
+              <div className="p-2.5">
+                <div className="font-medium text-sm">{act.name}</div>
+                {config.showDuration !== false && (
+                  <div
+                    className="inline-block px-1.5 py-0.5 rounded text-[10px] mt-1"
+                    style={{
+                      backgroundColor: `${theme.primaryColor}15`,
+                      color: theme.primaryColor,
+                    }}
+                  >
+                    {Math.floor(act.durationMinutes / 60)}h{" "}
+                    {act.durationMinutes % 60 > 0
+                      ? `${act.durationMinutes % 60}m`
+                      : ""}
+                  </div>
+                )}
+                <div className="flex items-center justify-between mt-2">
+                  <span
+                    className="font-semibold text-sm"
+                    style={{ color: theme.primaryColor }}
+                  >
+                    CHF {act.pricePerPerson}
+                  </span>
+                  <span className="text-[10px] text-gray-400">per person</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function ContactFormPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Contact Form ─────────────────────────────────────────────
+
+function ContactFormPreview({
+  config,
+  theme,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+  const [notes, setNotes] = useState("");
+  const [gdprAccepted, setGdprAccepted] = useState(false);
+
+  useEffect(() => {
+    const isValid =
+      firstName.trim() !== "" &&
+      lastName.trim() !== "" &&
+      email.trim() !== "" &&
+      (config.gdprConsent === false || gdprAccepted);
+    onOutput({
+      contactInfo: {
+        firstName,
+        lastName,
+        email,
+        phone,
+        company,
+        notes,
+        gdprAccepted,
+      },
+      isValid,
+    });
+  }, [firstName, lastName, email, phone, company, notes, gdprAccepted, config.gdprConsent, onOutput]);
+
   const fieldStyle = { borderRadius: `${theme.borderRadius / 2}px` };
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Your Details"}
       </h3>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">First Name *</label>
-          <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="John" readOnly style={fieldStyle} />
+          <label className="block text-xs text-gray-500 mb-1">
+            First Name *
+          </label>
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            placeholder="John"
+            style={fieldStyle}
+          />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Last Name *</label>
-          <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Doe" readOnly style={fieldStyle} />
+          <label className="block text-xs text-gray-500 mb-1">
+            Last Name *
+          </label>
+          <input
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            placeholder="Doe"
+            style={fieldStyle}
+          />
         </div>
       </div>
       <div>
         <label className="block text-xs text-gray-500 mb-1">Email *</label>
-        <input type="email" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="john@example.com" readOnly style={fieldStyle} />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+          placeholder="john@example.com"
+          style={fieldStyle}
+        />
       </div>
       {config.showPhone !== false && (
         <div>
           <label className="block text-xs text-gray-500 mb-1">Phone</label>
-          <input type="tel" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="+41 79 123 4567" readOnly style={fieldStyle} />
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            placeholder="+41 79 123 4567"
+            style={fieldStyle}
+          />
         </div>
       )}
       {!!config.showCompany && (
         <div>
           <label className="block text-xs text-gray-500 mb-1">Company</label>
-          <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Acme Corp" readOnly style={fieldStyle} />
+          <input
+            type="text"
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            placeholder="Acme Corp"
+            style={fieldStyle}
+          />
         </div>
       )}
       {config.showNotes !== false && (
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Notes / Special Requests</label>
-          <textarea className="w-full px-3 py-2 border rounded-lg text-sm" rows={2} placeholder="Any special requirements..." readOnly style={fieldStyle} />
+          <label className="block text-xs text-gray-500 mb-1">
+            Notes / Special Requests
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
+            rows={2}
+            placeholder="Any special requirements..."
+            style={fieldStyle}
+          />
         </div>
       )}
       {config.gdprConsent !== false && (
-        <label className="flex gap-2 items-start text-xs text-gray-500">
-          <input type="checkbox" className="mt-0.5" style={{ accentColor: theme.primaryColor }} readOnly />
-          <span>{(config.gdprText as string) || "I agree to the processing of my personal data."}</span>
+        <label
+          className="flex gap-2 items-start text-xs text-gray-500 cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={gdprAccepted}
+            onChange={(e) => setGdprAccepted(e.target.checked)}
+            style={{ accentColor: theme.primaryColor }}
+          />
+          <span>
+            {(config.gdprText as string) ||
+              "I agree to the processing of my personal data."}
+          </span>
         </label>
       )}
     </div>
   );
 }
 
-function InvoicePreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Invoice ──────────────────────────────────────────────────
+
+function InvoicePreview({
+  config,
+  theme,
+  resolvedInputs,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
   const currency = (config.currency as string) || "CHF";
-  const lineItems = [
-    { label: "Alpine Suite (4 nights x 2)", amount: 2560 },
-    { label: "Mountain Breakfast Buffet (4 nights x 2 guests)", amount: 280 },
-    { label: "Guided Mountain Hike (2 guests)", amount: 90 },
-    { label: "Alpine Spa & Wellness (2 guests)", amount: 240 },
-  ];
+
+  const checkIn = resolvedInputs?.checkIn as string | undefined;
+  const checkOut = resolvedInputs?.checkOut as string | undefined;
+  const guests = resolvedInputs?.guests as
+    | { adults: number; children: number }
+    | undefined;
+  const selectedRooms = (resolvedInputs?.selectedRooms as Array<{
+    name: string;
+    pricePerNight: number;
+    nights: number;
+    lineTotal: number;
+  }>) || [];
+  const selectedMeals = (resolvedInputs?.selectedMeals as Array<{
+    name: string;
+    pricePerPerson: number;
+    quantity: number;
+    lineTotal: number;
+  }>) || [];
+  const selectedActivities = (resolvedInputs?.selectedActivities as Array<{
+    name: string;
+    pricePerPerson: number;
+    quantity: number;
+    lineTotal: number;
+  }>) || [];
+  const contactInfo = resolvedInputs?.contactInfo as
+    | { firstName: string; lastName: string; email: string }
+    | undefined;
+
+  let nightCount = 4;
+  if (checkIn && checkOut) {
+    nightCount = Math.max(
+      1,
+      Math.round(
+        (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    );
+  }
+  const guestCount = guests ? guests.adults + guests.children : 2;
+
+  // Build dynamic line items from resolved inputs, or fall back to static
+  const lineItems: { label: string; amount: number }[] = [];
+
+  if (selectedRooms.length > 0) {
+    for (const room of selectedRooms) {
+      lineItems.push({
+        label: `${room.name} (${room.nights || nightCount} nights)`,
+        amount: room.lineTotal || room.pricePerNight * nightCount,
+      });
+    }
+  }
+  if (selectedMeals.length > 0) {
+    for (const meal of selectedMeals) {
+      lineItems.push({
+        label: `${meal.name} (${meal.quantity || guestCount} guests)`,
+        amount: meal.lineTotal || meal.pricePerPerson * guestCount,
+      });
+    }
+  }
+  if (selectedActivities.length > 0) {
+    for (const act of selectedActivities) {
+      lineItems.push({
+        label: `${act.name} (${act.quantity || guestCount} guests)`,
+        amount: act.lineTotal || act.pricePerPerson * guestCount,
+      });
+    }
+  }
+
+  // Fallback if nothing selected yet
+  if (lineItems.length === 0) {
+    lineItems.push(
+      { label: "No items selected yet", amount: 0 }
+    );
+  }
+
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
-  const tax = config.showTax ? subtotal * ((config.taxRate as number || 7.7) / 100) : 0;
+  const tax = config.showTax
+    ? subtotal * (((config.taxRate as number) || 7.7) / 100)
+    : 0;
   const total = subtotal + tax;
+
+  useEffect(() => {
+    onOutput({ totalPrice: total, lineItems });
+  }, [total, onOutput]);
+
+  const fmtDate = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
 
   return (
     <div className="space-y-3">
-      <div className="p-3 rounded-t-lg text-white text-center" style={{ backgroundColor: theme.primaryColor, borderRadius: `${theme.borderRadius}px ${theme.borderRadius}px 0 0` }}>
-        <h3 style={{ fontFamily: theme.headlineFont }} className="text-lg font-semibold">
+      <div
+        className="p-3 rounded-t-lg text-white text-center"
+        style={{
+          backgroundColor: theme.primaryColor,
+          borderRadius: `${theme.borderRadius}px ${theme.borderRadius}px 0 0`,
+        }}
+      >
+        <h3
+          style={{ fontFamily: theme.headlineFont }}
+          className="text-lg font-semibold"
+        >
           {(config.title as string) || "Booking Summary"}
         </h3>
       </div>
       {config.showDateSummary !== false && (
         <div className="flex justify-between text-xs text-gray-500 px-1">
-          <span>Mar 25 - Mar 29, 2026</span>
-          <span>4 nights, 2 guests</span>
+          <span>
+            {checkIn && checkOut
+              ? `${fmtDate(checkIn)} - ${fmtDate(checkOut)}, ${new Date(checkOut).getFullYear()}`
+              : "Dates not selected"}
+          </span>
+          <span>
+            {nightCount} night{nightCount !== 1 ? "s" : ""}, {guestCount} guest
+            {guestCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+      {config.showContactSummary !== false && contactInfo && contactInfo.firstName && (
+        <div className="text-xs text-gray-500 px-1 border-b border-gray-100 pb-2">
+          {contactInfo.firstName} {contactInfo.lastName}
+          {contactInfo.email && ` | ${contactInfo.email}`}
         </div>
       )}
       <div className="space-y-2">
         {lineItems.map((item, i) => (
-          <div key={i} className="flex justify-between items-center py-1.5 border-b border-gray-100 text-sm">
+          <div
+            key={i}
+            className="flex justify-between items-center py-1.5 border-b border-gray-100 text-sm"
+          >
             <span className="text-gray-700">{item.label}</span>
-            <span className="font-medium">{currency} {item.amount.toFixed(2)}</span>
+            <span className="font-medium">
+              {item.amount > 0
+                ? `${currency} ${item.amount.toFixed(2)}`
+                : "-"}
+            </span>
           </div>
         ))}
       </div>
       {!!config.showTax && (
         <div className="flex justify-between items-center py-1 text-sm text-gray-500">
-          <span>Tax ({config.taxRate as number || 7.7}%)</span>
-          <span>{currency} {tax.toFixed(2)}</span>
+          <span>
+            Tax ({(config.taxRate as number) || 7.7}%)
+          </span>
+          <span>
+            {currency} {tax.toFixed(2)}
+          </span>
         </div>
       )}
       <div
@@ -294,65 +940,169 @@ function InvoicePreview({ config, theme }: { config: Record<string, unknown>; th
         style={{ backgroundColor: `${theme.primaryColor}10` }}
       >
         <span>Total</span>
-        <span style={{ color: theme.primaryColor }}>{currency} {total.toFixed(2)}</span>
+        <span style={{ color: theme.primaryColor }}>
+          {currency} {total.toFixed(2)}
+        </span>
       </div>
     </div>
   );
 }
 
-function OptionPickerPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Option Picker ────────────────────────────────────────────
+
+function OptionPickerPreview({
+  config,
+  theme,
+  onOutput,
+}: {
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+  resolvedInputs: Record<string, unknown>;
+  onOutput: (outputs: Record<string, unknown>) => void;
+}) {
   const mockOptions = [
     { id: "standard", label: "Standard", desc: "Basic package" },
     { id: "premium", label: "Premium", desc: "Extra amenities" },
     { id: "deluxe", label: "Deluxe", desc: "All-inclusive" },
   ];
 
+  const isMulti = !!config.multiSelect;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (isMulti) {
+      onOutput({
+        selectedOption: [...selectedIds][0] || null,
+        selectedOptions: [...selectedIds],
+      });
+    } else {
+      onOutput({
+        selectedOption: selectedId,
+        selectedOptions: selectedId ? [selectedId] : [],
+      });
+    }
+  }, [selectedId, selectedIds, isMulti, onOutput]);
+
+  const handleClick = (id: string) => {
+    if (isMulti) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    } else {
+      setSelectedId((prev) => (prev === id ? null : id));
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+      <h3
+        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
+        className="text-lg font-semibold"
+      >
         {(config.title as string) || "Choose an Option"}
       </h3>
-      <div className={`grid grid-cols-${config.columns || 3} gap-2`}>
-        {mockOptions.map((opt, i) => (
-          <div
-            key={opt.id}
-            className="p-3 border-2 text-center cursor-pointer transition-colors"
-            style={{
-              borderRadius: `${theme.borderRadius}px`,
-              borderColor: i === 0 ? theme.primaryColor : "#e5e7eb",
-              backgroundColor: i === 0 ? `${theme.primaryColor}08` : "#fff",
-            }}
-          >
-            <div className="font-medium text-sm">{opt.label}</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">{opt.desc}</div>
-          </div>
-        ))}
+      <div
+        className="grid gap-2"
+        style={{
+          gridTemplateColumns: `repeat(${(config.columns as number) || 3}, 1fr)`,
+        }}
+      >
+        {mockOptions.map((opt) => {
+          const isSelected = isMulti
+            ? selectedIds.has(opt.id)
+            : selectedId === opt.id;
+          return (
+            <div
+              key={opt.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick(opt.id);
+              }}
+              className="p-3 border-2 text-center cursor-pointer transition-colors"
+              style={{
+                borderRadius: `${theme.borderRadius}px`,
+                borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
+                backgroundColor: isSelected
+                  ? `${theme.primaryColor}08`
+                  : "#fff",
+              }}
+            >
+              <div className="font-medium text-sm">{opt.label}</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">
+                {opt.desc}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function GenericWidgetPreview({ template, config, theme }: { template: { name: string; icon: string; inputs: { label: string }[]; outputs: { label: string }[] }; config: Record<string, unknown>; theme: ThemeConfig }) {
+// ─── Generic Fallback ─────────────────────────────────────────
+
+function GenericWidgetPreview({
+  template,
+  config,
+  theme,
+}: {
+  template: {
+    name: string;
+    icon: string;
+    inputs: { label: string }[];
+    outputs: { label: string }[];
+  };
+  config: Record<string, unknown>;
+  theme: ThemeConfig;
+}) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xl">{template.icon}</span>
-        <h3 style={{ fontFamily: theme.headlineFont }} className="text-base font-semibold">
+        <h3
+          style={{ fontFamily: theme.headlineFont }}
+          className="text-base font-semibold"
+        >
           {(config.title as string) || template.name}
         </h3>
       </div>
-      <div className="text-xs text-gray-400 italic">Widget preview placeholder</div>
+      <div className="text-xs text-gray-400 italic">
+        Widget preview placeholder
+      </div>
     </div>
   );
 }
 
-export function WidgetRenderer({ widget, theme, isSelected, onClick }: WidgetRendererProps) {
+// ─── Main Renderer ────────────────────────────────────────────
+
+export function WidgetRenderer({
+  widget,
+  theme,
+  isSelected,
+  onClick,
+  resolvedInputs = {},
+  onOutput,
+}: WidgetRendererProps) {
   const template = widgetTemplateRegistry[widget.templateId];
+
+  // Stable callback to avoid infinite re-render loops
+  const stableOnOutput = useCallback(
+    (outputs: Record<string, unknown>) => {
+      onOutput?.(outputs);
+    },
+    [onOutput]
+  );
 
   const cardStyle: React.CSSProperties = {
     borderRadius: `${theme.borderRadius}px`,
     backgroundColor: "#ffffff",
-    ...(theme.cardStyle === "elevated" && { boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }),
+    ...(theme.cardStyle === "elevated" && {
+      boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+    }),
     ...(theme.cardStyle === "outlined" && { border: "1px solid #e5e7eb" }),
     ...(theme.cardStyle === "flat" && { border: "1px solid transparent" }),
   };
@@ -360,34 +1110,96 @@ export function WidgetRenderer({ widget, theme, isSelected, onClick }: WidgetRen
   let content: React.ReactNode;
   switch (widget.templateId) {
     case "date-picker":
-      content = <DatePickerPreview config={widget.config} theme={theme} />;
+      content = (
+        <DatePickerPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "guest-counter":
-      content = <GuestCounterPreview config={widget.config} theme={theme} />;
+      content = (
+        <GuestCounterPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "guest-rooms":
-      content = <RoomSelectionPreview config={widget.config} theme={theme} />;
+      content = (
+        <RoomSelectionPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "meal-picker":
-      content = <MealPickerPreview config={widget.config} theme={theme} />;
+      content = (
+        <MealPickerPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "activity-picker":
-      content = <ActivityPickerPreview config={widget.config} theme={theme} />;
+      content = (
+        <ActivityPickerPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "contact-form":
-      content = <ContactFormPreview config={widget.config} theme={theme} />;
+      content = (
+        <ContactFormPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "invoice":
-      content = <InvoicePreview config={widget.config} theme={theme} />;
+      content = (
+        <InvoicePreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     case "option-picker":
-      content = <OptionPickerPreview config={widget.config} theme={theme} />;
+      content = (
+        <OptionPickerPreview
+          config={widget.config}
+          theme={theme}
+          resolvedInputs={resolvedInputs}
+          onOutput={stableOnOutput}
+        />
+      );
       break;
     default:
       content = template ? (
-        <GenericWidgetPreview template={template} config={widget.config} theme={theme} />
+        <GenericWidgetPreview
+          template={template}
+          config={widget.config}
+          theme={theme}
+        />
       ) : (
-        <div className="text-sm text-red-500">Unknown widget: {widget.templateId}</div>
+        <div className="text-sm text-red-500">
+          Unknown widget: {widget.templateId}
+        </div>
       );
   }
 
@@ -395,7 +1207,9 @@ export function WidgetRenderer({ widget, theme, isSelected, onClick }: WidgetRen
     <div
       onClick={onClick}
       className={`p-5 transition-all cursor-pointer ${
-        isSelected ? "ring-2 ring-offset-2" : "hover:ring-1 hover:ring-offset-1"
+        isSelected
+          ? "ring-2 ring-offset-2"
+          : "hover:ring-1 hover:ring-offset-1"
       }`}
       style={{
         ...cardStyle,
