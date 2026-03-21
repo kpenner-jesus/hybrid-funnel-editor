@@ -156,22 +156,31 @@ export function AiChatPanel() {
     [processImageFile]
   );
 
+  // Track whether the React onPaste already handled an image
+  const pasteHandledRef = useRef(false);
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       if (!e.clipboardData) return;
       if (extractPastedImage(e.clipboardData)) {
         e.preventDefault();
+        pasteHandledRef.current = true;
+        // Reset flag after current event loop so the global listener sees it
+        setTimeout(() => { pasteHandledRef.current = false; }, 0);
       }
       // If no image found, let normal text paste happen
     },
     [extractPastedImage]
   );
 
-  // Global paste listener — when the AI panel is open, catch image pastes
-  // even if focus isn't in the textarea (e.g. user clicked somewhere in the panel)
+  // Global paste listener — catches image pastes when textarea isn't focused
+  // (e.g. user clicked somewhere in the panel but not the textarea)
   useEffect(() => {
     if (!aiPanelOpen) return;
     const handler = (e: ClipboardEvent) => {
+      // Skip if the React onPaste handler already handled this event
+      if (pasteHandledRef.current) return;
+
       // Skip if user is focused on an input/textarea outside our panel
       const active = document.activeElement;
       const isInOurPanel = panelRef.current?.contains(active);
@@ -179,23 +188,8 @@ export function AiChatPanel() {
       if (isInExternalInput) return;
 
       if (!e.clipboardData) return;
-
-      // Check if clipboard has an image
-      let hasImage = false;
-      if (e.clipboardData.items) {
-        for (const item of Array.from(e.clipboardData.items)) {
-          if (item.type.startsWith("image/")) { hasImage = true; break; }
-        }
-      }
-      if (!hasImage && e.clipboardData.files) {
-        for (const file of Array.from(e.clipboardData.files)) {
-          if (file.type.startsWith("image/")) { hasImage = true; break; }
-        }
-      }
-
-      if (hasImage) {
+      if (extractPastedImage(e.clipboardData)) {
         e.preventDefault();
-        extractPastedImage(e.clipboardData);
         inputRef.current?.focus();
       }
     };
