@@ -922,17 +922,20 @@ function generateMainFunnel(
   lines.push(`      try {`);
   lines.push(`        await apiRef.current.ready();`);
   lines.push(`        const cats = await apiRef.current.getCategories();`);
+  lines.push(`        console.log('[Funnel] Categories loaded:', cats.map(c => c.id + ':' + c.name + '(' + (c.products||[]).length + ' products)'));`);
 
   // Category-based product fetching — always use .find(c => c.id === ID)?.products
   // Never fall back to positional indexing (cats[0], cats[1], etc.)
   if (hasRooms) {
     if (catInfo.roomCatIds.length === 1) {
-      lines.push(`        setRoomProducts(cats.find(c => c.id === ${catInfo.roomCatIds[0]})?.products || []);`);
+      lines.push(`        const roomCat = cats.find(c => c.id === ${catInfo.roomCatIds[0]});`);
+      lines.push(`        console.log('[Funnel] Room cat ${catInfo.roomCatIds[0]}:', roomCat?.name, (roomCat?.products||[]).length, 'products');`);
+      lines.push(`        setRoomProducts(roomCat?.products || []);`);
     } else if (catInfo.roomCatIds.length > 1) {
       lines.push(`        setRoomProducts(ROOM_CAT_IDS.flatMap(id => cats.find(c => c.id === id)?.products || []));`);
     } else {
       // No categoryId configured — warn but use empty array; user must configure categoryId
-      lines.push(`        // WARNING: No categoryId configured for rooms. Set categoryId in widget config.`);
+      lines.push(`        console.warn('[Funnel] WARNING: No categoryId configured for rooms!');`);
       lines.push(`        setRoomProducts([]);`);
     }
   }
