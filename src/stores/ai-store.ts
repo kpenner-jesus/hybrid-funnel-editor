@@ -332,7 +332,7 @@ export const useAiStore = create<AiStore>((set, get) => {
               toolCall.result = result;
               streamToolCalls.push(toolCall);
 
-              // Update assistant message with tool calls
+              // Update or create assistant message with tool calls
               const currentMessages = get().messages;
               const lastMsg = currentMessages[currentMessages.length - 1];
               if (lastMsg?.role === "assistant") {
@@ -343,6 +343,14 @@ export const useAiStore = create<AiStore>((set, get) => {
                   toolCalls: [...streamToolCalls],
                 };
                 set({ messages: updated });
+              } else {
+                // Continuation started with tool_use (no text first) — create assistant message
+                set({
+                  messages: [
+                    ...currentMessages,
+                    { role: "assistant", content: assistantContent, toolCalls: [...streamToolCalls] },
+                  ],
+                });
               }
             } else if (chunk.type === "error") {
               set({ error: chunk.message || "Unknown error" });
