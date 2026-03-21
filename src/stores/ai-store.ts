@@ -23,15 +23,25 @@ export interface AiMessage {
 
 // --- Store Interface ---
 
+export type ClaudeModel = "claude-sonnet-4-20250514" | "claude-opus-4-20250514" | "claude-haiku-4-20250514";
+
+export const CLAUDE_MODELS: { id: ClaudeModel; label: string; description: string }[] = [
+  { id: "claude-sonnet-4-20250514", label: "Sonnet 4", description: "Fast & capable" },
+  { id: "claude-opus-4-20250514", label: "Opus 4", description: "Most powerful" },
+  { id: "claude-haiku-4-20250514", label: "Haiku 4", description: "Fastest & cheapest" },
+];
+
 interface AiStore {
   messages: AiMessage[];
   isStreaming: boolean;
+  selectedModel: ClaudeModel;
   accountContext: AccountContext;
   funnelContext: FunnelContext;
   error: string | null;
   aiPanelOpen: boolean;
 
   togglePanel: () => void;
+  setModel: (model: ClaudeModel) => void;
   sendMessage: (content: string, funnel: FunnelDefinition | null) => Promise<void>;
   clearChat: () => void;
   setAccountContext: (ctx: Partial<AccountContext>) => void;
@@ -55,15 +65,30 @@ function saveAccountContext(ctx: AccountContext) {
   localStorage.setItem("ai-account-context", JSON.stringify(ctx));
 }
 
+function loadSelectedModel(): ClaudeModel {
+  if (typeof window === "undefined") return "claude-sonnet-4-20250514";
+  try {
+    const raw = localStorage.getItem("ai-selected-model");
+    if (raw && CLAUDE_MODELS.some(m => m.id === raw)) return raw as ClaudeModel;
+  } catch { /* ignore */ }
+  return "claude-sonnet-4-20250514";
+}
+
 export const useAiStore = create<AiStore>((set, get) => ({
   messages: [],
   isStreaming: false,
+  selectedModel: loadSelectedModel(),
   accountContext: loadAccountContext(),
   funnelContext: defaultFunnelContext,
   error: null,
   aiPanelOpen: false,
 
   togglePanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
+
+  setModel: (model) => {
+    if (typeof window !== "undefined") localStorage.setItem("ai-selected-model", model);
+    set({ selectedModel: model });
+  },
 
   clearChat: () => set({ messages: [], error: null }),
 
@@ -99,6 +124,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
         body: JSON.stringify({
           messages: apiMessages,
           context: aiContext,
+          model: get().selectedModel,
         }),
       });
 

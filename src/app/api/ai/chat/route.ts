@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   let body: {
     messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
     context: AiContext;
+    model?: string;
   };
 
   try {
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
   const provider = new AnthropicProvider();
   const stream = provider.chat({
     apiKey,
+    model: body.model || "claude-sonnet-4-20250514",
     systemPrompt,
     messages: anthropicMessages,
     tools: aiTools,

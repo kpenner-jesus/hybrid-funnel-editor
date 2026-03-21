@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import { useAiStore } from "@/stores/ai-store";
+import { useAiStore, CLAUDE_MODELS } from "@/stores/ai-store";
+import type { ClaudeModel } from "@/stores/ai-store";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { AiChatMessage } from "./AiChatMessage";
 
@@ -22,6 +23,8 @@ export function AiChatPanel() {
     sendMessage,
     clearChat,
     accountContext,
+    selectedModel,
+    setModel,
   } = useAiStore();
 
   const funnel = useFunnelStore((s) => s.funnel);
@@ -136,8 +139,22 @@ export function AiChatPanel() {
           </div>
         </div>
 
-        {/* Account context bar */}
-        <div className="px-4 py-2 bg-surface-dim border-b border-outline-variant">
+        {/* Model selector + Account context bar */}
+        <div className="px-4 py-2 bg-surface-dim border-b border-outline-variant space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant shrink-0">Model</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => setModel(e.target.value as ClaudeModel)}
+              className="flex-1 text-xs bg-white border border-outline-variant rounded-lg px-2 py-1 focus:outline-none focus:border-primary cursor-pointer"
+            >
+              {CLAUDE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label} — {m.description}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="text-xs text-on-surface-variant">
             {accountContext.venueName ? (
               <span>
