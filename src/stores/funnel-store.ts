@@ -30,7 +30,7 @@ function createExampleFunnel(): FunnelDefinition {
   // Step 2: Room Selection
   const step2 = createEmptyStep("Room Selection");
   const roomPicker = createWidgetInstance("guest-rooms");
-  roomPicker.config = { title: "Select Your Rooms", showImages: true, showTags: true, layout: "grid" };
+  roomPicker.config = { title: "Select Your Rooms", categoryId: 33, showImages: true, showTags: true, layout: "grid" };
   roomPicker.bindings = {
     inputs: { checkIn: "checkIn", checkOut: "checkOut", guests: "guests" },
     outputs: { selectedRooms: "selectedRooms" },
@@ -41,7 +41,7 @@ function createExampleFunnel(): FunnelDefinition {
   // Step 3: Meals
   const step3 = createEmptyStep("Meal Packages");
   const mealPicker = createWidgetInstance("meal-picker");
-  mealPicker.config = { title: "Meal Packages", showDietaryFilters: true, groupByCategory: true, priceDisplay: "per-person" };
+  mealPicker.config = { title: "Meal Packages", categoryId: 34, meetingMealCategoryId: 39, showDietaryFilters: true, groupByCategory: true, priceDisplay: "per-person" };
   mealPicker.bindings = {
     inputs: { guests: "guests" },
     outputs: { selectedMeals: "selectedMeals" },
@@ -52,7 +52,7 @@ function createExampleFunnel(): FunnelDefinition {
   // Step 4: Activities
   const step4 = createEmptyStep("Activities & Excursions");
   const activityPicker = createWidgetInstance("activity-picker");
-  activityPicker.config = { title: "Activities & Excursions", showImages: true, showDuration: true, layout: "grid" };
+  activityPicker.config = { title: "Activities & Excursions", categoryId: 40, showImages: true, showDuration: true, layout: "grid" };
   activityPicker.bindings = {
     inputs: { checkIn: "checkIn", checkOut: "checkOut", guests: "guests" },
     outputs: { selectedActivities: "selectedActivities" },
@@ -74,7 +74,7 @@ function createExampleFunnel(): FunnelDefinition {
   // Step 6: Invoice
   const step6 = createEmptyStep("Review & Confirm");
   const invoice = createWidgetInstance("invoice");
-  invoice.config = { title: "Booking Summary", currency: "CHF", showTax: true, taxRate: 7.7, showContactSummary: true };
+  invoice.config = { title: "Booking Summary", currency: "CAD", showTax: true, taxRate: 5, showContactSummary: true };
   invoice.bindings = {
     inputs: {
       checkIn: "checkIn",
