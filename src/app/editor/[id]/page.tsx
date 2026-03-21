@@ -11,6 +11,8 @@ import { ThemeEditor } from "@/components/editor/ThemeEditor";
 import { VariableFlow } from "@/components/editor/VariableFlow";
 import { FunnelPreview } from "@/components/preview/FunnelPreview";
 import { PublishModal } from "@/components/editor/PublishModal";
+import { AiChatPanel } from "@/components/ai/AiChatPanel";
+import { useAiStore } from "@/stores/ai-store";
 import { generateFunnelJSX } from "@/lib/jsx-generator";
 
 type EditorTab = "steps" | "theme" | "variables";
@@ -31,6 +33,7 @@ export default function EditorPage() {
     selectedWidgetId,
   } = useFunnelStore();
 
+  const { aiPanelOpen, togglePanel: toggleAiPanel } = useAiStore();
   const [activeTab, setActiveTab] = useState<EditorTab>("steps");
   const [saveFlash, setSaveFlash] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
@@ -142,6 +145,21 @@ export default function EditorPage() {
               )}
             </Button>
 
+            {/* AI Assistant */}
+            <Button
+              size="sm"
+              variant={aiPanelOpen ? "secondary" : "outline"}
+              onClick={toggleAiPanel}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path
+                  d="M7 1l1.46 2.98L12 4.9 9.55 7.28l.57 3.37L7 9.28l-3.12 1.37.57-3.37L2 4.9l3.54-.92L7 1z"
+                  fill="currentColor"
+                />
+              </svg>
+              AI
+            </Button>
+
             {/* Publish */}
             <Button size="sm" onClick={handlePublish}>Publish</Button>
           </div>
@@ -220,6 +238,9 @@ export default function EditorPage() {
           onClose={() => setPublishModalOpen(false)}
         />
       )}
+
+      {/* AI Chat Panel */}
+      <AiChatPanel />
     </div>
   );
 }

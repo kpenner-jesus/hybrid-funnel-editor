@@ -1,0 +1,110 @@
+"use client";
+
+import type { AiMessage, ToolCallInfo } from "@/stores/ai-store";
+
+interface AiChatMessageProps {
+  message: AiMessage;
+  isStreaming?: boolean;
+}
+
+function ToolCallCard({ toolCall }: { toolCall: ToolCallInfo }) {
+  const success = toolCall.result?.success ?? true;
+  const toolLabels: Record<string, string> = {
+    create_complete_funnel: "Create Funnel",
+    add_step: "Add Step",
+    remove_step: "Remove Step",
+    reorder_steps: "Reorder Steps",
+    add_widget: "Add Widget",
+    update_widget_config: "Update Widget",
+    remove_widget: "Remove Widget",
+    set_theme: "Set Theme",
+    configure_segment_picker: "Configure Segments",
+    suggest_improvements: "Suggestions",
+  };
+
+  return (
+    <div
+      className={`flex items-start gap-2 px-3 py-2 rounded-lg text-xs mt-1.5 ${
+        success
+          ? "bg-primary-light text-primary-dark"
+          : "bg-error-light text-error"
+      }`}
+    >
+      <span className="mt-0.5 shrink-0">
+        {success ? (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M3 7l3 3 5-5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M4 4l6 6M10 4l-6 6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+      <div>
+        <div className="font-medium">
+          {toolLabels[toolCall.name] || toolCall.name}
+        </div>
+        {toolCall.result?.message && (
+          <div className="opacity-80 mt-0.5">{toolCall.result.message}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AiChatMessage({ message, isStreaming }: AiChatMessageProps) {
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] bg-primary text-white px-3.5 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed">
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+
+  if (message.role === "tool_result") {
+    return null; // Tool results are shown inline with assistant messages
+  }
+
+  // Assistant message
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[90%]">
+        {message.content && (
+          <div className="bg-surface-dim px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm leading-relaxed text-on-surface whitespace-pre-wrap">
+            {message.content}
+            {isStreaming && (
+              <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 animate-pulse rounded-sm" />
+            )}
+          </div>
+        )}
+        {message.toolCalls?.map((tc) => (
+          <ToolCallCard key={tc.id} toolCall={tc} />
+        ))}
+        {!message.content && isStreaming && (
+          <div className="bg-surface-dim px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm">
+            <span className="inline-flex gap-1">
+              <span className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 bg-outline rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
