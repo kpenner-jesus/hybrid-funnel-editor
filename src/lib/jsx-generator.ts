@@ -333,7 +333,7 @@ function generateMealTimeslotGrid(): string {
     const result = [];
     const s = new Date(startDate + 'T00:00:00');
     const e = new Date(endDate + 'T00:00:00');
-    for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
       result.push(new Date(d));
     }
     return result;
