@@ -1,9 +1,180 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import type { ConfigField, WidgetTemplate } from "@/lib/types";
+
+// --- Visual Options Editor for segment-picker and option-picker ---
+interface OptionItem {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  nextStep?: string;
+}
+
+function VisualOptionsEditor({
+  value,
+  onChange,
+  showNextStep,
+}: {
+  value: unknown;
+  onChange: (val: string) => void;
+  showNextStep?: boolean;
+}) {
+  const funnel = useFunnelStore((s) => s.funnel);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Parse current options
+  let options: OptionItem[] = [];
+  try {
+    if (typeof value === "string") options = JSON.parse(value);
+    else if (Array.isArray(value)) options = value as OptionItem[];
+  } catch { /* ignore */ }
+
+  const save = (newOptions: OptionItem[]) => {
+    onChange(JSON.stringify(newOptions, null, 2));
+  };
+
+  const updateOption = (index: number, updates: Partial<OptionItem>) => {
+    const newOptions = [...options];
+    newOptions[index] = { ...newOptions[index], ...updates };
+    save(newOptions);
+  };
+
+  const addOption = () => {
+    const newId = `option-${Date.now().toString(36)}`;
+    save([...options, { id: newId, label: "New Option", description: "" }]);
+  };
+
+  const removeOption = (index: number) => {
+    save(options.filter((_, i) => i !== index));
+  };
+
+  const moveOption = (from: number, to: number) => {
+    if (to < 0 || to >= options.length) return;
+    const newOptions = [...options];
+    const [moved] = newOptions.splice(from, 1);
+    newOptions.splice(to, 0, moved);
+    save(newOptions);
+  };
+
+  if (showAdvanced) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <button
+            onClick={() => setShowAdvanced(false)}
+            className="text-[10px] text-primary hover:underline"
+          >
+            ← Back to visual editor
+          </button>
+        </div>
+        <textarea
+          value={typeof value === "string" ? value : JSON.stringify(value ?? [], null, 2)}
+          onChange={(e) => {
+            try { JSON.parse(e.target.value); onChange(e.target.value); } catch { onChange(e.target.value); }
+          }}
+          rows={8}
+          className="w-full px-3 py-1.5 text-[11px] border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white font-mono resize-y"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {options.map((opt, i) => (
+        <div
+          key={opt.id || i}
+          className="border border-gray-200 rounded-lg p-2.5 bg-white hover:border-gray-300 transition-colors"
+        >
+          <div className="flex items-start gap-2">
+            {/* Icon */}
+            <input
+              type="text"
+              value={opt.icon || ""}
+              onChange={(e) => updateOption(i, { icon: e.target.value })}
+              placeholder="🔹"
+              className="w-10 h-8 text-center text-lg border border-gray-200 rounded focus:outline-none focus:border-primary bg-gray-50"
+              title="Icon (emoji)"
+            />
+            {/* Label + Description */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <input
+                type="text"
+                value={opt.label}
+                onChange={(e) => updateOption(i, { label: e.target.value })}
+                placeholder="Option label"
+                className="w-full px-2 py-1 text-sm font-medium border border-gray-200 rounded focus:outline-none focus:border-primary"
+              />
+              <input
+                type="text"
+                value={opt.description || ""}
+                onChange={(e) => updateOption(i, { description: e.target.value })}
+                placeholder="Short description (optional)"
+                className="w-full px-2 py-1 text-xs text-gray-500 border border-gray-100 rounded focus:outline-none focus:border-primary"
+              />
+              {/* Next Step dropdown */}
+              {showNextStep && funnel && (
+                <select
+                  value={opt.nextStep || ""}
+                  onChange={(e) => updateOption(i, { nextStep: e.target.value })}
+                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:border-primary bg-gray-50"
+                >
+                  <option value="">→ Next step (default)</option>
+                  {funnel.steps.map((step, si) => (
+                    <option key={step.id} value={step.id}>
+                      → Step {si + 1}: {step.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {/* Move + Delete buttons */}
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <button
+                onClick={() => moveOption(i, i - 1)}
+                disabled={i === 0}
+                className="w-6 h-5 text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                title="Move up"
+              >▲</button>
+              <button
+                onClick={() => moveOption(i, i + 1)}
+                disabled={i === options.length - 1}
+                className="w-6 h-5 text-[10px] text-gray-400 hover:text-gray-600 disabled:opacity-20"
+                title="Move down"
+              >▼</button>
+              <button
+                onClick={() => removeOption(i)}
+                className="w-6 h-5 text-[10px] text-red-400 hover:text-red-600"
+                title="Remove"
+              >✕</button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Add + Advanced buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={addOption}
+          className="flex-1 py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+        >
+          + Add Option
+        </button>
+        <button
+          onClick={() => setShowAdvanced(true)}
+          className="px-2 py-1.5 text-[10px] text-gray-400 hover:text-gray-600"
+          title="Edit raw JSON"
+        >
+          { }
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ConfigFieldInput({
   field,
@@ -281,26 +452,44 @@ export function WidgetConfig() {
       {/* Config fields */}
       <div className="space-y-3">
         <div className="text-xs font-medium text-on-surface-variant">Configuration</div>
-        {template.configFields.map((field) => (
-          <div key={field.name}>
-            <label className="block text-xs text-on-surface-variant mb-1">
-              {field.label}
-              {field.required && <span className="text-error ml-0.5">*</span>}
-            </label>
-            <ConfigFieldInput
-              field={field}
-              value={widget.config[field.name]}
-              onChange={(val) =>
-                updateWidgetConfig(selectedStepId, selectedWidgetId, {
-                  [field.name]: val,
-                })
-              }
-            />
-            {field.description && (
-              <p className="text-[10px] text-outline mt-0.5">{field.description}</p>
-            )}
-          </div>
-        ))}
+        {template.configFields.map((field) => {
+          // Use visual editor for "options" field on segment-picker and option-picker
+          const isOptionsField = field.name === "options" && field.type === "json" &&
+            (widget.templateId === "segment-picker" || widget.templateId === "option-picker");
+
+          return (
+            <div key={field.name}>
+              <label className="block text-xs text-on-surface-variant mb-1">
+                {field.label}
+                {field.required && <span className="text-error ml-0.5">*</span>}
+              </label>
+              {isOptionsField ? (
+                <VisualOptionsEditor
+                  value={widget.config[field.name]}
+                  onChange={(val) =>
+                    updateWidgetConfig(selectedStepId, selectedWidgetId, {
+                      [field.name]: val,
+                    })
+                  }
+                  showNextStep={widget.templateId === "segment-picker"}
+                />
+              ) : (
+                <ConfigFieldInput
+                  field={field}
+                  value={widget.config[field.name]}
+                  onChange={(val) =>
+                    updateWidgetConfig(selectedStepId, selectedWidgetId, {
+                      [field.name]: val,
+                    })
+                  }
+                />
+              )}
+              {field.description && !isOptionsField && (
+                <p className="text-[10px] text-outline mt-0.5">{field.description}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Bindings */}
