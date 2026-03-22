@@ -1210,6 +1210,7 @@ function SegmentPickerPreview({
           return (
             <div
               key={opt.id}
+              data-segment-option={opt.id}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClick(opt.id);

@@ -11,6 +11,7 @@ interface Connection {
   toStepId: string;
   label?: string;
   color: string;
+  segmentOptionId?: string; // For wired mode: the segment option element to source from
 }
 
 const SEGMENT_COLORS = [
@@ -59,7 +60,7 @@ function deriveConnections(funnel: FunnelDefinition): {
           targets.push(opt.nextStep!);
           labels.push(opt.label || opt.id || `Option ${oi + 1}`);
           colors.push(color);
-          connections.push({ fromStepId: step.id, toStepId: opt.nextStep!, label: opt.label || opt.id, color });
+          connections.push({ fromStepId: step.id, toStepId: opt.nextStep!, label: opt.label || opt.id, color, segmentOptionId: opt.id });
         });
         branchMap.set(step.id, { targets, labels, colors });
         continue;
@@ -80,7 +81,7 @@ function deriveConnections(funnel: FunnelDefinition): {
               targets.push(target.id);
               labels.push(opt.label || opt.id || `Option ${oi + 1}`);
               colors.push(color);
-              connections.push({ fromStepId: step.id, toStepId: target.id, label: opt.label || opt.id, color });
+              connections.push({ fromStepId: step.id, toStepId: target.id, label: opt.label || opt.id, color, segmentOptionId: opt.id });
             }
           });
           branchMap.set(step.id, { targets, labels, colors });
@@ -255,6 +256,7 @@ export function FlowPreview() {
   const hasInitialized = useRef(false);
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [renderKey, setRenderKey] = useState(0);
+  const [wiredMode, setWiredMode] = useState(false); // Lines from segment option buttons
 
   // Re-render for SVG after layout settles
   useEffect(() => {
@@ -318,37 +320,64 @@ export function FlowPreview() {
   // Build SVG connection lines
   const svgLines: React.ReactNode[] = [];
   connections.forEach((conn, ci) => {
-    const fromEl = stepRefs.current.get(conn.fromStepId);
+    const fromStepEl = stepRefs.current.get(conn.fromStepId);
     const toEl = stepRefs.current.get(conn.toStepId);
-    if (!fromEl || !toEl || !containerRef.current) return;
+    if (!fromStepEl || !toEl || !containerRef.current) return;
     const cRect = containerRef.current.getBoundingClientRect();
+
+    // In wired mode, try to find the actual segment option button element
+    let fromEl = fromStepEl;
+    if (wiredMode && conn.segmentOptionId) {
+      const optEl = fromStepEl.querySelector(`[data-segment-option="${conn.segmentOptionId}"]`) as HTMLDivElement | null;
+      if (optEl) fromEl = optEl;
+    }
+
     const fromRect = fromEl.getBoundingClientRect();
     const toRect = toEl.getBoundingClientRect();
 
-    const fromX = (fromRect.left + fromRect.width / 2 - cRect.left - pan.x) / zoom;
-    const fromY = (fromRect.bottom - cRect.top - pan.y) / zoom;
+    // Source point: right edge of button in wired mode, bottom center of step otherwise
+    let fromX: number, fromY: number;
+    if (wiredMode && conn.segmentOptionId && fromEl !== fromStepEl) {
+      fromX = (fromRect.right - cRect.left - pan.x) / zoom;
+      fromY = (fromRect.top + fromRect.height / 2 - cRect.top - pan.y) / zoom;
+    } else {
+      fromX = (fromRect.left + fromRect.width / 2 - cRect.left - pan.x) / zoom;
+      fromY = (fromRect.bottom - cRect.top - pan.y) / zoom;
+    }
+
     const toX = (toRect.left + toRect.width / 2 - cRect.left - pan.x) / zoom;
     const toY = (toRect.top - cRect.top - pan.y) / zoom;
-    const midY = (fromY + toY) / 2;
+
+    // Different curve for wired mode (horizontal-first) vs normal (vertical)
+    let pathD: string;
+    if (wiredMode && conn.segmentOptionId && fromEl !== fromStepEl) {
+      // Horizontal exit, then curve down to target
+      const exitX = fromX + 30;
+      pathD = `M ${fromX} ${fromY} L ${exitX} ${fromY} C ${exitX + 60} ${fromY}, ${toX} ${toY - 40}, ${toX} ${toY}`;
+    } else {
+      const midY = (fromY + toY) / 2;
+      pathD = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`;
+    }
 
     svgLines.push(
-      <g key={`conn-${ci}-${renderKey}`}>
+      <g key={`conn-${ci}-${renderKey}-${wiredMode}`}>
         <path
-          d={`M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`}
-          fill="none" stroke={conn.color} strokeWidth={2.5}
+          d={pathD}
+          fill="none" stroke={conn.color} strokeWidth={wiredMode ? 2 : 2.5}
           strokeDasharray={conn.label ? "8,4" : "none"}
           markerEnd={`url(#arrow-${ci})`}
         />
-        {conn.label && (
+        {/* Only show labels in non-wired mode (wired mode labels are on the buttons) */}
+        {!wiredMode && conn.label && (
           <>
             <rect
               x={(fromX + toX) / 2 - Math.min(conn.label.length * 4, 60)}
-              y={midY - 10}
+              y={(fromY + toY) / 2 - 10}
               width={Math.min(conn.label.length * 8, 120)}
               height={20} rx={4}
               fill="white" stroke={conn.color} strokeWidth={1}
             />
-            <text x={(fromX + toX) / 2} y={midY + 4}
+            <text x={(fromX + toX) / 2} y={(fromY + toY) / 2 + 4}
               textAnchor="middle" fontSize={10} fontWeight={600} fill={conn.color}>
               {conn.label}
             </text>
@@ -373,11 +402,19 @@ export function FlowPreview() {
       onWheel={handleWheel} onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
     >
-      {/* Zoom controls */}
+      {/* Zoom controls + Wired toggle */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-1 py-0.5">
         <button onClick={() => setZoom((z) => Math.max(0.05, z - 0.1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold">−</button>
         <span className="text-[10px] text-gray-500 w-10 text-center font-mono">{Math.round(zoom * 100)}%</span>
         <button onClick={() => setZoom((z) => Math.min(1.5, z + 0.1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold">+</button>
+        <div className="w-px h-5 bg-gray-200" />
+        <button
+          onClick={() => { setWiredMode((w) => !w); setTimeout(() => setRenderKey((n) => n + 1), 50); }}
+          className={`px-2 h-7 flex items-center justify-center text-[10px] transition-colors ${
+            wiredMode ? "text-blue-600 font-bold" : "text-gray-500 hover:text-gray-800"
+          }`}
+          title="Wired: show connection lines from actual buttons"
+        >🔌 Wired</button>
         <div className="w-px h-5 bg-gray-200" />
         <button
           onClick={() => {
