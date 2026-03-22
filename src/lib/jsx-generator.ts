@@ -864,7 +864,7 @@ function generateMainFunnel(
   }
 
   // --- Progress calculation (matches wilderness-edge-funnel.jsx pattern) ---
-  const stepLabels = funnel.steps.map(s => `'${deriveStepLabel(s)}'`);
+  const stepLabels = funnel.steps.map(s => `'${escapeJsString(deriveStepLabel(s))}'`);
   lines.push(`  const progressSteps = [${stepLabels.join(", ")}];`);
   lines.push(`  const stepOrder = [${stepNames.map((s) => `'${s}'`).join(", ")}];`);
   lines.push(`  const currentIdx = stepOrder.indexOf(step);`);
@@ -1343,6 +1343,15 @@ function escapeJsx(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/`/g, "\\`");
+}
+
+/** Escape for use inside JavaScript single-quoted strings (not JSX text) */
+function escapeJsString(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
 }
 
 function findStepIdForTemplate(funnel: FunnelDefinition, templateId: string): string {
