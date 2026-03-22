@@ -5,7 +5,7 @@ import { useFunnelStore } from "@/stores/funnel-store";
 import { useAiStore } from "@/stores/ai-store";
 import { useVenueDataStore } from "@/stores/venue-data-store";
 
-type DiagSection = "overview" | "selected" | "venue" | "ai" | "full";
+type DiagSection = "overview" | "flow" | "selected" | "venue" | "ai" | "full";
 
 export function DiagnosticsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [activeSection, setActiveSection] = useState<DiagSection>("overview");
@@ -52,6 +52,100 @@ export function DiagnosticsPanel({ open, onClose }: { open: boolean; onClose: ()
             })),
           }
         : null;
+    }
+
+    if (activeSection === "flow" || activeSection === "full") {
+      if (funnel && funnel.steps.length > 0) {
+        // Build a text flow map showing connections
+        const flowMap: Array<{
+          step: string;
+          index: number;
+          widgets: string[];
+          connectsTo: Array<{ target: string; targetIndex: number; label?: string; source: string }>;
+        }> = [];
+
+        for (let i = 0; i < funnel.steps.length; i++) {
+          const step = funnel.steps[i];
+          const entry: typeof flowMap[0] = {
+            step: step.title,
+            index: i,
+            widgets: step.widgets.map((w) => `${w.templateId} (${w.instanceId.slice(-6)})`),
+            connectsTo: [],
+          };
+
+          // Check for segment picker branching
+          const segWidget = step.widgets.find((w) => w.templateId === "segment-picker");
+          if (segWidget) {
+            let options: Array<{ id?: string; label?: string; nextStep?: string }> = [];
+            try {
+              const raw = segWidget.config.options;
+              if (typeof raw === "string") options = JSON.parse(raw);
+              else if (Array.isArray(raw)) options = raw;
+            } catch {}
+
+            const explicitBranches = options.filter((o) => o.nextStep);
+            if (explicitBranches.length > 0) {
+              explicitBranches.forEach((opt) => {
+                const targetIdx = funnel.steps.findIndex((s) => s.id === opt.nextStep);
+                entry.connectsTo.push({
+                  target: targetIdx >= 0 ? funnel.steps[targetIdx].title : `ID:${opt.nextStep}`,
+                  targetIndex: targetIdx,
+                  label: opt.label,
+                  source: "segment-picker (explicit nextStep)",
+                });
+              });
+            } else if (options.length > 1) {
+              // Implied branches
+              options.forEach((opt, oi) => {
+                const targetIdx = i + 1 + oi;
+                if (targetIdx < funnel.steps.length) {
+                  entry.connectsTo.push({
+                    target: funnel.steps[targetIdx].title,
+                    targetIndex: targetIdx,
+                    label: opt.label,
+                    source: "segment-picker (implied: option order → next N steps)",
+                  });
+                }
+              });
+            }
+          }
+
+          // Check explicit navigation
+          if (entry.connectsTo.length === 0 && step.navigation.next) {
+            const targetIdx = funnel.steps.findIndex((s) => s.id === step.navigation.next);
+            entry.connectsTo.push({
+              target: targetIdx >= 0 ? funnel.steps[targetIdx].title : `ID:${step.navigation.next}`,
+              targetIndex: targetIdx,
+              source: "navigation.next (explicit)",
+            });
+          }
+
+          // Default: next step
+          if (entry.connectsTo.length === 0 && i < funnel.steps.length - 1) {
+            entry.connectsTo.push({
+              target: funnel.steps[i + 1].title,
+              targetIndex: i + 1,
+              source: "default (next step in list)",
+            });
+          }
+
+          flowMap.push(entry);
+        }
+
+        // Also generate a compact ASCII flow
+        const asciiLines: string[] = ["FLOW MAP:", "========="];
+        flowMap.forEach((entry) => {
+          asciiLines.push(`[${entry.index}] ${entry.step} (${entry.widgets.join(", ")})`);
+          entry.connectsTo.forEach((conn) => {
+            asciiLines.push(`    → [${conn.targetIndex}] ${conn.target}${conn.label ? ` (${conn.label})` : ""} via ${conn.source}`);
+          });
+        });
+
+        sections["flowMap"] = {
+          ascii: asciiLines.join("\n"),
+          connections: flowMap,
+        };
+      }
     }
 
     if (activeSection === "selected" || activeSection === "full") {
@@ -134,6 +228,7 @@ export function DiagnosticsPanel({ open, onClose }: { open: boolean; onClose: ()
 
   const tabs: { id: DiagSection; label: string; desc: string }[] = [
     { id: "overview", label: "Funnel", desc: "All steps, widgets, configs, theme" },
+    { id: "flow", label: "Flow Map", desc: "Connection graph: which step connects where and why" },
     { id: "selected", label: "Selected", desc: "Currently selected step & widget" },
     { id: "venue", label: "Venue", desc: "Venue data store (rooms, meals, etc.)" },
     { id: "ai", label: "AI Chat", desc: "Last 10 AI messages & tool calls" },
