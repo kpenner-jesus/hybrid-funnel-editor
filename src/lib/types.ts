@@ -7,11 +7,14 @@
 export interface ThemeConfig {
   primaryColor: string;
   secondaryColor: string;
+  accentColor?: string; // e.g., amber/gold #F5A623
   surfaceColor: string;
   headlineFont: string;
   bodyFont: string;
   borderRadius: number; // px
   cardStyle: "flat" | "elevated" | "outlined";
+  logoUrl?: string; // account/venue logo URL
+  timezone?: string; // e.g., "America/Chicago"
 }
 
 // --- Variables ---
@@ -136,8 +139,8 @@ export interface Step {
 
 export interface FunnelAction {
   id: string;
-  type: "submit" | "email" | "webhook" | "redirect";
-  trigger: "on_complete" | "on_step_enter" | "on_step_exit";
+  type: "submit" | "email" | "webhook" | "redirect" | "generate_invoice";
+  trigger: "on_complete" | "on_step_enter" | "on_step_exit" | "on_button_click";
   config: Record<string, unknown>;
 }
 
@@ -189,6 +192,8 @@ export interface ActivityProduct {
   currency: string;
   durationMinutes: number;
   maxParticipants: number;
+  tags?: string[];
+  timeslots?: Array<{ start: string; end: string }>; // e.g., [{start:"09:00", end:"12:00"}]
 }
 
 // --- Saved Funnel Metadata (for home page list) ---

@@ -1289,6 +1289,260 @@ function SegmentPickerPreview({
   );
 }
 
+// ─── Hero Section ────────────────────────────────────────────
+
+function HeroSectionPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+  const bgUrl = (config.backgroundImageUrl as string) || "";
+  const headline = (config.headline as string) || "Welcome";
+  const subtitle = (config.subtitle as string) || "";
+  const logoUrl = (config.logoUrl as string) || "";
+  const height = config.height === "small" ? 200 : config.height === "large" ? 400 : config.height === "full" ? 500 : 300;
+  const opacity = typeof config.overlayOpacity === "number" ? config.overlayOpacity / 100 : 0.4;
+
+  return (
+    <div style={{
+      position: "relative", borderRadius: theme.borderRadius, overflow: "hidden",
+      height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
+      backgroundSize: "cover", backgroundPosition: "center",
+      backgroundColor: bgUrl ? undefined : theme.primaryColor,
+    }}>
+      <div style={{ position: "absolute", inset: 0, backgroundColor: `rgba(0,0,0,${opacity})` }} />
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "20px", maxWidth: 600 }}>
+        {logoUrl && <img src={logoUrl} alt="Logo" style={{ maxHeight: 60, marginBottom: 16, filter: "brightness(0) invert(1)" }} />}
+        <h1 style={{ color: "#fff", fontSize: 28, fontWeight: 800, fontFamily: theme.headlineFont, lineHeight: 1.2, marginBottom: 8 }}>{headline}</h1>
+        {subtitle && <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, lineHeight: 1.5 }}>{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Headline ────────────────────────────────────────────────
+
+function HeadlinePreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+  const text = (config.text as string) || "Section Title";
+  const size = config.size === "small" ? 18 : config.size === "medium" ? 24 : config.size === "xlarge" ? 40 : 32;
+  const alignment = (config.alignment as string) || "left";
+  const useTheme = config.useThemeColor !== false;
+  const variant = (config as Record<string, unknown>).variant;
+
+  return (
+    <div style={{ textAlign: alignment as "left" | "center" | "right" }}>
+      <h2 style={{
+        fontSize: size, fontWeight: 700, fontFamily: theme.headlineFont,
+        color: useTheme ? theme.primaryColor : "#1a1a1a",
+        margin: 0, lineHeight: 1.3,
+        ...(variant === "decorated" ? { borderBottom: `3px solid ${theme.primaryColor}`, paddingBottom: 8, display: "inline-block" } : {}),
+      }}>{text}</h2>
+    </div>
+  );
+}
+
+// ─── Text Block ──────────────────────────────────────────────
+
+function TextBlockPreview({ config, theme, variant }: { config: Record<string, unknown>; theme: ThemeConfig; variant?: string }) {
+  const content = (config.content as string) || "<p>Text content here</p>";
+  const maxWidth = config.maxWidth === "narrow" ? 400 : config.maxWidth === "medium" ? 600 : undefined;
+  const fontSize = config.fontSize === "small" ? 13 : config.fontSize === "large" ? 17 : 15;
+
+  const wrapStyle: React.CSSProperties = variant === "callout"
+    ? { backgroundColor: `${theme.primaryColor}08`, border: `1px solid ${theme.primaryColor}30`, borderRadius: theme.borderRadius, padding: 16 }
+    : variant === "quote"
+    ? { borderLeft: `4px solid ${theme.primaryColor}`, paddingLeft: 16, fontStyle: "italic" }
+    : {};
+
+  return (
+    <div style={{ maxWidth, ...wrapStyle }}>
+      <div style={{ fontSize, lineHeight: 1.7, color: "#374151", fontFamily: theme.bodyFont }}
+        dangerouslySetInnerHTML={{ __html: content }} />
+    </div>
+  );
+}
+
+// ─── Image Block ─────────────────────────────────────────────
+
+function ImageBlockPreview({ config, theme, variant }: { config: Record<string, unknown>; theme: ThemeConfig; variant?: string }) {
+  const imageUrl = (config.imageUrl as string) || "";
+  const altText = (config.altText as string) || "Image";
+  const caption = (config.caption as string) || "";
+  const width = config.width === "small" ? 300 : config.width === "medium" ? 500 : config.width === "large" ? 700 : "100%";
+  const borderRadius = typeof config.borderRadius === "number" ? config.borderRadius : theme.borderRadius;
+  const isCard = variant === "card";
+
+  if (!imageUrl) {
+    return (
+      <div style={{ width: typeof width === "number" ? width : "100%", height: 200, backgroundColor: "#f3f4f6", borderRadius, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 14 }}>
+        🏞️ No image URL set
+      </div>
+    );
+  }
+
+  return (
+    <figure style={{ margin: 0, maxWidth: typeof width === "number" ? width : "100%", ...(isCard ? { boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderRadius, overflow: "hidden", border: "1px solid #e5e7eb" } : {}) }}>
+      <img src={imageUrl} alt={altText} style={{ width: "100%", display: "block", borderRadius: isCard ? 0 : borderRadius, objectFit: "cover" }}
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      {caption && <figcaption style={{ fontSize: 12, color: "#6b7280", textAlign: "center", padding: "8px 12px" }}>{caption}</figcaption>}
+    </figure>
+  );
+}
+
+// ─── Category Picker ─────────────────────────────────────────
+
+function CategoryPickerPreview({ config, theme, resolvedInputs, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; resolvedInputs: Record<string, unknown>; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = (config.title as string) || "Select Products";
+  const currency = (config.currency as string) || "CAD";
+  const showImages = config.showImages !== false;
+
+  let categories: Array<{ name: string; products: Array<{ id: string; name: string; description?: string; price: number; unit?: string; stock?: number; imageUrl?: string; tags?: string[] }> }> = [];
+  try {
+    const raw = config.categories;
+    if (typeof raw === "string") categories = JSON.parse(raw);
+    else if (Array.isArray(raw)) categories = raw as typeof categories;
+  } catch {}
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(n);
+
+  return (
+    <div className="space-y-4">
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      {categories.map((cat, ci) => (
+        <div key={ci}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#6b7280", marginBottom: 8, borderBottom: "1px solid #e5e7eb", paddingBottom: 4 }}>{cat.name}</div>
+          <div className="space-y-2">
+            {cat.products.map((p) => (
+              <div key={p.id} onClick={() => toggle(p.id)} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                style={{ borderColor: selected.has(p.id) ? theme.primaryColor : "#e5e7eb", backgroundColor: selected.has(p.id) ? `${theme.primaryColor}08` : "#fff" }}>
+                {showImages && p.imageUrl && <img src={p.imageUrl} alt={p.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />}
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
+                  {p.description && <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.3 }}>{p.description}</div>}
+                  {p.tags && p.tags.length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {p.tags.map((t, ti) => <span key={ti} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, backgroundColor: "#f3f4f6", color: "#6b7280" }}>{t}</span>)}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: theme.primaryColor, whiteSpace: "nowrap" }}>
+                  {fmt(p.price)}{p.unit ? `/${p.unit}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {categories.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 20 }}>No categories configured</div>}
+    </div>
+  );
+}
+
+// ─── Text Input ──────────────────────────────────────────────
+
+function TextInputPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const label = (config.label as string) || "Your Answer";
+  const placeholder = (config.placeholder as string) || "Type here...";
+  const required = config.required === true;
+  const helpText = (config.helpText as string) || "";
+  const [value, setValue] = useState("");
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && " *"}</label>
+      <input type={(config.inputType as string) || "text"} value={value}
+        onChange={(e) => { setValue(e.target.value); onOutput({ value: e.target.value }); }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none"
+        style={{ borderColor: "#d1d5db", borderRadius: theme.borderRadius }} />
+      {helpText && <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{helpText}</p>}
+    </div>
+  );
+}
+
+// ─── Textarea Input ──────────────────────────────────────────
+
+function TextareaInputPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const label = (config.label as string) || "Additional Notes";
+  const placeholder = (config.placeholder as string) || "Enter your response here...";
+  const required = config.required === true;
+  const rows = typeof config.rows === "number" ? config.rows : 4;
+  const helpText = (config.helpText as string) || "";
+  const [value, setValue] = useState("");
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && " *"}</label>
+      <textarea value={value}
+        onChange={(e) => { setValue(e.target.value); onOutput({ value: e.target.value }); }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder={placeholder} rows={rows}
+        className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none resize-y"
+        style={{ borderColor: "#d1d5db", borderRadius: theme.borderRadius }} />
+      {helpText && <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{helpText}</p>}
+    </div>
+  );
+}
+
+// ─── Booking Widget ──────────────────────────────────────────
+
+function BookingWidgetPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+  const visible = config.visible !== false;
+  const categoryName = (config.categoryName as string) || "Booking Package";
+
+  if (!visible) {
+    return (
+      <div style={{ padding: 12, backgroundColor: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: theme.borderRadius, textAlign: "center" }}>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>📦 Hidden Booking Widget — <strong>{categoryName}</strong></span>
+        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Creates booking in background when quote is generated</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 16, backgroundColor: "#f0fdf4", border: `1px solid ${theme.primaryColor}30`, borderRadius: theme.borderRadius }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: theme.primaryColor, marginBottom: 4 }}>📦 {categoryName}</div>
+      <div style={{ fontSize: 12, color: "#6b7280" }}>Booking will be created with all selected products, dates, and guest counts.</div>
+    </div>
+  );
+}
+
+// ─── Payment Widget ──────────────────────────────────────────
+
+function PaymentWidgetPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
+  const title = (config.title as string) || "Secure Your Booking";
+  const amount = typeof config.amount === "number" ? config.amount : 10;
+  const amountType = (config.amountType as string) || "percent";
+  const description = (config.description as string) || "A deposit is required to secure your dates.";
+
+  const amountLabel = amountType === "percent" ? `${amount}% deposit` : amountType === "full" ? "Full payment" : `$${amount} deposit`;
+
+  return (
+    <div className="space-y-3">
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.5 }}>{description}</p>
+      <div style={{ padding: 16, backgroundColor: "#f8fafc", borderRadius: theme.borderRadius, border: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>Amount due: <strong style={{ color: theme.primaryColor }}>{amountLabel}</strong></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div><label style={{ fontSize: 11, color: "#9ca3af" }}>Card Number</label><div style={{ padding: "8px 12px", backgroundColor: "#fff", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, color: "#9ca3af" }}>•••• •••• •••• ••••</div></div>
+          <div><label style={{ fontSize: 11, color: "#9ca3af" }}>Expiry</label><div style={{ padding: "8px 12px", backgroundColor: "#fff", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, color: "#9ca3af" }}>MM / YY</div></div>
+        </div>
+        <button style={{ marginTop: 12, width: "100%", padding: "10px", backgroundColor: theme.primaryColor, color: "#fff", border: "none", borderRadius: theme.borderRadius, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          💳 Pay {amountLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Generic Fallback ─────────────────────────────────────────
 
 function GenericWidgetPreview({
@@ -1444,6 +1698,33 @@ export function WidgetRenderer({
           onOutput={stableOnOutput}
         />
       );
+      break;
+    case "hero-section":
+      content = <HeroSectionPreview config={widget.config} theme={theme} />;
+      break;
+    case "headline":
+      content = <HeadlinePreview config={widget.config} theme={theme} />;
+      break;
+    case "text-block":
+      content = <TextBlockPreview config={widget.config} theme={theme} variant={widget.variant} />;
+      break;
+    case "image-block":
+      content = <ImageBlockPreview config={widget.config} theme={theme} variant={widget.variant} />;
+      break;
+    case "category-picker":
+      content = <CategoryPickerPreview config={widget.config} theme={theme} resolvedInputs={resolvedInputs} onOutput={stableOnOutput} />;
+      break;
+    case "text-input":
+      content = <TextInputPreview config={widget.config} theme={theme} onOutput={stableOnOutput} />;
+      break;
+    case "textarea-input":
+      content = <TextareaInputPreview config={widget.config} theme={theme} onOutput={stableOnOutput} />;
+      break;
+    case "booking-widget":
+      content = <BookingWidgetPreview config={widget.config} theme={theme} />;
+      break;
+    case "payment-widget":
+      content = <PaymentWidgetPreview config={widget.config} theme={theme} />;
       break;
     default:
       content = template ? (

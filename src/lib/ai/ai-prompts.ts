@@ -125,30 +125,71 @@ When building funnels, follow these binding patterns so data flows correctly bet
 - contact-form outputs: contactInfo -> "contactInfo"
 - invoice inputs: checkIn, checkOut, guests, selectedRooms, selectedMeals, selectedActivities, contactInfo from variables; outputs totalPrice -> "totalPrice"
 - segment-picker outputs: selectedSegment -> "selectedSegment"
+- text-input outputs: value -> any variable name (set via config.variableName)
+- textarea-input outputs: value -> any variable name (set via config.variableName)
+- category-picker outputs: selectedProducts -> "selectedProducts", productTotal -> "productTotal"
+- booking-widget inputs: all upstream selections; outputs: bookingId -> "bookingId"
+- payment-widget inputs: bookingId, totalPrice from variables
+
+## Content & Layout Widgets
+
+Use these widgets to create visually rich, professional funnels:
+- **hero-section**: Full-width background image with overlay text. Use as first widget on welcome step. Config: backgroundImageUrl, headline, subtitle, logoUrl, height (small/medium/large/full), overlayOpacity.
+- **headline**: Standalone heading text. Use for section titles between widgets. Config: text, size (small/medium/large/xlarge), alignment (left/center/right), useThemeColor. Variant "decorated" adds an underline accent.
+- **text-block**: Rich text/HTML content. Use for descriptions, instructions, promotional copy. Config: content (HTML string), maxWidth (narrow/medium/full), fontSize (small/normal/large). Variants: "callout" (highlighted box), "quote" (left-border blockquote).
+- **image-block**: Inline image with optional caption. Config: imageUrl, altText, caption, width (small/medium/large/full), borderRadius. Variant "card" adds a card frame.
+
+## Transaction Widgets
+
+- **category-picker**: Grouped product selection (wedding venues, meeting rooms, AV equipment). Config: title, categories (JSON with products), multiSelect, showImages, showQuantity, currency.
+- **booking-widget**: Hidden backend widget that creates an actual booking. Config: categoryName, visible (usually false), products (JSON of extra items). Place on contact step.
+- **payment-widget**: Payment collection for deposits. Config: title, amount, amountType (percent/fixed/full), description, acceptedMethods.
+
+## Standalone Input Widgets
+
+- **text-input**: Single-line text field bound to any variable. Config: label, placeholder, required, inputType (text/email/tel/url/number), helpText, variableName. Use for "Organization Name", "Event Name", etc.
+- **textarea-input**: Multi-line text field. Config: label, placeholder, required, rows, helpText, variableName. Use for "Dietary Restrictions", "Additional Notes", etc.
 
 ## Standard Funnel Patterns
 
 **Full Booking Funnel** (resort/retreat center):
-1. Dates & Guests (date-picker + guest-counter)
-2. Room Selection (guest-rooms)
-3. Meals (meal-picker)
-4. Activities (activity-picker)
-5. Contact Details (contact-form)
-6. Review & Invoice (invoice)
+1. Welcome (hero-section + headline + text-block + segment-picker)
+2. Type selector per segment (option-picker with retreat/conference/family/wedding options)
+3. Dates (image-block + date-picker)
+4. Group Size (guest-counter)
+5. Venue Space [wedding only] (category-picker with venues)
+6. Room Selection (image-block + guest-rooms)
+7. Meals (image-block + meal-picker)
+8. Meeting Rooms [conference only] (category-picker with rooms + AV)
+9. AV Equipment [wedding only] (category-picker with AV)
+10. Activities (image-block + activity-picker)
+11. Contact Details (image-block + contact-form + text-input for org name + textarea-input for dietary/notes)
+12. Quote / Invoice (headline + text-block + invoice)
+13. Payment (payment-widget)
+14. Confirmation (headline + text-block + image-block)
 
 **Quotation Funnel** (conference/events):
-1. Event Type (segment-picker)
+1. Welcome (hero-section + segment-picker)
 2. Dates & Group Size (date-picker + guest-counter)
 3. Accommodation (guest-rooms)
 4. Catering (meal-picker)
-5. Contact & Notes (contact-form)
-6. Quote Summary (invoice)
+5. Meeting Rooms & AV (category-picker)
+6. Contact & Notes (contact-form + textarea-input)
+7. Quote Summary (invoice)
 
 **Simple Booking** (hotel/villa):
-1. Dates & Guests (date-picker + guest-counter)
-2. Room Selection (guest-rooms)
-3. Contact Details (contact-form)
-4. Review (invoice)
+1. Welcome (hero-section + headline)
+2. Dates & Guests (date-picker + guest-counter)
+3. Room Selection (guest-rooms)
+4. Contact Details (contact-form)
+5. Review (invoice)
+6. Payment (payment-widget)
+7. Confirmation (headline + text-block)
+
+**IMPORTANT: Use content widgets liberally.** Every step should have context — an image, a description, or a headline — not just a bare functional widget. Steps with only a widget and no context feel cold and impersonal. Add:
+- image-block with venue photos before room/meal/activity pickers
+- text-block with helpful descriptions and instructions
+- headline for clear section titles
 
 ## PROACTIVE BRANCHING INTELLIGENCE
 
@@ -193,7 +234,7 @@ The preview shows real venue products when available, or generic mock data when 
 Extract rooms, meals, and activities from whatever format the user provides (pasted text, CSV, structured data). Map each product to the correct category:
 - Rooms: id, name, description, imageUrl, pricePerNight, tags, maxAdults, maxChildren, stock
 - Meals: id, name, description, pricePerPerson, category (breakfast/lunch/dinner/snack), dietaryOptions
-- Activities: id, name, description, imageUrl, pricePerPerson, durationMinutes, maxParticipants
+- Activities: id, name, description, imageUrl, pricePerPerson, durationMinutes, maxParticipants, tags (string[]), timeslots ([{start, end}])
 
 ## Instructions
 

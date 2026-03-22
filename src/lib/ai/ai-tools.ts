@@ -25,15 +25,18 @@ export const aiTools: AiToolDefinition[] = [
         theme: {
           type: "object",
           description:
-            "Optional theme overrides: { primaryColor, secondaryColor, surfaceColor, headlineFont, bodyFont, borderRadius, cardStyle }",
+            "Optional theme overrides: { primaryColor, secondaryColor, accentColor, surfaceColor, headlineFont, bodyFont, borderRadius, cardStyle, logoUrl, timezone }",
           properties: {
             primaryColor: { type: "string" },
             secondaryColor: { type: "string" },
+            accentColor: { type: "string", description: "Accent/highlight color, e.g. amber/gold" },
             surfaceColor: { type: "string" },
             headlineFont: { type: "string" },
             bodyFont: { type: "string" },
             borderRadius: { type: "number" },
             cardStyle: { type: "string", enum: ["flat", "elevated", "outlined"] },
+            logoUrl: { type: "string", description: "URL to the venue/account logo" },
+            timezone: { type: "string", description: "e.g. America/Chicago" },
           },
         },
         steps: {
