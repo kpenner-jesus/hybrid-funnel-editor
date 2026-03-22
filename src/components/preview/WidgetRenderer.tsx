@@ -1667,55 +1667,146 @@ function CategoryPickerPreview({ config, theme, resolvedInputs, onOutput }: { co
   const title = (config.title as string) || "Select Products";
   const currency = (config.currency as string) || "CAD";
   const showImages = config.showImages !== false;
+  const showQuantity = config.showQuantity !== false;
 
-  let categories: Array<{ name: string; products: Array<{ id: string; name: string; description?: string; price: number; unit?: string; stock?: number; imageUrl?: string; tags?: string[] }> }> = [];
+  interface CatProduct { id: string; name: string; description?: string; price: number; salePrice?: number; unit?: string; stock?: number; imageUrl?: string; tags?: string[]; details?: string; capacity?: string }
+  interface CatGroup { name: string; products: CatProduct[] }
+
+  let categories: CatGroup[] = [];
   try {
     const raw = config.categories;
     if (typeof raw === "string") categories = JSON.parse(raw);
-    else if (Array.isArray(raw)) categories = raw as typeof categories;
+    else if (Array.isArray(raw)) categories = raw as CatGroup[];
   } catch {}
 
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    if (showQuantity) {
+      setQuantities((prev) => {
+        const cur = prev[id] || 0;
+        return { ...prev, [id]: cur > 0 ? 0 : 1 };
+      });
+    } else {
+      setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    }
   };
 
-  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(n);
+  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency, minimumFractionDigits: 2 }).format(n);
+
+  // Calculate totals
+  const allProducts = categories.flatMap((c) => c.products);
+  const totalSelected = showQuantity
+    ? Object.entries(quantities).filter(([, q]) => q > 0).length
+    : selected.size;
+  const subtotal = showQuantity
+    ? allProducts.reduce((sum, p) => sum + (quantities[p.id] || 0) * p.price, 0)
+    : allProducts.filter((p) => selected.has(p.id)).reduce((sum, p) => sum + p.price, 0);
+
+  useEffect(() => {
+    const selectedProducts = allProducts.filter((p) => (quantities[p.id] || 0) > 0 || selected.has(p.id)).map((p) => ({
+      ...p, quantity: quantities[p.id] || 1, lineTotal: p.price * (quantities[p.id] || 1),
+    }));
+    onOutput({ selectedProducts, productTotal: subtotal });
+  }, [quantities, selected, subtotal, onOutput]);
 
   return (
     <div className="space-y-4">
       <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+
       {categories.map((cat, ci) => (
         <div key={ci}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#6b7280", marginBottom: 8, borderBottom: "1px solid #e5e7eb", paddingBottom: 4 }}>{cat.name}</div>
-          <div className="space-y-2">
-            {cat.products.map((p) => (
-              <div key={p.id} data-item-label={p.name} onClick={() => toggle(p.id)} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                style={{ borderColor: selected.has(p.id) ? theme.primaryColor : "#e5e7eb", backgroundColor: selected.has(p.id) ? `${theme.primaryColor}08` : "#fff" }}>
-                {showImages && p.imageUrl && <img src={p.imageUrl} alt={p.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />}
-                <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
-                  {p.description && <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.3 }}>{p.description}</div>}
-                  {p.tags && p.tags.length > 0 && (
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      {p.tags.map((t, ti) => <span key={ti} style={{ fontSize: 9, padding: "1px 6px", borderRadius: 8, backgroundColor: "#f3f4f6", color: "#6b7280" }}>{t}</span>)}
+          <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 pb-1 border-b border-gray-200">{cat.name}</div>
+          <div className="space-y-3">
+            {cat.products.map((p) => {
+              const isSelected = (quantities[p.id] || 0) > 0 || selected.has(p.id);
+              const qty = quantities[p.id] || 0;
+              const images = p.imageUrl ? [p.imageUrl] : [];
+
+              return (
+                <div key={p.id} data-item-label={p.name}
+                  onClick={(e) => { e.stopPropagation(); if (!showQuantity) toggle(p.id); }}
+                  className="overflow-hidden border transition-all hover:shadow-md cursor-pointer"
+                  style={{
+                    borderRadius: theme.borderRadius,
+                    borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
+                    borderWidth: isSelected ? 2 : 1,
+                    backgroundColor: isSelected ? `${theme.primaryColor}05` : "#fff",
+                  }}
+                >
+                  {/* Image + content row */}
+                  <div className="flex">
+                    {/* Thumbnail or carousel */}
+                    {showImages && images.length > 0 && (
+                      <div className="w-24 h-24 shrink-0 overflow-hidden" style={{ borderRadius: `${theme.borderRadius}px 0 0 ${theme.borderRadius}px` }}>
+                        <img src={images[0]} alt={p.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+
+                    <div className="flex-1 p-3 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm">{p.name}</div>
+                          {p.description && <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{p.description}</div>}
+                        </div>
+
+                        {/* Price */}
+                        <PriceDisplay
+                          price={p.price}
+                          salePrice={p.salePrice}
+                          currency={currency}
+                          unit={p.unit || "day"}
+                          primaryColor={theme.primaryColor}
+                        />
+                      </div>
+
+                      {/* Tags */}
+                      {p.tags && p.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                          {p.tags.map((t, ti) => (
+                            <span key={ti} className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-gray-100 text-gray-500">{t}</span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Capacity if specified */}
+                      {p.capacity && (
+                        <div className="text-[10px] text-gray-400 mt-1">Capacity: {p.capacity}</div>
+                      )}
+
+                      {/* Quantity picker */}
+                      {showQuantity && (
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden">
+                            <button onClick={(e) => { e.stopPropagation(); setQuantities((prev) => ({ ...prev, [p.id]: Math.max(0, qty - 1) })); }}
+                              className="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm font-bold">−</button>
+                            <span className="w-6 text-center text-xs font-bold">{qty}</span>
+                            <button onClick={(e) => { e.stopPropagation(); setQuantities((prev) => ({ ...prev, [p.id]: Math.min(qty + 1, p.stock || 20) })); }}
+                              className="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-sm font-bold">+</button>
+                          </div>
+                          {/* Availability */}
+                          <AvailabilityBadge available={p.stock} total={p.stock} />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: theme.primaryColor, whiteSpace: "nowrap" }}>
-                  {fmt(p.price)}{p.unit ? `/${p.unit}` : ""}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
-      {categories.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: 20 }}>No categories configured</div>}
+
+      {categories.length === 0 && <div className="text-gray-400 text-sm text-center py-5">No categories configured</div>}
+
+      {/* Subtotal */}
+      {totalSelected > 0 && (
+        <div className="p-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between">
+          <span className="text-xs text-gray-500">{totalSelected} item{totalSelected !== 1 ? "s" : ""} selected</span>
+          <span className="font-bold text-sm" style={{ color: theme.primaryColor }}>{fmt(subtotal)}</span>
+        </div>
+      )}
     </div>
   );
 }

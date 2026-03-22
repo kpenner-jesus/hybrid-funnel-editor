@@ -141,9 +141,25 @@ Use these widgets to create visually rich, professional funnels:
 
 ## Transaction Widgets
 
-- **category-picker**: Grouped product selection (wedding venues, meeting rooms, AV equipment). Config: title, categories (JSON with products), multiSelect, showImages, showQuantity, currency.
+- **category-picker**: Grouped product selection (wedding venues, meeting rooms, AV equipment). Config: title, categories (JSON with products grouped by category name), multiSelect, showImages, showQuantity, currency. Each product: { id, name, description, price, salePrice, unit, stock, imageUrl, tags[], capacity }. Shows quantity pickers, sale pricing, availability badges, and subtotal.
 - **booking-widget**: Hidden backend widget that creates an actual booking. Config: categoryName, visible (usually false), products (JSON of extra items). Place on contact step.
 - **payment-widget**: Payment collection for deposits. Config: title, amount, amountType (percent/fixed/full), description, acceptedMethods.
+
+## Widget Feature Reference (for all product/selection widgets)
+
+**Image Carousel:** guest-rooms and activities show image carousels with left/right arrows when multiple images exist. Use the venue store's imageUrl for the primary image. Future: multiple images per product.
+
+**Sale Pricing:** Products with a salePrice show: 🏷 SALE badge, current sale price in bold, regular price crossed out. Set via salePrice field on any product in venue data or category-picker products.
+
+**Availability:** Shows "X/Y Available" in green/yellow/red based on stock. Set stock field on products. If unavailableUntil date is set, shows "Unavailable until [date]" in red.
+
+**Quantity Pickers:** guest-rooms and category-picker have +/- quantity buttons per product (not just toggle on/off). The quantity multiplies with price for the subtotal.
+
+**Subtotal Calculator:** guest-rooms and category-picker show a running subtotal at the bottom when items are selected. Includes night count multiplication for rooms.
+
+**Expandable Details:** guest-rooms support a "Show Details" toggle revealing amenities, features, and more info. Set via details and moreDetails fields on room products.
+
+**Tags:** All product widgets display tags as small chips below the product name. Tags help customers filter and understand what's included (e.g., "Kitchen", "Wi-Fi", "Two Bedrooms").
 
 ## Meal Widget — Expert Configuration Guide
 
@@ -259,9 +275,14 @@ ${funnelSummary}
 The preview shows real venue products when available, or generic mock data when not. **When the user provides venue-specific data (room names, prices, meal options, activities, images), you MUST call set_venue_products FIRST before creating the funnel.** This populates the preview with real data so the venue owner can see their actual rooms, meals, and activities during the Zoom demo.
 
 Extract rooms, meals, and activities from whatever format the user provides (pasted text, CSV, structured data). Map each product to the correct category:
-- Rooms: id, name, description, imageUrl, pricePerNight, tags, maxAdults, maxChildren, stock
+- Rooms: id, name, description, imageUrl, pricePerNight, salePrice (optional), tags, maxAdults, maxChildren, stock, details (HTML amenities), moreDetails (HTML convenience/extras)
 - Meals: id, name, description, pricePerPerson, category (breakfast/lunch/dinner/snack), dietaryOptions
 - Activities: id, name, description, imageUrl, pricePerPerson, durationMinutes, maxParticipants, tags (string[]), timeslots ([{start, end}])
+
+**Category picker products** (for wedding venues, meeting rooms, AV equipment) use this format in the categories JSON:
+\`\`\`json
+[{"name": "Category Name", "products": [{"id": "unique-id", "name": "Product Name", "description": "Short desc", "price": 500, "salePrice": null, "unit": "day", "stock": 1, "imageUrl": "url", "tags": ["tag1"], "capacity": "60-100 Guests"}]}]
+\`\`\`
 
 ## Instructions
 
