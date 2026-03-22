@@ -437,6 +437,53 @@ function RoomSelectionPreview({
 
 // ─── Meal Picker ──────────────────────────────────────────────
 
+// ─── Meal Widget Types ───────────────────────────────────────
+
+interface MealDef {
+  id: string;
+  name: string;
+  sortOrder: number;
+  adultPrice: number;
+  timeslots: Array<{ startTime: string; endTime: string }>;
+  timeslotLocked?: boolean;
+  allowCheckIn: "selectable" | "unselectable" | "preselected";
+  allowMiddle: "selectable" | "unselectable" | "preselected";
+  allowCheckOut: "selectable" | "unselectable" | "preselected";
+  cascadeFrom?: string[];
+}
+
+// Availability bar colors based on selectability
+const AVAIL_COLORS: Record<string, string> = {
+  selectable: "#22c55e",   // green
+  preselected: "#3b82f6",  // blue
+  unselectable: "#ef4444", // red
+};
+
+function formatTime(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
+
+function generateDates(checkIn: string | undefined, checkOut: string | undefined, nightCount: number): Date[] {
+  const dates: Date[] = [];
+  let start: Date;
+  if (checkIn) {
+    start = new Date(checkIn);
+  } else {
+    start = new Date();
+    start.setDate(start.getDate() + 7); // default: 1 week from now
+  }
+  const nights = nightCount || 3;
+  for (let i = 0; i <= nights; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+}
+
 function MealPickerPreview({
   config,
   theme,
@@ -448,106 +495,258 @@ function MealPickerPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const venueData = useVenueDataStore((s) => s.venueData);
-  const allMeals = venueData?.meals && venueData.meals.length > 0 ? venueData.meals : mockMeals;
+  // Parse meal definitions from config
+  let meals: MealDef[] = [];
+  try {
+    const raw = config.meals;
+    if (typeof raw === "string") meals = JSON.parse(raw);
+    else if (Array.isArray(raw)) meals = raw as MealDef[];
+  } catch { /* use empty */ }
+  if (meals.length === 0) {
+    // Fallback defaults
+    meals = [
+      { id: "breakfast", name: "Breakfast", sortOrder: 1, adultPrice: 18, timeslots: [{ startTime: "07:00", endTime: "09:00" }], allowCheckIn: "unselectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
+      { id: "lunch", name: "Lunch", sortOrder: 2, adultPrice: 20, timeslots: [{ startTime: "12:00", endTime: "14:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
+      { id: "supper", name: "Supper", sortOrder: 3, adultPrice: 25, timeslots: [{ startTime: "17:00", endTime: "19:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
+      { id: "night-snack", name: "Night Snack", sortOrder: 4, adultPrice: 8, timeslots: [{ startTime: "20:00", endTime: "22:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
+    ];
+  }
+  meals.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-  const guests = resolvedInputs?.guests as
-    | { adults: number; children: number }
-    | undefined;
-  const guestCount = guests ? guests.adults + guests.children : 2;
+  const currency = (config.currency as string) || "CAD";
+  const singleDate = !!config.singleDate;
+  const showSelectAll = config.showSelectAll !== false;
+  const kidsEnabled = config.kidsEnabled !== false;
+  const kidsPricingModel = (config.kidsPricingModel as string) || "percentage";
+  const kidsPercentage = (config.kidsPercentage as number) || 10;
 
-  useEffect(() => {
-    const selected = allMeals.filter((m) => selectedIds.has(m.id));
-    const mealTotal = selected.reduce(
-      (sum, m) => sum + m.pricePerPerson * guestCount,
-      0
-    );
-    onOutput({
-      selectedMeals: selected.map((m) => ({
-        ...m,
-        quantity: guestCount,
-        lineTotal: m.pricePerPerson * guestCount,
-      })),
-      mealTotal,
-    });
-  }, [selectedIds, guestCount, onOutput, allMeals]);
+  // Get dates from inputs
+  const checkIn = resolvedInputs?.checkIn as string | undefined;
+  const checkOut = resolvedInputs?.checkOut as string | undefined;
+  const nightCount = (resolvedInputs?.nightCount as number) || 3;
+  const dates = singleDate ? [new Date()] : generateDates(checkIn, checkOut, nightCount);
 
-  const toggle = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  // Selection state: Map<"mealId-dateIdx", timeslotIdx | -1 for unselected>
+  const [selections, setSelections] = useState<Map<string, number>>(new Map());
+
+  const getAvailability = (meal: MealDef, dateIdx: number): string => {
+    if (singleDate) return "selectable";
+    if (dateIdx === 0) return meal.allowCheckIn;
+    if (dateIdx === dates.length - 1) return meal.allowCheckOut;
+    return meal.allowMiddle;
+  };
+
+  const toggleCell = (mealId: string, dateIdx: number) => {
+    const key = `${mealId}-${dateIdx}`;
+    setSelections((prev) => {
+      const next = new Map(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.set(key, 0); // default to first timeslot
+        // Apply cascade
+        const meal = meals.find((m) => m.id === mealId);
+        if (meal?.cascadeFrom && meal.cascadeFrom.length > 0) {
+          for (const cascadeId of meal.cascadeFrom) {
+            const cascadeKey = `${cascadeId}-${dateIdx}`;
+            const cascadeMeal = meals.find((m) => m.id === cascadeId);
+            if (cascadeMeal) {
+              const avail = getAvailability(cascadeMeal, dateIdx);
+              if (avail !== "unselectable" && !next.has(cascadeKey)) {
+                next.set(cascadeKey, 0);
+              }
+            }
+          }
+        }
+      }
       return next;
     });
   };
 
+  const selectAllDay = (dateIdx: number) => {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const allSelected = meals.every((meal) => {
+        const avail = getAvailability(meal, dateIdx);
+        return avail === "unselectable" || next.has(`${meal.id}-${dateIdx}`);
+      });
+      for (const meal of meals) {
+        const key = `${meal.id}-${dateIdx}`;
+        const avail = getAvailability(meal, dateIdx);
+        if (avail === "unselectable") continue;
+        if (allSelected) next.delete(key);
+        else if (!next.has(key)) next.set(key, 0);
+      }
+      return next;
+    });
+  };
+
+  // Calculate totals
+  const guests = resolvedInputs?.guests as { adults?: number; children?: number } | undefined;
+  const adultCount = guests?.adults || 2;
+  const childCount = guests?.children || 0;
+
+  useEffect(() => {
+    let mealTotal = 0;
+    let kidsMealTotal = 0;
+    const selectedMeals: Array<Record<string, unknown>> = [];
+
+    selections.forEach((tsIdx, key) => {
+      const [mealId, dateIdxStr] = key.split("-");
+      const dateIdx = parseInt(dateIdxStr);
+      const meal = meals.find((m) => m.id === mealId);
+      if (!meal) return;
+      const ts = meal.timeslots[tsIdx] || meal.timeslots[0];
+
+      const adultLineTotal = meal.adultPrice * adultCount;
+      mealTotal += adultLineTotal;
+
+      if (kidsEnabled && childCount > 0) {
+        const kidsPrice = kidsPricingModel === "percentage"
+          ? meal.adultPrice * (kidsPercentage / 100)
+          : 0; // age-based calculated differently
+        kidsMealTotal += kidsPrice * childCount;
+      }
+
+      selectedMeals.push({
+        mealId: meal.id,
+        mealName: meal.name,
+        dateIdx,
+        date: dates[dateIdx]?.toISOString().split("T")[0],
+        timeslot: ts ? `${ts.startTime}-${ts.endTime}` : null,
+        adultQty: adultCount,
+        adultPrice: meal.adultPrice,
+        lineTotal: adultLineTotal,
+      });
+    });
+
+    onOutput({ selectedMeals, mealTotal, kidsMealTotal });
+  }, [selections, adultCount, childCount, kidsEnabled, kidsPricingModel, kidsPercentage, meals, dates, onOutput]);
+
   return (
     <div className="space-y-3">
-      <h3
-        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
-        className="text-lg font-semibold"
-      >
-        {(config.title as string) || "Meal Packages"}
+      {/* Title */}
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+        {(config.title as string) || "Meals"}
       </h3>
-      {["breakfast", "lunch", "dinner", "snack"].map((cat) => {
-        const meals = allMeals.filter((m) => m.category === cat);
-        if (meals.length === 0) return null;
-        return (
-          <div key={cat}>
-            {config.groupByCategory !== false && (
-              <div className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">
-                {cat}
+      {config.subtitle && (
+        <p className="text-sm text-gray-500">{String(config.subtitle)}</p>
+      )}
+      {kidsEnabled && (
+        <p className="text-xs text-center">
+          <span style={{ color: "#dc2626" }} className="font-semibold">Special rates</span>
+          {" "}for <strong>kids under 10</strong>
+        </p>
+      )}
+
+      {/* Grid: dates as rows, meals as columns */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden" style={{ borderRadius: theme.borderRadius }}>
+        {/* Header row — meal names + prices */}
+        <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: `100px repeat(${meals.length}, 1fr)` }}>
+          <div className="p-2 text-[10px] text-gray-400 font-medium">Date</div>
+          {meals.map((meal) => (
+            <div key={meal.id} className="p-2 text-center border-l border-gray-200" data-item-label={meal.name}>
+              <div className="text-xs font-bold text-gray-800">{meal.name}</div>
+              <div className="text-[10px] font-medium" style={{ color: theme.primaryColor }}>
+                Starting at {currency}${meal.adultPrice.toFixed(2)}/person
               </div>
-            )}
-            <div className="space-y-1.5">
-              {meals.map((meal) => {
-                const isSelected = selectedIds.has(meal.id);
-                return (
-                  <div
-                    key={meal.id}
-                    data-item-label={meal.name}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggle(meal.id);
-                    }}
-                    className="flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors"
-                    style={{
-                      borderRadius: `${theme.borderRadius / 2}px`,
-                      borderColor: isSelected
-                        ? theme.primaryColor
-                        : "#e5e7eb",
-                      backgroundColor: isSelected
-                        ? `${theme.primaryColor}08`
-                        : "#fff",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      readOnly
-                      className="accent-current"
-                      style={{ accentColor: theme.primaryColor }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{meal.name}</div>
-                      <div className="text-[10px] text-gray-500 truncate">
-                        {meal.description}
-                      </div>
-                    </div>
-                    <span
-                      className="text-sm font-semibold whitespace-nowrap"
-                      style={{ color: theme.primaryColor }}
-                    >
-                      {meal.currency || "CAD"} {meal.pricePerPerson}
-                    </span>
-                  </div>
-                );
-              })}
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+
+        {/* Date rows */}
+        {dates.map((date, dateIdx) => {
+          const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          const isCheckIn = dateIdx === 0 && !singleDate;
+          const isCheckOut = dateIdx === dates.length - 1 && !singleDate;
+
+          return (
+            <div key={dateIdx} className="border-b border-gray-100 last:border-0">
+              <div className="grid" style={{ gridTemplateColumns: `100px repeat(${meals.length}, 1fr)` }}>
+                {/* Date label */}
+                <div className="p-2 flex flex-col justify-center">
+                  <div className="text-[11px] font-medium text-gray-600">{dateStr}</div>
+                  {isCheckIn && <div className="text-[9px] text-gray-400">Check-in</div>}
+                  {isCheckOut && <div className="text-[9px] text-gray-400">Check-out</div>}
+                </div>
+
+                {/* Meal cells */}
+                {meals.map((meal) => {
+                  const avail = getAvailability(meal, dateIdx);
+                  const cellKey = `${meal.id}-${dateIdx}`;
+                  const isSelected = selections.has(cellKey);
+                  const barColor = AVAIL_COLORS[avail] || AVAIL_COLORS.selectable;
+                  const tsIdx = selections.get(cellKey) || 0;
+                  const ts = meal.timeslots[tsIdx] || meal.timeslots[0];
+
+                  return (
+                    <div key={meal.id} className="p-1.5 border-l border-gray-200">
+                      {/* Availability bar */}
+                      <div className="h-1.5 rounded-full mb-1" style={{ backgroundColor: barColor }} />
+
+                      {avail === "unselectable" ? (
+                        <div className="text-[10px] text-gray-400 text-center py-1">Unavailable</div>
+                      ) : (
+                        <select
+                          value={isSelected ? `${ts.startTime}-${ts.endTime}` : ""}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.value === "") {
+                              // Deselect
+                              setSelections((prev) => { const n = new Map(prev); n.delete(cellKey); return n; });
+                            } else {
+                              // Select with timeslot
+                              const idx = meal.timeslots.findIndex((t) => `${t.startTime}-${t.endTime}` === e.target.value);
+                              toggleCell(meal.id, dateIdx);
+                              if (idx >= 0) {
+                                setSelections((prev) => { const n = new Map(prev); n.set(cellKey, idx); return n; });
+                              }
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full text-[10px] border border-gray-200 rounded px-1 py-1 bg-white"
+                          style={{
+                            borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
+                            backgroundColor: isSelected ? `${theme.primaryColor}08` : "#fff",
+                          }}
+                        >
+                          <option value="">
+                            {avail === "preselected" ? `Optional ${meal.name}` : `Select ${meal.name}`}
+                          </option>
+                          {meal.timeslots.map((t, ti) => (
+                            <option key={ti} value={`${t.startTime}-${t.endTime}`}>
+                              {formatTime(t.startTime)} - {formatTime(t.endTime)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Select All for this day */}
+              {showSelectAll && (
+                <div className="text-right pr-2 pb-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); selectAllDay(dateIdx); }}
+                    className="text-[9px] font-medium hover:underline"
+                    style={{ color: theme.primaryColor }}
+                  >
+                    Select All
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Summary */}
+      <div className="text-xs text-gray-500 text-right">
+        {selections.size} meals selected for {adultCount} adults
+        {kidsEnabled && childCount > 0 && ` + ${childCount} kids`}
+      </div>
     </div>
   );
 }
