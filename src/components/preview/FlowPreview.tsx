@@ -21,8 +21,8 @@ const SEGMENT_COLORS = [
 
 // --- Layout row: either a single step or parallel columns ---
 interface LayoutRow {
-  type: "single" | "parallel";
-  stepIds: string[]; // single: [id], parallel: [id1, id2, ...]
+  type: "single" | "parallel" | "orphan";
+  stepIds: string[]; // single: [id], parallel: [id1, id2, ...], orphan: [id1, id2, ...]
   colors?: string[]; // segment colors for parallel columns
   labels?: string[]; // segment labels for parallel columns
 }
@@ -247,7 +247,25 @@ function buildLayoutRows(
     if (placed.has(step.id)) { i++; continue; }
     const branches = stepBranches.get(step.id);
 
-    if (!branches || branches.size === 0 || branches.size === branchTargets.length) {
+    if (!branches || branches.size === 0) {
+      // NOT reachable from ANY branch = ORPHAN step
+      // Collect consecutive orphans into one orphan group
+      const orphanGroup: string[] = [step.id];
+      placed.add(step.id);
+      for (let j = i + 1; j < remaining.length; j++) {
+        const ns = remaining[j];
+        if (placed.has(ns.id)) continue;
+        const nb = stepBranches.get(ns.id);
+        if (!nb || nb.size === 0) {
+          orphanGroup.push(ns.id);
+          placed.add(ns.id);
+        } else {
+          break;
+        }
+      }
+      rows.push({ type: "orphan", stepIds: orphanGroup });
+      i++;
+    } else if (branches.size === branchTargets.length) {
       // Reachable from ALL branches = convergence point → single row
       rows.push({ type: "single", stepIds: [step.id] });
       placed.add(step.id);
@@ -662,6 +680,49 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
               />
+            );
+          }
+
+          // Orphan row — disconnected steps, offset to the right with warning
+          if (row.type === "orphan") {
+            return (
+              <div key={`orphan-${ri}`} style={{ display: "flex", gap: 20, alignItems: "flex-start", marginLeft: 120 }}>
+                {/* Warning label */}
+                <div style={{
+                  writingMode: "vertical-rl", textOrientation: "mixed",
+                  fontSize: 10, fontWeight: 700, color: "#dc2626",
+                  padding: "8px 4px", backgroundColor: "#fef2f2",
+                  border: "2px dashed #fca5a5", borderRadius: 8,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  minHeight: 80,
+                }}>
+                  ⚠️ DISCONNECTED
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+                  {row.stepIds.map((stepId) => {
+                    const step = funnel.steps.find((s) => s.id === stepId);
+                    if (!step) return null;
+                    const idx = stepIndexMap.get(stepId) ?? 0;
+                    return (
+                      <StepCard
+                        key={stepId}
+                        step={step}
+                        stepIndex={idx}
+                        isActive={previewStep === stepId}
+                        theme={funnel.theme}
+                        selectedWidgetId={selectedWidgetId}
+                        borderColor="#dc2626"
+                        onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
+                        onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
+                        onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
+                        resolveWidgetInputs={resolveWidgetInputs}
+                        setWidgetOutput={setWidgetOutput}
+                        stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             );
           }
 

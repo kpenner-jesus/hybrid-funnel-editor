@@ -48,9 +48,42 @@ ${widgetList || "      (no widgets)"}`;
 
     const truncNote = totalSteps > 60 ? `\n    ... and ${totalSteps - 60} more steps (truncated)` : "";
 
+    // Detect orphan steps (not reachable from any navigation path)
+    const reachable = new Set<string>();
+    const navQueue = [currentFunnelState.steps[0]?.id].filter(Boolean);
+    const stepMap = new Map(currentFunnelState.steps.map((s, i) => [s.id, { step: s, index: i }]));
+    while (navQueue.length > 0) {
+      const id = navQueue.shift()!;
+      if (reachable.has(id)) continue;
+      reachable.add(id);
+      const entry = stepMap.get(id);
+      if (!entry) continue;
+      const { step: s, index: idx } = entry;
+      // Check segment picker branches
+      const segW = s.widgets.find((w: { templateId: string }) => w.templateId === "segment-picker");
+      if (segW) {
+        try {
+          const raw = (segW.config as Record<string, unknown>).options;
+          const opts = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : [];
+          for (const opt of opts) { if (opt.nextStep) navQueue.push(opt.nextStep); }
+        } catch {}
+      }
+      // Check navigation.next
+      if (s.navigation.next && stepMap.has(s.navigation.next)) {
+        navQueue.push(s.navigation.next);
+      } else if (idx < currentFunnelState.steps.length - 1) {
+        // Default next
+        navQueue.push(currentFunnelState.steps[idx + 1].id);
+      }
+    }
+    const orphanSteps = currentFunnelState.steps.filter((s) => !reachable.has(s.id));
+    const orphanNote = orphanSteps.length > 0
+      ? `\n  ⚠️ DISCONNECTED STEPS (${orphanSteps.length}): ${orphanSteps.map((s, i) => `[${currentFunnelState.steps.indexOf(s)}] "${s.title}"`).join(", ")}. These steps are not reachable from any navigation path. They need navigation.next wiring to connect them to the flow.`
+      : "";
+
     funnelSummary = `Name: ${currentFunnelState.name}
   Steps (${totalSteps}):
-${stepsSummary || "    (no steps)"}${truncNote}
+${stepsSummary || "    (no steps)"}${truncNote}${orphanNote}
   Theme: primary=${currentFunnelState.theme.primaryColor}, secondary=${currentFunnelState.theme.secondaryColor}, cardStyle=${currentFunnelState.theme.cardStyle}`;
   }
 
