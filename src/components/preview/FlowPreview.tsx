@@ -477,9 +477,10 @@ function StepCard({
               }}
               className="relative"
               style={{
-                backgroundColor: widgetBgHighlight ? `${theme.primaryColor}15` : undefined,
-                borderRadius: widgetBgHighlight ? "8px" : undefined,
-                transition: "background-color 0.2s ease",
+                backgroundColor: widgetBgHighlight ? `${theme.primaryColor}25` : undefined,
+                borderRadius: "8px",
+                boxShadow: widgetBgHighlight ? `inset 0 0 0 3px ${theme.primaryColor}50, 0 0 16px ${theme.primaryColor}20` : undefined,
+                transition: "background-color 0.2s ease, box-shadow 0.2s ease",
               }}
             >
               {/* Item-level highlighting: scoped to THIS widget via data-widget-scope */}
