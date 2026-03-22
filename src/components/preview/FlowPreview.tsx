@@ -165,6 +165,59 @@ function buildLayoutRows(
     }
   }
 
+  // 4b. Reverse propagation for orphan steps:
+  // Build reverse map (who navigates TO each step?)
+  const incomingMap = new Map<string, string[]>();
+  for (const [from, to] of nextMap) {
+    if (!incomingMap.has(to)) incomingMap.set(to, []);
+    incomingMap.get(to)!.push(from);
+  }
+  // Also add segment picker branch targets
+  for (const target of branchTargets) {
+    if (!incomingMap.has(target)) incomingMap.set(target, []);
+    incomingMap.get(target)!.push(branchStepId);
+  }
+
+  // For steps with no branch tags, try to inherit from incoming connections
+  // Repeat until stable
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 10) {
+    changed = false;
+    iterations++;
+    for (const step of funnel.steps) {
+      if (step.id === branchStepId) continue;
+      const existing = stepBranches.get(step.id);
+      if (existing && existing.size > 0) continue; // already tagged
+
+      // Check incoming connections
+      const sources = incomingMap.get(step.id) || [];
+      for (const srcId of sources) {
+        const srcBranches = stepBranches.get(srcId);
+        if (srcBranches && srcBranches.size > 0) {
+          if (!stepBranches.has(step.id)) stepBranches.set(step.id, new Set());
+          for (const b of srcBranches) stepBranches.get(step.id)!.add(b);
+          changed = true;
+        }
+      }
+    }
+    // Forward propagate from newly tagged steps
+    if (changed) {
+      for (const step of funnel.steps) {
+        const tags = stepBranches.get(step.id);
+        if (!tags || tags.size === 0) continue;
+        const nextId = nextMap.get(step.id);
+        if (nextId) {
+          if (!stepBranches.has(nextId)) stepBranches.set(nextId, new Set());
+          const nextTags = stepBranches.get(nextId)!;
+          for (const b of tags) {
+            if (!nextTags.has(b)) { nextTags.add(b); changed = true; }
+          }
+        }
+      }
+    }
+  }
+
   // 5. Build layout rows by processing steps in order
   const rows: LayoutRow[] = [];
   const placed = new Set<string>();
