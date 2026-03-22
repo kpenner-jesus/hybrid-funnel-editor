@@ -176,6 +176,380 @@ function VisualOptionsEditor({
   );
 }
 
+// --- Visual Meal Config Editor ---
+
+interface MealItem {
+  id: string;
+  name: string;
+  sortOrder: number;
+  adultPrice: number;
+  timeslots: Array<{ startTime: string; endTime: string }>;
+  timeslotLocked?: boolean;
+  allowCheckIn: string;
+  allowMiddle: string;
+  allowCheckOut: string;
+  cascadeFrom?: string[];
+}
+
+const DAY_OPTIONS = [
+  { value: "selectable", label: "✅ Available" },
+  { value: "unselectable", label: "❌ Unavailable" },
+  { value: "preselected", label: "🔵 Pre-selected" },
+];
+
+const MEAL_PRESETS = [
+  { id: "breakfast", name: "Breakfast", price: 18, time: "07:00-09:00", checkIn: "unselectable", middle: "selectable", checkOut: "selectable" },
+  { id: "brunch", name: "Brunch", price: 22, time: "10:00-12:00", checkIn: "selectable", middle: "selectable", checkOut: "selectable" },
+  { id: "lunch", name: "Lunch", price: 20, time: "12:00-14:00", checkIn: "selectable", middle: "selectable", checkOut: "selectable" },
+  { id: "afternoon-tea", name: "Afternoon Tea", price: 12, time: "14:00-16:00", checkIn: "selectable", middle: "selectable", checkOut: "unselectable" },
+  { id: "supper", name: "Supper", price: 25, time: "17:00-19:00", checkIn: "selectable", middle: "selectable", checkOut: "unselectable" },
+  { id: "night-snack", name: "Night Snack", price: 8, time: "20:00-22:00", checkIn: "selectable", middle: "selectable", checkOut: "unselectable" },
+  { id: "nutrition-break", name: "Nutrition Break", price: 6, time: "10:00-10:30", checkIn: "selectable", middle: "selectable", checkOut: "unselectable" },
+];
+
+function MealConfigEditor({
+  value,
+  onChange,
+  allMeals,
+}: {
+  value: unknown;
+  onChange: (val: string) => void;
+  allMeals?: MealItem[];
+}) {
+  const [mode, setMode] = useState<"easy" | "pro">("easy");
+  const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  let meals: MealItem[] = [];
+  try {
+    if (typeof value === "string") meals = JSON.parse(value);
+    else if (Array.isArray(value)) meals = value as MealItem[];
+  } catch { /* ignore */ }
+
+  const save = (newMeals: MealItem[]) => {
+    onChange(JSON.stringify(newMeals, null, 2));
+  };
+
+  const updateMeal = (index: number, updates: Partial<MealItem>) => {
+    const updated = [...meals];
+    updated[index] = { ...updated[index], ...updates };
+    save(updated);
+  };
+
+  const addMealFromPreset = (preset: typeof MEAL_PRESETS[0]) => {
+    const [startTime, endTime] = preset.time.split("-");
+    const newMeal: MealItem = {
+      id: `${preset.id}-${Date.now().toString(36)}`,
+      name: preset.name,
+      sortOrder: meals.length + 1,
+      adultPrice: preset.price,
+      timeslots: [{ startTime, endTime }],
+      timeslotLocked: false,
+      allowCheckIn: preset.checkIn,
+      allowMiddle: preset.middle,
+      allowCheckOut: preset.checkOut,
+      cascadeFrom: [],
+    };
+    save([...meals, newMeal]);
+    setShowAddMenu(false);
+  };
+
+  const addCustomMeal = () => {
+    const newMeal: MealItem = {
+      id: `custom-${Date.now().toString(36)}`,
+      name: "New Meal",
+      sortOrder: meals.length + 1,
+      adultPrice: 15,
+      timeslots: [{ startTime: "12:00", endTime: "13:00" }],
+      timeslotLocked: false,
+      allowCheckIn: "selectable",
+      allowMiddle: "selectable",
+      allowCheckOut: "selectable",
+      cascadeFrom: [],
+    };
+    save([...meals, newMeal]);
+    setShowAddMenu(false);
+    setExpandedMeal(newMeal.id);
+  };
+
+  const removeMeal = (index: number) => {
+    save(meals.filter((_, i) => i !== index));
+  };
+
+  const moveMeal = (from: number, to: number) => {
+    if (to < 0 || to >= meals.length) return;
+    const updated = [...meals];
+    const [moved] = updated.splice(from, 1);
+    updated.splice(to, 0, moved);
+    updated.forEach((m, i) => m.sortOrder = i + 1);
+    save(updated);
+  };
+
+  // Pro mode — raw JSON
+  if (mode === "pro") {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold text-amber-600 uppercase">Pro Mode</span>
+          <button onClick={() => setMode("easy")} className="text-[10px] text-primary hover:underline">← Easy Mode</button>
+        </div>
+        <textarea
+          value={typeof value === "string" ? value : JSON.stringify(value ?? [], null, 2)}
+          onChange={(e) => { try { onChange(JSON.stringify(JSON.parse(e.target.value), null, 2)); } catch { onChange(e.target.value); } }}
+          rows={12}
+          className="w-full px-3 py-2 text-[11px] border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white font-mono resize-y"
+        />
+      </div>
+    );
+  }
+
+  // Easy mode — visual cards
+  return (
+    <div>
+      {/* Mode toggle */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-gray-700">{meals.length} Meal{meals.length !== 1 ? "s" : ""}</span>
+        <button onClick={() => setMode("pro")} className="text-[10px] text-gray-400 hover:text-gray-600" title="Advanced JSON editor">
+          Pro ⚙
+        </button>
+      </div>
+
+      {/* Meal cards */}
+      <div className="space-y-2">
+        {meals.map((meal, i) => {
+          const isExpanded = expandedMeal === meal.id;
+          const ts = meal.timeslots?.[0];
+
+          return (
+            <div key={meal.id} className="border border-gray-200 rounded-lg overflow-hidden">
+              {/* Collapsed view — always visible */}
+              <div
+                className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-gray-50 cursor-pointer"
+                onClick={() => setExpandedMeal(isExpanded ? null : meal.id)}
+              >
+                {/* Reorder */}
+                <div className="flex flex-col">
+                  <button onClick={(e) => { e.stopPropagation(); moveMeal(i, i - 1); }} disabled={i === 0} className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-20">▲</button>
+                  <button onClick={(e) => { e.stopPropagation(); moveMeal(i, i + 1); }} disabled={i === meals.length - 1} className="text-[9px] text-gray-400 hover:text-gray-600 disabled:opacity-20">▼</button>
+                </div>
+
+                {/* Name + time */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 truncate">{meal.name}</div>
+                  <div className="text-[10px] text-gray-400">
+                    {ts ? `${ts.startTime} - ${ts.endTime}` : "No timeslot"}
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div className="text-sm font-bold text-primary">${meal.adultPrice}</div>
+
+                {/* Day indicators */}
+                <div className="flex gap-0.5">
+                  <span title="Check-in" className="w-2 h-2 rounded-full" style={{ backgroundColor: meal.allowCheckIn === "selectable" ? "#22c55e" : meal.allowCheckIn === "preselected" ? "#3b82f6" : "#ef4444" }} />
+                  <span title="Middle days" className="w-2 h-2 rounded-full" style={{ backgroundColor: meal.allowMiddle === "selectable" ? "#22c55e" : meal.allowMiddle === "preselected" ? "#3b82f6" : "#ef4444" }} />
+                  <span title="Check-out" className="w-2 h-2 rounded-full" style={{ backgroundColor: meal.allowCheckOut === "selectable" ? "#22c55e" : meal.allowCheckOut === "preselected" ? "#3b82f6" : "#ef4444" }} />
+                </div>
+
+                {/* Expand arrow */}
+                <span className="text-gray-400 text-xs">{isExpanded ? "▾" : "▸"}</span>
+              </div>
+
+              {/* Expanded view — detailed editing */}
+              {isExpanded && (
+                <div className="px-3 py-3 bg-gray-50 border-t border-gray-200 space-y-3">
+                  {/* Name */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium block mb-0.5">Meal Name</label>
+                    <input
+                      type="text"
+                      value={meal.name}
+                      onChange={(e) => updateMeal(i, { name: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Price */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium block mb-0.5">Adult Price (per person)</label>
+                    <input
+                      type="number"
+                      value={meal.adultPrice}
+                      onChange={(e) => updateMeal(i, { adultPrice: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-primary"
+                      min={0}
+                      step={0.01}
+                    />
+                  </div>
+
+                  {/* Timeslots */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium block mb-1">Timeslots</label>
+                    {(meal.timeslots || []).map((ts, ti) => (
+                      <div key={ti} className="flex items-center gap-1 mb-1">
+                        <input
+                          type="time"
+                          value={ts.startTime}
+                          onChange={(e) => {
+                            const newTs = [...(meal.timeslots || [])];
+                            newTs[ti] = { ...newTs[ti], startTime: e.target.value };
+                            updateMeal(i, { timeslots: newTs });
+                          }}
+                          className="px-1.5 py-1 text-[11px] border border-gray-200 rounded"
+                        />
+                        <span className="text-gray-400 text-[10px]">to</span>
+                        <input
+                          type="time"
+                          value={ts.endTime}
+                          onChange={(e) => {
+                            const newTs = [...(meal.timeslots || [])];
+                            newTs[ti] = { ...newTs[ti], endTime: e.target.value };
+                            updateMeal(i, { timeslots: newTs });
+                          }}
+                          className="px-1.5 py-1 text-[11px] border border-gray-200 rounded"
+                        />
+                        {(meal.timeslots || []).length > 1 && (
+                          <button
+                            onClick={() => {
+                              const newTs = (meal.timeslots || []).filter((_, j) => j !== ti);
+                              updateMeal(i, { timeslots: newTs });
+                            }}
+                            className="text-red-400 hover:text-red-600 text-xs"
+                          >✕</button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => updateMeal(i, { timeslots: [...(meal.timeslots || []), { startTime: "12:00", endTime: "13:00" }] })}
+                      className="text-[10px] text-primary hover:underline"
+                    >+ Add Timeslot</button>
+                  </div>
+
+                  {/* Timeslot locked */}
+                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={!!meal.timeslotLocked}
+                      onChange={(e) => updateMeal(i, { timeslotLocked: e.target.checked })}
+                      className="accent-primary"
+                    />
+                    Lock timeslot (show time but don't let customer change it)
+                  </label>
+
+                  {/* Day selectability */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium block mb-1">Day Availability</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <div className="text-[9px] text-gray-400 mb-0.5 text-center">Check-in</div>
+                        <select
+                          value={meal.allowCheckIn}
+                          onChange={(e) => updateMeal(i, { allowCheckIn: e.target.value })}
+                          className="w-full text-[10px] border border-gray-200 rounded px-1 py-1"
+                        >
+                          {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-400 mb-0.5 text-center">Middle</div>
+                        <select
+                          value={meal.allowMiddle}
+                          onChange={(e) => updateMeal(i, { allowMiddle: e.target.value })}
+                          className="w-full text-[10px] border border-gray-200 rounded px-1 py-1"
+                        >
+                          {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-400 mb-0.5 text-center">Check-out</div>
+                        <select
+                          value={meal.allowCheckOut}
+                          onChange={(e) => updateMeal(i, { allowCheckOut: e.target.value })}
+                          className="w-full text-[10px] border border-gray-200 rounded px-1 py-1"
+                        >
+                          {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cascade */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium block mb-1">
+                      Auto-select when this meal is picked (cascade)
+                    </label>
+                    <div className="space-y-1">
+                      {meals.filter((m) => m.id !== meal.id).map((otherMeal) => {
+                        const isLinked = (meal.cascadeFrom || []).includes(otherMeal.id);
+                        return (
+                          <label key={otherMeal.id} className="flex items-center gap-2 text-[11px] text-gray-600">
+                            <input
+                              type="checkbox"
+                              checked={isLinked}
+                              onChange={() => {
+                                const current = meal.cascadeFrom || [];
+                                const updated = isLinked
+                                  ? current.filter((id) => id !== otherMeal.id)
+                                  : [...current, otherMeal.id];
+                                updateMeal(i, { cascadeFrom: updated });
+                              }}
+                              className="accent-primary"
+                            />
+                            Also select {otherMeal.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => removeMeal(i)}
+                    className="text-[10px] text-red-500 hover:text-red-700 hover:underline"
+                  >
+                    Remove {meal.name}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add meal */}
+      <div className="mt-3 relative">
+        <button
+          onClick={() => setShowAddMenu(!showAddMenu)}
+          className="w-full py-2 text-xs font-medium text-primary border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
+        >
+          + Add Meal
+        </button>
+
+        {showAddMenu && (
+          <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+            {MEAL_PRESETS.filter((p) => !meals.some((m) => m.name.toLowerCase() === p.name.toLowerCase())).map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => addMealFromPreset(preset)}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b border-gray-100 last:border-0"
+              >
+                <span className="font-medium">{preset.name}</span>
+                <span className="text-gray-400 ml-1">${preset.price} · {preset.time}</span>
+              </button>
+            ))}
+            <button
+              onClick={addCustomMeal}
+              className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-primary/5 font-medium"
+            >
+              + Custom Meal...
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ConfigFieldInput({
   field,
   value,
@@ -457,6 +831,9 @@ export function WidgetConfig() {
           const isOptionsField = field.name === "options" && field.type === "json" &&
             (widget.templateId === "segment-picker" || widget.templateId === "option-picker");
 
+          // Use meal config editor for "meals" field on meal-picker
+          const isMealsField = field.name === "meals" && field.type === "json" && widget.templateId === "meal-picker";
+
           return (
             <div key={field.name}>
               <label className="block text-xs text-on-surface-variant mb-1">
@@ -473,6 +850,15 @@ export function WidgetConfig() {
                   }
                   showNextStep={widget.templateId === "segment-picker"}
                 />
+              ) : isMealsField ? (
+                <MealConfigEditor
+                  value={widget.config[field.name]}
+                  onChange={(val) =>
+                    updateWidgetConfig(selectedStepId, selectedWidgetId, {
+                      [field.name]: val,
+                    })
+                  }
+                />
               ) : (
                 <ConfigFieldInput
                   field={field}
@@ -484,7 +870,7 @@ export function WidgetConfig() {
                   }
                 />
               )}
-              {field.description && !isOptionsField && (
+              {field.description && !isOptionsField && !isMealsField && (
                 <p className="text-[10px] text-outline mt-0.5">{field.description}</p>
               )}
             </div>
