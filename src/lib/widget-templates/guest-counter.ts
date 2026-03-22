@@ -4,13 +4,17 @@ export const guestCounterTemplate: WidgetTemplate = {
   id: "guest-counter",
   name: "Guest Counter",
   category: "input",
-  description: "Counter controls for adults, children, and infants. Outputs a guests object used by room/meal/activity widgets for pricing and capacity checks. Pair with date-picker on the same step or an adjacent early step.",
+  description:
+    "Interactive counter for adults and configurable youth/children categories with slider for fast big-number selection. " +
+    "Supports age collection (average slider or individual age boxes). " +
+    "Configurable minimum adults, max per category, and multiple age categories. " +
+    "Outputs guests object used by room/meal/activity widgets for pricing.",
   icon: "👥",
   inputs: [
-    { name: "maxGuests", type: "number", label: "Maximum Total Guests", defaultValue: 20 },
+    { name: "maxGuests", type: "number", label: "Maximum Total Guests", defaultValue: 400 },
   ],
   outputs: [
-    { name: "guests", type: "object", label: "Guest Count", description: "Object with adults, children, infants counts" },
+    { name: "guests", type: "object", label: "Guest Count", description: "Object with adults, children counts per category, and ages" },
     { name: "totalGuests", type: "number", label: "Total Guest Count" },
   ],
   themeSlots: [
@@ -19,19 +23,36 @@ export const guestCounterTemplate: WidgetTemplate = {
     { name: "buttonText", cssProperty: "color", defaultValue: "#ffffff", label: "Button Text Color" },
   ],
   configFields: [
-    { name: "title", type: "text", label: "Section Title", defaultValue: "Number of Guests" },
-    { name: "showInfants", type: "boolean", label: "Show Infants Counter", defaultValue: true },
-    { name: "minAdults", type: "number", label: "Minimum Adults", defaultValue: 1 },
-    { name: "maxAdults", type: "number", label: "Maximum Adults", defaultValue: 10 },
-    { name: "maxChildren", type: "number", label: "Maximum Children", defaultValue: 10 },
-    { name: "maxInfants", type: "number", label: "Maximum Infants", defaultValue: 5 },
-    { name: "childAgeLabel", type: "text", label: "Children Age Label", defaultValue: "Ages 2-12" },
+    { name: "title", type: "text", label: "Section Title", defaultValue: "How Many Guests?" },
+    { name: "subtitle", type: "text", label: "Subtitle", defaultValue: "" },
+    { name: "minAdults", type: "number", label: "Minimum Adults", defaultValue: 20 },
+    { name: "maxAdults", type: "number", label: "Maximum Adults", defaultValue: 400 },
+    { name: "defaultAdults", type: "number", label: "Default Adults Count", defaultValue: 20 },
+    { name: "showSlider", type: "boolean", label: "Show Slider for Adults", defaultValue: true },
+    { name: "sliderMax", type: "number", label: "Slider Maximum", defaultValue: 200 },
+    // Youth/children categories — JSON array
+    { name: "youthCategories", type: "json", label: "Youth/Children Categories",
+      defaultValue: JSON.stringify([
+        { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, max: 100, defaultCount: 0 },
+        { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, max: 100, defaultCount: 0 },
+      ]),
+    },
+    // Age collection
+    { name: "collectAges", type: "boolean", label: "Collect Ages for Pricing", defaultValue: true },
+    { name: "ageCollectionMode", type: "select", label: "Default Age Collection Mode",
+      defaultValue: "average",
+      options: [
+        { value: "average", label: "Average Age Slider" },
+        { value: "individual", label: "Individual Age Boxes" },
+      ],
+    },
   ],
   variants: [
-    { id: "default", name: "Default", description: "Standard layout" },
+    { id: "default", name: "Full Slider", description: "Large number + slider + buttons" },
+    { id: "compact", name: "Compact", description: "Buttons only, no slider" },
   ],
   rules: [
-    { id: "min-adults", description: "Require at least one adult", condition: "guests.adults < config.minAdults", action: "error" },
+    { id: "min-adults", description: "Require minimum adults", condition: "guests.adults < config.minAdults", action: "error" },
     { id: "max-total", description: "Cap total guests", condition: "totalGuests > config.maxGuests", action: "error" },
   ],
 };

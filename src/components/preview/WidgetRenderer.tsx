@@ -188,96 +188,233 @@ function GuestCounterPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
+  const minAdults = (config.minAdults as number) || 20;
+  const maxAdults = (config.maxAdults as number) || 400;
+  const defaultAdults = (config.defaultAdults as number) || minAdults;
+  const showSlider = config.showSlider !== false;
+  const sliderMax = (config.sliderMax as number) || 200;
+  const collectAges = config.collectAges !== false;
 
-  const maxAdults = (config.maxAdults as number) || 10;
-  const maxChildren = (config.maxChildren as number) || 10;
-  const maxInfants = (config.maxInfants as number) || 5;
-  const minAdults = (config.minAdults as number) || 1;
+  const [adults, setAdults] = useState(defaultAdults);
 
-  useEffect(() => {
-    onOutput({
-      guests: { adults, children, infants },
-      totalGuests: adults + children,
-    });
-  }, [adults, children, infants]);
+  // Parse youth categories
+  let categories: Array<{ id: string; name: string; ageLabel: string; minAge: number; maxAge: number; max: number; defaultCount: number }> = [];
+  try {
+    const raw = config.youthCategories;
+    if (typeof raw === "string") categories = JSON.parse(raw);
+    else if (Array.isArray(raw)) categories = raw as typeof categories;
+  } catch { /* ignore */ }
+  if (categories.length === 0) {
+    categories = [
+      { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, max: 100, defaultCount: 0 },
+      { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, max: 100, defaultCount: 0 },
+    ];
+  }
 
-  const CounterRow = ({
-    label,
-    value,
-    min,
-    max,
-    onChange,
-  }: {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    onChange: (v: number) => void;
-  }) => (
-    <div data-item-label={label} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm">{label}</span>
-      <div className="flex items-center gap-3">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (value > min) onChange(value - 1);
-          }}
-          disabled={value <= min}
-          className="w-7 h-7 rounded-full border flex items-center justify-center text-sm disabled:opacity-30"
-          style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
-        >
-          -
-        </button>
-        <span className="text-sm font-medium w-4 text-center">{value}</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (value < max) onChange(value + 1);
-          }}
-          disabled={value >= max}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm disabled:opacity-50"
-          style={{ backgroundColor: theme.primaryColor }}
-        >
-          +
-        </button>
-      </div>
-    </div>
+  const [catCounts, setCatCounts] = useState<Record<string, number>>(
+    Object.fromEntries(categories.map(c => [c.id, c.defaultCount || 0]))
   );
+  const [avgAges, setAvgAges] = useState<Record<string, number>>(
+    Object.fromEntries(categories.map(c => [c.id, Math.round((c.minAge + c.maxAge) / 2)]))
+  );
+  const [showIndividual, setShowIndividual] = useState<Record<string, boolean>>({});
+  const [individualAges, setIndividualAges] = useState<Record<string, number[]>>({});
+
+  const totalChildren = Object.values(catCounts).reduce((a, b) => a + b, 0);
+
+  const outputRef = useRef({ adults: 0, total: 0 });
+  useEffect(() => {
+    const total = adults + totalChildren;
+    if (outputRef.current.adults === adults && outputRef.current.total === total) return;
+    outputRef.current = { adults, total };
+    onOutput({
+      guests: { adults, ...catCounts, totalChildren },
+      totalGuests: total,
+    });
+  }, [adults, catCounts, totalChildren]);
+
+  const updateCat = (id: string, val: number) => {
+    setCatCounts(prev => ({ ...prev, [id]: val }));
+  };
+
+  const hFont = `${theme.headlineFont}`;
+  const pColor = `${theme.primaryColor}`;
+  const sColor = `${theme.secondaryColor}`;
+  const titleText = `${config.title || "How Many Guests?"}`;
 
   return (
-    <div data-item-label="Guest Counter" className="space-y-3">
-      <h3
-        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
-        className="text-lg font-semibold"
-      >
-        {(config.title as string) || "Number of Guests"}
+    <div data-item-label="Guest Counter" className="space-y-4">
+      <h3 className="text-lg font-semibold" style={{ fontFamily: hFont, color: pColor }}>
+        {titleText}
       </h3>
-      <CounterRow
-        label="Adults"
-        value={adults}
-        min={minAdults}
-        max={maxAdults}
-        onChange={setAdults}
-      />
-      <CounterRow
-        label={`Children (${(config.childAgeLabel as string) || "Ages 2-12"})`}
-        value={children}
-        min={0}
-        max={maxChildren}
-        onChange={setChildren}
-      />
-      {config.showInfants !== false && (
-        <CounterRow
-          label="Infants (Under 2)"
-          value={infants}
-          min={0}
-          max={maxInfants}
-          onChange={setInfants}
-        />
-      )}
+      {config.subtitle ? <p className="text-sm text-gray-500">{`${config.subtitle}`}</p> : null}
+
+      {/* Adults — Large Display + Slider */}
+      <div data-item-label="Adults" className="text-center py-4">
+        <div className="flex items-center justify-center gap-4 mb-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); if (adults > minAdults) setAdults(adults - 1); }}
+            disabled={adults <= minAdults}
+            className="w-10 h-10 rounded-full border-2 flex items-center justify-center text-lg font-bold disabled:opacity-30 transition-all active:scale-90"
+            style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
+          >−</button>
+          <div className="text-center" style={{ minWidth: 80 }}>
+            <span className="text-5xl font-bold tabular-nums" style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}>{adults}</span>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (adults < maxAdults) setAdults(adults + 1); }}
+            disabled={adults >= maxAdults}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-bold disabled:opacity-50 transition-all active:scale-90 shadow-lg"
+            style={{ backgroundColor: theme.primaryColor }}
+          >+</button>
+        </div>
+        <span className="text-sm font-medium italic" style={{ fontFamily: theme.headlineFont, color: theme.secondaryColor }}>Adults</span>
+
+        {/* Slider */}
+        {showSlider && (
+          <div className="mt-4 px-2">
+            <input
+              type="range"
+              min={minAdults}
+              max={sliderMax}
+              value={Math.min(adults, sliderMax)}
+              onChange={(e) => setAdults(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, ${theme.primaryColor} 0%, ${theme.primaryColor} ${((adults - minAdults) / (sliderMax - minAdults)) * 100}%, #e5e7eb ${((adults - minAdults) / (sliderMax - minAdults)) * 100}%, #e5e7eb 100%)`,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="flex justify-between mt-1 text-[10px] text-gray-400 font-medium">
+              <span>{minAdults}</span>
+              <span>{Math.round(sliderMax * 0.25)}</span>
+              <span>{Math.round(sliderMax * 0.5)}</span>
+              <span>{Math.round(sliderMax * 0.75)}</span>
+              <span>{sliderMax}+</span>
+            </div>
+          </div>
+        )}
+
+        {adults < minAdults && (
+          <p className="text-xs mt-2" style={{ color: "#dc2626" }}>Minimum {minAdults} adults required for group bookings</p>
+        )}
+      </div>
+
+      {/* Youth/Children Categories */}
+      {categories.map(cat => (
+        <div key={cat.id} data-item-label={cat.name} className="pt-4 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="text-sm font-semibold">{cat.name}</h4>
+              <span className="text-xs text-gray-400">{cat.ageLabel}</span>
+            </div>
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${theme.primaryColor}08` }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); if ((catCounts[cat.id] || 0) > 0) updateCat(cat.id, (catCounts[cat.id] || 0) - 1); }}
+                disabled={(catCounts[cat.id] || 0) <= 0}
+                className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold disabled:opacity-30 transition-all"
+                style={{ borderColor: theme.primaryColor + "40", color: theme.primaryColor }}
+              >−</button>
+              <span className="text-lg font-bold w-8 text-center tabular-nums" style={{ fontFamily: theme.headlineFont }}>{catCounts[cat.id] || 0}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); if ((catCounts[cat.id] || 0) < cat.max) updateCat(cat.id, (catCounts[cat.id] || 0) + 1); }}
+                disabled={(catCounts[cat.id] || 0) >= cat.max}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                style={{ backgroundColor: theme.primaryColor }}
+              >+</button>
+            </div>
+          </div>
+
+          {/* Age Collection — only shows when count > 0 and collectAges is on */}
+          {collectAges && (catCounts[cat.id] || 0) > 0 && (
+            <div className="ml-2 mt-2 p-3 rounded-xl" style={{ backgroundColor: `${theme.primaryColor}05`, border: `1px solid ${theme.primaryColor}15` }}>
+              {/* Toggle between average and individual */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500">
+                  {showIndividual[cat.id] ? "Individual ages" : "Average age"}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowIndividual(prev => ({ ...prev, [cat.id]: !prev[cat.id] }));
+                    if (!individualAges[cat.id]) {
+                      setIndividualAges(prev => ({
+                        ...prev,
+                        [cat.id]: Array(catCounts[cat.id] || 0).fill(avgAges[cat.id] || Math.round((cat.minAge + cat.maxAge) / 2)),
+                      }));
+                    }
+                  }}
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors"
+                  style={{ color: theme.primaryColor, backgroundColor: `${theme.primaryColor}10` }}
+                >
+                  {showIndividual[cat.id] ? "Use average" : "Enter individual ages"}
+                </button>
+              </div>
+
+              {showIndividual[cat.id] ? (
+                /* Individual age boxes */
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: catCounts[cat.id] || 0 }).map((_, i) => (
+                    <input
+                      key={i}
+                      type="number"
+                      min={cat.minAge}
+                      max={cat.maxAge}
+                      value={individualAges[cat.id]?.[i] ?? Math.round((cat.minAge + cat.maxAge) / 2)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const val = parseInt(e.target.value) || cat.minAge;
+                        setIndividualAges(prev => {
+                          const arr = [...(prev[cat.id] || [])];
+                          arr[i] = Math.max(cat.minAge, Math.min(cat.maxAge, val));
+                          return { ...prev, [cat.id]: arr };
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-10 h-8 text-center text-xs font-medium border rounded-lg focus:outline-none focus:ring-1"
+                      style={{ borderColor: theme.primaryColor + "30", color: theme.primaryColor }}
+                      title={`${cat.name} #${i + 1} age`}
+                    />
+                  ))}
+                </div>
+              ) : (
+                /* Average age slider */
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-400">Average age:</span>
+                    <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>{avgAges[cat.id] || Math.round((cat.minAge + cat.maxAge) / 2)} yrs</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={cat.minAge}
+                    max={cat.maxAge}
+                    value={avgAges[cat.id] || Math.round((cat.minAge + cat.maxAge) / 2)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      setAvgAges(prev => ({ ...prev, [cat.id]: parseInt(e.target.value) }));
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, ${theme.primaryColor} 0%, ${theme.primaryColor} ${((avgAges[cat.id] || 5) - cat.minAge) / (cat.maxAge - cat.minAge) * 100}%, #e5e7eb ${((avgAges[cat.id] || 5) - cat.minAge) / (cat.maxAge - cat.minAge) * 100}%, #e5e7eb 100%)`,
+                    }}
+                  />
+                  <div className="flex justify-between mt-0.5 text-[9px] text-gray-300">
+                    <span>{cat.minAge} yrs</span>
+                    <span>{cat.maxAge} yrs</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Total */}
+      <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-400">Total guests</span>
+        <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>{adults + totalChildren}</span>
+      </div>
     </div>
   );
 }
