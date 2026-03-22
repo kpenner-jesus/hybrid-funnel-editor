@@ -264,24 +264,42 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load — delayed to let content lay out
+  // Center on initial load — uses multiple attempts to ensure content is measured
   useEffect(() => {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
-    // Wait for content to render before measuring
-    const timer = setTimeout(() => {
-      if (!containerRef.current || !contentRef.current) return;
+
+    let attempts = 0;
+    const tryCenter = () => {
+      attempts++;
+      if (!containerRef.current || !contentRef.current) {
+        if (attempts < 10) requestAnimationFrame(tryCenter);
+        return;
+      }
+
+      const contentW = contentRef.current.scrollWidth;
+      const contentH = contentRef.current.scrollHeight;
+      // Wait until content has actually rendered (non-zero dimensions)
+      if ((contentW < 100 || contentH < 100) && attempts < 10) {
+        requestAnimationFrame(tryCenter);
+        return;
+      }
+
       hasInitialized.current = true;
       const cw = containerRef.current.clientWidth;
       const ch = containerRef.current.clientHeight;
-      const contentW = contentRef.current.scrollWidth || 800;
-      const contentH = contentRef.current.scrollHeight || 2000;
-      // Calculate zoom to fit width, then center horizontally
-      const fitZoom = Math.min(0.3, (cw * 0.85) / contentW);
-      const scaledW = contentW * fitZoom;
-      const centerX = Math.max(20, (cw - scaledW) / 2);
-      setZoom(fitZoom);
-      setPan({ x: centerX, y: 30 });
-    }, 200);
+
+      // Target zoom: fit the content width with padding, cap at 28%
+      const targetZoom = Math.max(0.1, Math.min(0.28, (cw * 0.8) / contentW));
+      const scaledW = contentW * targetZoom;
+      // Center horizontally: place content in the middle of viewport
+      const centerX = (cw - scaledW) / 2;
+
+      setZoom(targetZoom);
+      setPan({ x: Math.max(10, centerX), y: 20 });
+    };
+
+    // Start after a short delay to let React render
+    const timer = setTimeout(tryCenter, 300);
     return () => clearTimeout(timer);
   }, [funnel?.steps.length]);
 
