@@ -124,16 +124,6 @@ export function PublishModal({ jsxCode, funnelName, onClose }: PublishModalProps
               Download .jsx
             </button>
             <button
-              onClick={() => downloadFile(jsxCode, fileName.replace(".jsx", ".txt"), "text/plain")}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v8m0 0l3-3m-3 3L5 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-              Download .txt
-            </button>
-            <button
               onClick={onClose}
               className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               aria-label="Close"
