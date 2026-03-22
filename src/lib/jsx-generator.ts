@@ -746,6 +746,18 @@ function generateMainFunnel(
       }
     }
   }
+  // Category-picker state — one state variable per category-picker widget instance
+  if (usedTemplates.has("category-picker")) {
+    for (const step of funnel.steps) {
+      for (const widget of step.widgets) {
+        if (widget.templateId === "category-picker") {
+          const stateKey = `catPick_${widget.instanceId.slice(-6)}`;
+          const capitalized = stateKey.charAt(0).toUpperCase() + stateKey.slice(1);
+          lines.push(`  const [${stateKey}, set${capitalized}] = useState([]);`);
+        }
+      }
+    }
+  }
   lines.push(``);
 
   // --- Rich-text style injection (matches wilderness-edge-funnel.jsx) ---
@@ -1310,39 +1322,72 @@ function generateWidgetInStep(
     case "category-picker": {
       const catTitle = (cfg.title as string) || "Select Products";
       const catCurrency = (cfg.currency as string) || "CAD";
+      const catStateKey = `catPick_${widget.instanceId.slice(-6)}`;
+      const catSetKey = `set${catStateKey.charAt(0).toUpperCase() + catStateKey.slice(1)}`;
       let catData: Array<{ name: string; products: Array<{ id: string; name: string; description?: string; price: number; unit?: string; imageUrl?: string; tags?: string[] }> }> = [];
       try {
         const raw = cfg.categories;
         if (typeof raw === "string") catData = JSON.parse(raw);
         else if (Array.isArray(raw)) catData = raw as typeof catData;
       } catch {}
+      const fmtCat = `new Intl.NumberFormat('en-CA', { style: 'currency', currency: '${catCurrency}' })`;
       const catLines: string[] = [];
       catLines.push(`            <h3 className="font-semibold text-lg mb-3" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(catTitle)}</h3>`);
       catLines.push(`            <div className="space-y-4">`);
       for (const cat of catData) {
         catLines.push(`              <div>`);
-        catLines.push(`                <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 pb-1 border-b border-gray-200">${escapeJsx(cat.name)}</div>`);
+        catLines.push(`                <div className="text-[11px] font-bold uppercase tracking-wider mb-2 pb-1 border-b" style={{ color: THEME.outline, borderColor: THEME.outlineVariant }}>${escapeJsx(cat.name)}</div>`);
+        catLines.push(`                <div className="space-y-2">`);
         for (const p of cat.products) {
-          catLines.push(`                <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 mb-2 cursor-pointer hover:border-gray-400">`);
-          if (p.imageUrl) catLines.push(`                  <img src="${escapeJsx(p.imageUrl)}" alt="${escapeJsx(p.name)}" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />`);
-          catLines.push(`                  <div className="flex-1"><div className="font-semibold text-sm">${escapeJsx(p.name)}</div>${p.description ? `<div className="text-xs text-gray-500">${escapeJsx(p.description)}</div>` : ""}</div>`);
-          catLines.push(`                  <div className="font-bold text-sm" style={{ color: THEME.primary }}>${new Intl.NumberFormat("en-CA", { style: "currency", currency: catCurrency }).format(p.price)}${p.unit ? `/${p.unit}` : ""}</div>`);
-          catLines.push(`                </div>`);
+          const pId = JSON.stringify(p.id);
+          catLines.push(`                  <div onClick={() => ${catSetKey}(prev => prev.includes(${pId}) ? prev.filter(x => x !== ${pId}) : [...prev, ${pId}])} className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all" style={{ background: ${catStateKey}.includes(${pId}) ? THEME.primary + '08' : THEME.surfaceContainerLowest, border: '2px solid ' + (${catStateKey}.includes(${pId}) ? THEME.primary : THEME.surfaceContainerHigh + '4D'), boxShadow: ${catStateKey}.includes(${pId}) ? '0 4px 12px rgba(0,0,0,0.08)' : '0 2px 6px rgba(0,0,0,0.03)' }}>`);
+          if (p.imageUrl) catLines.push(`                    <img src="${escapeJsx(p.imageUrl)}" alt="${escapeJsx(p.name)}" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover' }} />`);
+          catLines.push(`                    <div className="flex-1">`);
+          catLines.push(`                      <div className="font-semibold text-sm" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(p.name)}</div>`);
+          if (p.description) catLines.push(`                      <div className="text-xs mt-0.5" style={{ color: THEME.outline }}>${escapeJsx(p.description)}</div>`);
+          if (p.tags && p.tags.length > 0) catLines.push(`                      <div className="flex gap-1 mt-1 flex-wrap">${p.tags.map(t => `<span className="px-1.5 py-0.5 rounded text-[9px]" style={{ background: THEME.surfaceContainerHigh, color: THEME.outline }}>${escapeJsx(t)}</span>`).join("")}</div>`);
+          catLines.push(`                    </div>`);
+          catLines.push(`                    <div className="text-right">`);
+          catLines.push(`                      <div className="font-bold text-sm" style={{ color: THEME.primary }}>${fmtCat}.format(${p.price})</div>`);
+          if (p.unit) catLines.push(`                      <div className="text-[10px]" style={{ color: THEME.outline }}>per ${escapeJsx(p.unit)}</div>`);
+          catLines.push(`                    </div>`);
+          if (cfg.multiSelect !== false) {
+            catLines.push(`                    {${catStateKey}.includes(${pId}) && <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: THEME.primary }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>}`);
+          }
+          catLines.push(`                  </div>`);
         }
+        catLines.push(`                </div>`);
         catLines.push(`              </div>`);
       }
       catLines.push(`            </div>`);
       return catLines.join("\n");
     }
 
-    case "booking-widget":
-      // Booking widget is rendered by the Everybooking runtime, not in generated JSX
-      // The booking_widget JSON element is added to the step data directly
-      return `            {/* Booking widget — handled by Everybooking runtime */}`;
+    case "booking-widget": {
+      // The booking widget creates a hidden booking in the Everybooking backend
+      // In generated React funnels, this is handled by syncBooking in handleGenerateInvoice
+      const bwCategoryName = (cfg.categoryName as string) || "Booking";
+      const bwVisible = cfg.visible !== false;
+      if (!bwVisible) {
+        return `            {/* Hidden booking widget: ${escapeJsx(bwCategoryName)} — booking created via syncBooking */}`;
+      }
+      return `            <div className="p-4 rounded-xl" style={{ background: THEME.surfaceContainerLow, border: '1px solid ' + THEME.outlineVariant }}><div className="text-sm font-semibold" style={{ color: THEME.onSurface }}>${escapeJsx(bwCategoryName)}</div><div className="text-xs mt-1" style={{ color: THEME.outline }}>Booking will be created when you generate your quote.</div></div>`;
+    }
 
-    case "payment-widget":
-      // Payment widget uses the Everybooking payment SDK
-      return `            {/* Payment widget — handled by Everybooking runtime */}`;
+    case "payment-widget": {
+      const pwTitle = (cfg.title as string) || "Secure Your Booking";
+      const pwAmount = (cfg.amount as number) || 10;
+      const pwType = (cfg.amountType as string) || "percent";
+      const pwDesc = (cfg.description as string) || "";
+      const payLines: string[] = [];
+      payLines.push(`            <div className="p-6 rounded-2xl text-center" style={{ background: THEME.surfaceContainerLowest, border: '2px solid ' + THEME.primary + '30', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>`);
+      payLines.push(`              <h3 className="font-bold text-lg mb-2" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(pwTitle)}</h3>`);
+      if (pwDesc) payLines.push(`              <p className="text-sm mb-4" style={{ color: THEME.outline }}>${escapeJsx(pwDesc)}</p>`);
+      payLines.push(`              <div className="inline-block px-6 py-3 rounded-xl font-bold text-lg" style={{ background: THEME.primary + '10', color: THEME.primary }}>${pwType === "percent" ? `${pwAmount}% Deposit Required` : pwType === "full" ? "Full Payment" : `$${pwAmount} Deposit`}</div>`);
+      payLines.push(`              <div className="mt-4 text-xs" style={{ color: THEME.outline }}>Secure payment processed by Everybooking</div>`);
+      payLines.push(`            </div>`);
+      return payLines.join("\n");
+    }
 
     default:
       return `            {/* Unknown widget: ${widget.templateId} */}`;
