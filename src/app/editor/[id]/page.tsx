@@ -18,7 +18,65 @@ import { generateFunnelJSX } from "@/lib/jsx-generator";
 
 type EditorTab = "steps" | "theme" | "variables";
 
-export default function EditorPage() {
+// Error boundary to catch rendering crashes
+class EditorErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-8">
+          <div className="max-w-lg text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h1 className="text-xl font-bold mb-2">Editor crashed</h1>
+            <p className="text-sm text-gray-500 mb-4">
+              This is usually caused by corrupted saved data. Try clearing your browser storage.
+            </p>
+            <pre className="text-xs text-red-600 bg-red-50 p-3 rounded-lg mb-4 text-left overflow-auto max-h-32">
+              {this.state.error?.message}
+            </pre>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => {
+                  try { localStorage.removeItem("hybrid-funnel-editor-funnels"); } catch {}
+                  window.location.href = "/";
+                }}
+                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+              >
+                Clear Data & Go Home
+              </button>
+              <button
+                onClick={() => window.location.href = "/"}
+                className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function EditorPageWrapper() {
+  return (
+    <EditorErrorBoundary>
+      <EditorPageInner />
+    </EditorErrorBoundary>
+  );
+}
+
+function EditorPageInner() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
