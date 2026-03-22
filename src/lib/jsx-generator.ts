@@ -62,6 +62,10 @@ export function generateFunnelJSX(funnel: FunnelDefinition): string {
     lines.push(generateSegmentPickerComponent());
     lines.push(``);
   }
+  if (usedTemplates.has("meal-picker")) {
+    lines.push(generateMealTimeslotGrid());
+    lines.push(``);
+  }
 
   // --- Main funnel component ---
   lines.push(generateMainFunnel(funnel, catInfo, usedTemplates));
@@ -313,6 +317,224 @@ function BigQtyPicker({ value, onChange, min = 0, max = 9999 }) {
 
 function BigGuestCounter({ label, value, min, max, onChange }) {
   return <div className="p-5 rounded-[2rem]" style={{ background: THEME.surfaceContainerLowest, border: \`1px solid \${THEME.surfaceContainerHigh}4D\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="mb-4"><div className="font-semibold text-base" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{label}</div>{min > 1 && <div className="text-xs mt-0.5" style={{ color: THEME.outline }}>Minimum {min}</div>}</div><BigQtyPicker value={value} onChange={onChange} min={min} max={max} /></div>;
+}`;
+}
+
+// ────────────────────────────────────────────────────────────
+// MealTimeslotGrid — date × meal grid with availability bars
+// Matches the Everybooking booking_widget meal display
+// ────────────────────────────────────────────────────────────
+
+function generateMealTimeslotGrid(): string {
+  return `function MealTimeslotGrid({ meals, startDate, endDate, adults, currency = 'CAD', apiRef }) {
+  // Build date range array
+  const dates = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    const result = [];
+    const s = new Date(startDate + 'T00:00:00');
+    const e = new Date(endDate + 'T00:00:00');
+    for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) {
+      result.push(new Date(d));
+    }
+    return result;
+  }, [startDate, endDate]);
+
+  const dateCount = dates.length;
+
+  // Timeslot selections: key = "dateIdx-mealIdx", value = timeslot label or null
+  const [selections, setSelections] = useState({});
+  // Select-all per date row
+  const [selectAllState, setSelectAllState] = useState({});
+
+  // Determine cell availability: 'selectable', 'unselectable', or 'optional'
+  function cellState(meal, dateIdx) {
+    if (dateIdx === 0) return meal.allowCheckIn || 'selectable';
+    if (dateIdx === dateCount - 1) return meal.allowCheckOut || 'selectable';
+    return meal.allowMiddle || 'selectable';
+  }
+
+  // Get the default timeslot for a meal
+  function defaultTimeslot(meal) {
+    if (!meal.timeslots || meal.timeslots.length === 0) return null;
+    const ts = meal.timeslots[0];
+    return formatTime(ts.startTime || ts.start_time) + ' - ' + formatTime(ts.endTime || ts.end_time);
+  }
+
+  function formatTime(t) {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return h12 + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+  }
+
+  // Format date for display
+  function formatDate(d, idx) {
+    const label = d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (idx === 0) return { label, sub: 'Check-in' };
+    if (idx === dateCount - 1) return { label, sub: 'Check-out' };
+    return { label, sub: null };
+  }
+
+  // Toggle a cell
+  function toggleCell(dateIdx, mealIdx) {
+    const key = dateIdx + '-' + mealIdx;
+    setSelections(prev => {
+      const cur = prev[key];
+      if (cur) return { ...prev, [key]: null };
+      return { ...prev, [key]: defaultTimeslot(meals[mealIdx]) || 'selected' };
+    });
+  }
+
+  // Select all for a date row
+  function handleSelectAll(dateIdx) {
+    const allSelected = meals.every((meal, mi) => {
+      const state = cellState(meal, dateIdx);
+      if (state === 'unselectable') return true;
+      return !!selections[dateIdx + '-' + mi];
+    });
+    const newSelections = { ...selections };
+    meals.forEach((meal, mi) => {
+      const state = cellState(meal, dateIdx);
+      if (state === 'unselectable') return;
+      const key = dateIdx + '-' + mi;
+      newSelections[key] = allSelected ? null : (defaultTimeslot(meal) || 'selected');
+    });
+    setSelections(newSelections);
+    setSelectAllState(prev => ({ ...prev, [dateIdx]: !allSelected }));
+  }
+
+  // Count selected meals
+  const selectedCount = Object.values(selections).filter(Boolean).length;
+
+  // Bar color
+  function barColor(dateIdx, mealIdx) {
+    const state = cellState(meals[mealIdx], dateIdx);
+    if (state === 'unselectable') return '#ef4444'; // red
+    const key = dateIdx + '-' + mealIdx;
+    if (selections[key]) return '#22c55e'; // green
+    return '#eab308'; // yellow (available but not selected)
+  }
+
+  // Cell display
+  function cellDisplay(dateIdx, mealIdx) {
+    const meal = meals[mealIdx];
+    const state = cellState(meal, dateIdx);
+    const key = dateIdx + '-' + mealIdx;
+    const selected = selections[key];
+
+    if (state === 'unselectable') {
+      return { text: 'Unavailable', disabled: true, color: '#ef4444' };
+    }
+    if (selected) {
+      return { text: selected === 'selected' ? meal.name : selected, disabled: false, color: '#22c55e' };
+    }
+    return { text: 'Optional ' + meal.name, disabled: false, color: '#eab308' };
+  }
+
+  const fmtPrice = (p) => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(p);
+
+  if (dates.length === 0) {
+    return <div className="text-center py-8 text-gray-400 text-sm">Select dates first to see meal options</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto mb-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+      {/* Kids rate notice */}
+      <div className="text-center mb-4">
+        <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '0.875rem' }}>Special rates</span>
+        <span className="text-sm text-gray-600"> for <strong>kids under 10</strong></span>
+      </div>
+
+      <table className="w-full border-separate" style={{ borderSpacing: '0 8px', minWidth: meals.length * 180 + 120 }}>
+        <thead>
+          <tr>
+            <th className="text-left p-2 text-xs font-medium text-gray-500 w-28">Date</th>
+            {meals.map((meal, mi) => (
+              <th key={mi} className="text-center p-2" style={{ minWidth: 160 }}>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="font-bold text-sm" style={{ color: '#1f2937' }}>{meal.name}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                </div>
+                <div className="text-xs font-semibold mt-0.5" style={{ color: '#2563eb' }}>
+                  Starting at {fmtPrice(meal.adultPrice)}/persons
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dates.map((date, di) => {
+            const { label, sub } = formatDate(date, di);
+            return (
+              <tr key={di}>
+                <td className="p-2 align-top">
+                  <div className="text-sm font-medium text-gray-700">{label}</div>
+                  {sub && <div className="text-xs text-gray-400">{sub}</div>}
+                </td>
+                {meals.map((meal, mi) => {
+                  const bColor = barColor(di, mi);
+                  const cell = cellDisplay(di, mi);
+                  const state = cellState(meal, di);
+                  const key = di + '-' + mi;
+                  const hasTimeslots = meal.timeslots && meal.timeslots.length > 0;
+
+                  return (
+                    <td key={mi} className="p-1 align-top">
+                      {/* Availability bar */}
+                      <div className="w-full h-2 rounded-full mb-1" style={{ backgroundColor: bColor }} />
+
+                      {state === 'unselectable' ? (
+                        <div className="w-full px-2 py-2 rounded-lg text-sm text-gray-400 bg-gray-50 border border-gray-200">
+                          Unavailable
+                        </div>
+                      ) : hasTimeslots && meal.timeslots.length > 1 ? (
+                        <select
+                          className="w-full px-2 py-2 rounded-lg text-sm border border-gray-200 bg-white cursor-pointer"
+                          style={{ color: selections[key] ? '#1f2937' : '#9ca3af' }}
+                          value={selections[key] || ''}
+                          onChange={e => setSelections(prev => ({ ...prev, [key]: e.target.value || null }))}
+                        >
+                          <option value="">Optional {meal.name}</option>
+                          {meal.timeslots.map((ts, ti) => {
+                            const label2 = formatTime(ts.startTime || ts.start_time) + ' - ' + formatTime(ts.endTime || ts.end_time);
+                            return <option key={ti} value={label2}>{label2}</option>;
+                          })}
+                        </select>
+                      ) : (
+                        <select
+                          className="w-full px-2 py-2 rounded-lg text-sm border border-gray-200 bg-white cursor-pointer"
+                          style={{ color: selections[key] ? '#1f2937' : '#9ca3af' }}
+                          value={selections[key] || ''}
+                          onChange={e => setSelections(prev => ({ ...prev, [key]: e.target.value || null }))}
+                        >
+                          <option value="">Optional {meal.name}</option>
+                          <option value={defaultTimeslot(meal) || meal.name}>{defaultTimeslot(meal) || meal.name}</option>
+                        </select>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="p-1 align-top text-right">
+                  <button
+                    onClick={() => handleSelectAll(di)}
+                    className="text-xs font-semibold whitespace-nowrap mt-3"
+                    style={{ color: '#2563eb' }}
+                  >
+                    {selectAllState[di] ? 'Clear All' : 'Select All'}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div className="text-right text-sm text-gray-500 mt-2">
+        {selectedCount} meals selected for {adults || 0} adults
+      </div>
+    </div>
+  );
 }`;
 }
 
@@ -1140,12 +1362,53 @@ function generateWidgetInStep(
         `            {selRoomCount > 0 && <div className="mb-4 p-3.5 rounded-2xl flex items-center gap-2.5" style={{ background: \`\${THEME.primary}08\`, border: \`1px solid \${THEME.primary}20\` }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={THEME.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span className="text-sm font-semibold" style={{ color: THEME.onPrimaryContainer }}>{selRoomCount} room{selRoomCount !== 1 ? 's' : ''} selected</span></div>}`,
       ].join("\n");
 
-    case "meal-picker":
+    case "meal-picker": {
+      // Extract meal config - try meals JSON first, then fall back to venue data
+      let mealsJson = "[]";
+      try {
+        const rawMeals = cfg.meals;
+        if (typeof rawMeals === "string" && rawMeals.startsWith("[")) {
+          mealsJson = rawMeals;
+        } else if (Array.isArray(rawMeals)) {
+          mealsJson = JSON.stringify(rawMeals);
+        }
+      } catch { /* fall through */ }
+
+      // Parse meals to build the config array for MealTimeslotGrid
+      let parsedMeals: Array<{
+        name: string;
+        adultPrice: number;
+        timeslots: Array<{ startTime: string; endTime: string }>;
+        allowCheckIn: string;
+        allowMiddle: string;
+        allowCheckOut: string;
+      }> = [];
+      try { parsedMeals = JSON.parse(mealsJson); } catch { /* ignore */ }
+
+      // If no meals config, use defaults
+      if (parsedMeals.length === 0) {
+        parsedMeals = [
+          { name: "Breakfast", adultPrice: 18, timeslots: [{ startTime: "07:00", endTime: "09:00" }], allowCheckIn: "unselectable", allowMiddle: "selectable", allowCheckOut: "selectable" },
+          { name: "Lunch", adultPrice: 20, timeslots: [{ startTime: "12:00", endTime: "14:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "selectable" },
+          { name: "Supper", adultPrice: 25, timeslots: [{ startTime: "18:00", endTime: "20:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable" },
+          { name: "Night Snack", adultPrice: 8, timeslots: [{ startTime: "20:00", endTime: "22:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable" },
+        ];
+      }
+
+      const mealsConfigStr = JSON.stringify(parsedMeals).replace(/'/g, "\\'");
+      const currency = (cfg.currency as string) || "CAD";
+
       return [
-        `            <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2.5 flex items-center gap-2" style={{ color: THEME.outline }}><span className="inline-block w-4 h-px" style={{ background: THEME.outlineVariant }} /> Adult Meals</div>`,
-        `            <div className="space-y-3 mb-5">{adultMeals.map(m => { const q = selectedMeals[m.id] || 0, pr = Object.values(m.price || {})?.[0]?.base_price, pm = (m.parameters || [])[0], ts = (m.timeslots || [])[0]; return <div key={m.id} className="p-5 rounded-[2rem]" style={{ background: q > 0 ? \`\${THEME.primary}05\` : THEME.surfaceContainerLowest, border: \`2px solid \${q > 0 ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="flex items-start justify-between mb-3"><div className="flex-1"><div className="font-semibold text-sm" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{m.name}</div>{pr > 0 && <div className="font-bold text-xs mt-0.5" style={{ color: THEME.secondary }}>{fmtCurrency(pr)} <span className="font-normal" style={{ color: THEME.outline }}>/ {pm?.name || 'person'}</span></div>}{ts && <div className="text-[10px] mt-0.5" style={{ color: THEME.outline }}>{ts.start_time} - {ts.end_time}</div>}</div></div><CompactQtyPicker value={q} onChange={v => setSelectedMeals(p => ({ ...p, [m.id]: v }))} min={0} /></div>; })}</div>`,
-        `            {children > 0 && kidsMeals.length > 0 && <><div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2.5 flex items-center gap-2" style={{ color: THEME.outline }}><span className="inline-block w-4 h-px" style={{ background: THEME.outlineVariant }} /> Kids Meals</div><div className="space-y-3 mb-5">{kidsMeals.map(m => { const q = selectedMeals[m.id] || 0; return <div key={m.id} className="p-5 rounded-[2rem]" style={{ background: q > 0 ? \`\${THEME.primary}05\` : THEME.surfaceContainerLowest, border: \`2px solid \${q > 0 ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="font-semibold text-sm mb-3" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{m.name}</div><CompactQtyPicker value={q} max={children} onChange={v => setSelectedMeals(p => ({ ...p, [m.id]: v }))} min={0} /></div>; })}</div></>}`,
+        `            <MealTimeslotGrid`,
+        `              meals={${mealsConfigStr}}`,
+        `              startDate={startDate}`,
+        `              endDate={endDate}`,
+        `              adults={adults}`,
+        `              currency="${currency}"`,
+        `              apiRef={apiRef}`,
+        `            />`,
       ].join("\n");
+    }
 
     case "activity-picker":
       return [
