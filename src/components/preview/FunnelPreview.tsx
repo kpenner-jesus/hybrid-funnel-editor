@@ -57,25 +57,95 @@ export function FunnelPreview() {
   const stepBarRef = useRef<HTMLDivElement>(null);
   const activeStepRef = useRef<HTMLButtonElement>(null);
 
-  // Auto-scroll the active step into view
+  // Auto-scroll the active step into view (vertical rail)
   useEffect(() => {
     if (activeStepRef.current && stepBarRef.current) {
       activeStepRef.current.scrollIntoView({
         behavior: "smooth",
-        block: "nearest",
-        inline: "center",
+        block: "center",
+        inline: "nearest",
       });
     }
   }, [currentStepIndex]);
 
-  const manySteps = funnel.steps.length > 8;
-
   return (
-    <div className="h-full flex flex-col">
-      {/* Step progress indicator — scrollable for large funnels */}
+    <div className="h-full flex flex-row">
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Step content */}
+        <div
+          className="flex-1 overflow-y-auto px-6 pb-6"
+          style={{ backgroundColor: funnel.theme.surfaceColor }}
+        >
+          <div className="max-w-xl mx-auto space-y-4">
+            {/* Step title */}
+            <h2
+              className="text-2xl font-bold mt-4"
+              style={{
+                fontFamily: funnel.theme.headlineFont,
+                color: funnel.theme.primaryColor,
+              }}
+            >
+              {currentStep.title}
+            </h2>
+
+            {/* Widgets */}
+            {currentStep.widgets.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+                No widgets in this step. Add widgets from the editor panel.
+              </div>
+            ) : (
+              currentStep.widgets.map((widget) => (
+                <WidgetRendererWithBindings
+                  key={widget.instanceId}
+                  widget={widget}
+                  theme={funnel.theme}
+                  isSelected={selectedWidgetId === widget.instanceId}
+                  onClick={() => {
+                    selectStep(currentStep.id);
+                    selectWidget(widget.instanceId);
+                  }}
+                  resolveWidgetInputs={resolveWidgetInputs}
+                  setWidgetOutput={setWidgetOutput}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-between">
+          <button
+            onClick={goBack}
+            disabled={isFirst}
+            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            style={{ borderRadius: `${funnel.theme.borderRadius / 2}px` }}
+          >
+            {currentStep.navigation.backLabel || "Back"}
+          </button>
+
+          <span className="text-xs text-gray-400">
+            Step {currentStepIndex + 1} of {funnel.steps.length}
+          </span>
+
+          <button
+            onClick={goNext}
+            disabled={isLast}
+            className="px-5 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{
+              backgroundColor: funnel.theme.primaryColor,
+              borderRadius: `${funnel.theme.borderRadius / 2}px`,
+            }}
+          >
+            {currentStep.navigation.nextLabel || "Continue"}
+          </button>
+        </div>
+      </div>
+
+      {/* Vertical step rail — right side */}
       <div
         ref={stepBarRef}
-        className="flex items-center gap-1 px-4 pt-4 pb-3 overflow-x-auto scrollbar-thin"
+        className="w-14 border-l border-gray-200 bg-gray-50/50 overflow-y-auto flex flex-col items-center gap-1 py-3 shrink-0"
         style={{ scrollbarWidth: "thin" }}
       >
         {funnel.steps.map((step, i) => {
@@ -90,35 +160,26 @@ export function FunnelPreview() {
                   selectStep(step.id);
                 }}
                 title={step.title}
-                className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors ${
                   isActive
                     ? "text-white"
                     : isPast
-                    ? "text-white/80"
-                    : "text-gray-400 bg-gray-100"
+                    ? "text-white/90"
+                    : "text-gray-400 bg-gray-100 hover:bg-gray-200"
                 }`}
                 style={
                   isActive
-                    ? { backgroundColor: funnel.theme.primaryColor }
+                    ? { backgroundColor: funnel.theme.primaryColor, boxShadow: `0 0 0 2px white, 0 0 0 4px ${funnel.theme.primaryColor}` }
                     : isPast
-                    ? { backgroundColor: `${funnel.theme.primaryColor}99` }
+                    ? { backgroundColor: `${funnel.theme.primaryColor}88` }
                     : {}
                 }
               >
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border border-current/20">
-                  {i + 1}
-                </span>
-                {/* Show title only when few steps; truncate for many */}
-                {!manySteps && (
-                  <span className="hidden sm:inline truncate max-w-[80px]">{step.title}</span>
-                )}
-                {manySteps && isActive && (
-                  <span className="inline truncate max-w-[100px]">{step.title}</span>
-                )}
+                {i + 1}
               </button>
               {i < funnel.steps.length - 1 && (
                 <div
-                  className="shrink-0 w-4 h-0.5 rounded"
+                  className="shrink-0 w-0.5 h-2 rounded"
                   style={{
                     backgroundColor: isPast ? funnel.theme.primaryColor : "#e5e7eb",
                   }}
@@ -127,75 +188,6 @@ export function FunnelPreview() {
             </React.Fragment>
           );
         })}
-      </div>
-
-      {/* Step content */}
-      <div
-        className="flex-1 overflow-y-auto px-6 pb-6"
-        style={{ backgroundColor: funnel.theme.surfaceColor }}
-      >
-        <div className="max-w-xl mx-auto space-y-4">
-          {/* Step title */}
-          <h2
-            className="text-2xl font-bold mt-4"
-            style={{
-              fontFamily: funnel.theme.headlineFont,
-              color: funnel.theme.primaryColor,
-            }}
-          >
-            {currentStep.title}
-          </h2>
-
-          {/* Widgets */}
-          {currentStep.widgets.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
-              No widgets in this step. Add widgets from the editor panel.
-            </div>
-          ) : (
-            currentStep.widgets.map((widget) => (
-              <WidgetRendererWithBindings
-                key={widget.instanceId}
-                widget={widget}
-                theme={funnel.theme}
-                isSelected={selectedWidgetId === widget.instanceId}
-                onClick={() => {
-                  selectStep(currentStep.id);
-                  selectWidget(widget.instanceId);
-                }}
-                resolveWidgetInputs={resolveWidgetInputs}
-                setWidgetOutput={setWidgetOutput}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-between">
-        <button
-          onClick={goBack}
-          disabled={isFirst}
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          style={{ borderRadius: `${funnel.theme.borderRadius / 2}px` }}
-        >
-          {currentStep.navigation.backLabel || "Back"}
-        </button>
-
-        <span className="text-xs text-gray-400">
-          Step {currentStepIndex + 1} of {funnel.steps.length}
-        </span>
-
-        <button
-          onClick={goNext}
-          disabled={isLast}
-          className="px-5 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          style={{
-            backgroundColor: funnel.theme.primaryColor,
-            borderRadius: `${funnel.theme.borderRadius / 2}px`,
-          }}
-        >
-          {currentStep.navigation.nextLabel || "Continue"}
-        </button>
       </div>
     </div>
   );
