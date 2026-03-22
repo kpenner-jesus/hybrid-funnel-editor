@@ -73,9 +73,18 @@ export function AiChatPanel() {
   const [liveSize, setLiveSize] = useState(undockedSize);
 
   // Sync live state when store values change (e.g. on mount or external update)
+  // Resolve y=-1 sentinel to bottom-left on first render
   useEffect(() => {
-    if (!isDragging.current) setLivePos(undockedPosition);
-  }, [undockedPosition]);
+    if (!isDragging.current) {
+      if (undockedPosition.y === -1 && typeof window !== "undefined") {
+        const bottomY = window.innerHeight - undockedSize.height - 20;
+        setLivePos({ x: undockedPosition.x, y: Math.max(20, bottomY) });
+        setUndockedPosition({ x: undockedPosition.x, y: Math.max(20, bottomY) });
+      } else {
+        setLivePos(undockedPosition);
+      }
+    }
+  }, [undockedPosition, undockedSize.height, setUndockedPosition]);
   useEffect(() => {
     if (!isResizing.current) setLiveSize(undockedSize);
   }, [undockedSize]);

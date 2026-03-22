@@ -115,7 +115,7 @@ function loadSelectedModel(): ClaudeModel {
 
 // --- Undocked state persistence ---
 
-const DEFAULT_UNDOCKED_POSITION = { x: 100, y: 100 };
+const DEFAULT_UNDOCKED_POSITION = { x: 20, y: -1 }; // y=-1 means "bottom-left" — resolved at render time
 const DEFAULT_UNDOCKED_SIZE = { width: 400, height: 600 };
 
 function loadUndockedState(): {
@@ -141,8 +141,9 @@ function loadUndockedState(): {
       };
     }
   } catch { /* ignore */ }
+  // Default: undocked and in bottom-left for first-time users
   return {
-    isUndocked: false,
+    isUndocked: true,
     undockedPosition: DEFAULT_UNDOCKED_POSITION,
     undockedSize: DEFAULT_UNDOCKED_SIZE,
   };
@@ -169,7 +170,7 @@ export const useAiStore = create<AiStore>((set, get) => {
   accountContext: loadAccountContext(),
   funnelContext: defaultFunnelContext,
   error: null,
-  aiPanelOpen: false,
+  aiPanelOpen: true, // open by default
 
   // Undocked state
   isUndocked: undockedInit.isUndocked,
