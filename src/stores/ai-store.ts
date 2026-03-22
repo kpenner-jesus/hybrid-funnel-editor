@@ -768,5 +768,60 @@ function buildApiMessages(
     }
   }
 
+  // SAFETY: Validate that every tool_use in an assistant message has a matching
+  // tool_result in the immediately following user message. If not, remove the
+  // orphaned tool_use blocks to prevent Claude API 400 errors.
+  for (let i = apiMessages.length - 1; i >= 0; i--) {
+    const msg = apiMessages[i];
+    if (msg.role === "assistant" && Array.isArray(msg.content)) {
+      const toolUseIds = (msg.content as Array<Record<string, unknown>>)
+        .filter((b) => b.type === "tool_use")
+        .map((b) => b.id as string);
+      if (toolUseIds.length === 0) continue;
+
+      // Check next message for matching tool_results
+      const nextMsg = apiMessages[i + 1];
+      if (!nextMsg || nextMsg.role !== "user" || !Array.isArray(nextMsg.content)) {
+        // No tool_result follows — strip tool_use blocks from this assistant message
+        const cleaned = (msg.content as Array<Record<string, unknown>>).filter((b) => b.type !== "tool_use");
+        if (cleaned.length === 0) {
+          apiMessages.splice(i, 1); // Remove empty assistant message entirely
+        } else {
+          apiMessages[i] = { ...msg, content: cleaned };
+        }
+        continue;
+      }
+
+      // Check that ALL tool_use IDs have matching tool_results
+      const resultIds = new Set(
+        (nextMsg.content as Array<Record<string, unknown>>)
+          .filter((b) => b.type === "tool_result")
+          .map((b) => b.tool_use_id as string)
+      );
+      const missingIds = toolUseIds.filter((id) => !resultIds.has(id));
+      if (missingIds.length > 0) {
+        // Remove unmatched tool_use blocks
+        const cleaned = (msg.content as Array<Record<string, unknown>>).filter(
+          (b) => b.type !== "tool_use" || !missingIds.includes(b.id as string)
+        );
+        if (cleaned.length === 0) {
+          apiMessages.splice(i, 1);
+        } else {
+          apiMessages[i] = { ...msg, content: cleaned };
+        }
+      }
+    }
+  }
+
+  // Also ensure no consecutive same-role messages (Claude requires alternating)
+  for (let i = apiMessages.length - 1; i > 0; i--) {
+    if (apiMessages[i].role === apiMessages[i - 1].role) {
+      // Merge into the earlier message or remove the later one
+      if (apiMessages[i].role === "assistant") {
+        apiMessages.splice(i, 1);
+      }
+    }
+  }
+
   return apiMessages;
 }
