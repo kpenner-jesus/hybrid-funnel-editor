@@ -195,17 +195,6 @@ export const useAiStore = create<AiStore>((set, get) => {
       const config = widget.config;
 
       if (templateId === "segment-picker" || templateId === "option-picker") {
-        // Show current options
-        let options: Array<{ label?: string; id?: string }> = [];
-        try {
-          const raw = config.options;
-          if (typeof raw === "string") options = JSON.parse(raw);
-          else if (Array.isArray(raw)) options = raw;
-        } catch {}
-        if (options.length > 0) {
-          const optList = options.map((o) => `• ${o.label || o.id}`).join("\n");
-          greeting += `\n\n**Current options (${options.length}):**\n${optList}`;
-        }
         greeting += `\n\nTry: *"add a Yoga option"*, *"rename Church to Faith-based"*, *"remove the last one"*`;
       } else if (templateId === "date-picker") {
         greeting += `\n\nTry: *"set minimum stay to 3 nights"*, *"change the title"*`;
