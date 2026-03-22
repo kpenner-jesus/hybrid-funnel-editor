@@ -1438,7 +1438,7 @@ export function WidgetRenderer({
     case "segment-picker":
       content = (
         <SegmentPickerPreview
-          config={widget.config}
+          config={{ ...widget.config, style: widget.variant === "pills" ? "pills" : (widget.config.style || "cards") }}
           theme={theme}
           resolvedInputs={resolvedInputs}
           onOutput={stableOnOutput}
