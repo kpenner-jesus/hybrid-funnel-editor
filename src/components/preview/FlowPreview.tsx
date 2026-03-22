@@ -292,13 +292,26 @@ export function FlowPreview() {
     return { layoutRows: rows, connections: conns, stepIndexMap: idxMap };
   }, [funnel]);
 
-  // Center on initial load — calculate from layout data
+  // Calculate content width from layout rows (used for centering + explicit width)
+  const CARD_W = 380;
+  const PARALLEL_GAP = 30;
+  const contentWidth = useMemo(() => {
+    let maxW = CARD_W;
+    for (const row of layoutRows) {
+      if (row.type === "parallel") {
+        const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
+        if (rowW > maxW) maxW = rowW;
+      }
+    }
+    return maxW;
+  }, [layoutRows]);
+
+  // Center on initial load
   useEffect(() => {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
     hasInitialized.current = true;
 
     const cw = containerRef.current.clientWidth;
-    // contentWidth is calculated in render from layoutRows
     const targetZoom = Math.min(0.5, (cw * 0.95) / contentWidth);
     const scaledW = contentWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
@@ -387,17 +400,6 @@ export function FlowPreview() {
   });
 
   const ROW_GAP = 50;
-  const CARD_W = 380;
-  const PARALLEL_GAP = 30;
-
-  // Calculate the actual content width for the layout
-  let contentWidth = CARD_W;
-  for (const row of layoutRows) {
-    if (row.type === "parallel") {
-      const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
-      if (rowW > contentWidth) contentWidth = rowW;
-    }
-  }
 
   return (
     <div
