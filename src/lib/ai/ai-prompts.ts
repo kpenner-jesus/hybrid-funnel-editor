@@ -288,7 +288,7 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 
 1. **When the user provides venue data, ALWAYS call set_venue_products FIRST** before creating the funnel. This is critical for Zoom demos.
 2. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
-3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** The standard patterns above are simplified — real funnels break each question or choice into its own step for a focused, one-question-per-page experience.
+3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** CRITICAL: Never generate more than 30 steps in a single create_complete_funnel call. If the venue needs more, create 20-25 steps first and add more separately. Keep widget configs compact — do NOT inline huge JSON blobs in the steps array. For meals, just set title and categoryId; the system auto-populates meal definitions from venue data.
 4. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
 5. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
 6. Always set widget bindings so data flows correctly between steps.
