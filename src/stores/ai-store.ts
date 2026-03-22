@@ -222,6 +222,12 @@ export const useAiStore = create<AiStore>((set, get) => {
       aiPanelOpen: true,
       messages: [...s.messages, greetingMessage],
     }));
+
+    // Force the widget to stay selected after docking
+    // (the double-click's underlying click events may have already toggled it off)
+    setTimeout(() => {
+      useFunnelStore.getState().selectWidget(widgetId);
+    }, 0);
   },
 
   undockWidget: () => {
