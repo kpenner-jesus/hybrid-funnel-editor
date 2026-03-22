@@ -11,6 +11,72 @@ import type { FunnelDefinition, Step, WidgetInstance, ThemeConfig } from "./type
  *
  * Default mode: live (connects to real Everybooking API).
  */
+// Trace each segment path through the funnel and count steps per path
+function computePathLengths(funnel: FunnelDefinition): Record<string, number> {
+  const result: Record<string, number> = {};
+  const stepIdMap = new Map(funnel.steps.map((s, i) => [s.id, { step: s, index: i }]));
+
+  // Find segment picker options
+  for (const step of funnel.steps) {
+    const segWidget = step.widgets.find(w => w.templateId === "segment-picker");
+    if (!segWidget) continue;
+
+    let options: Array<{ id?: string; label?: string; nextStep?: string }> = [];
+    try {
+      const raw = (segWidget.config as Record<string, unknown>).options;
+      if (typeof raw === "string") options = JSON.parse(raw);
+      else if (Array.isArray(raw)) options = raw;
+    } catch { /* ignore */ }
+
+    for (const opt of options) {
+      const segLabel = opt.label || opt.id || "default";
+      const startStepId = opt.nextStep;
+      if (!startStepId) continue;
+
+      // Trace path: welcome → segment target → follow navigation until end
+      const visited = new Set<string>();
+      let count = 1; // count the welcome step
+      let currentId = startStepId;
+
+      while (currentId && !visited.has(currentId)) {
+        visited.add(currentId);
+        const entry = stepIdMap.get(currentId);
+        if (!entry) break;
+        count++;
+
+        const s = entry.step;
+        const idx = entry.index;
+
+        // Check conditionalNext (pick the one matching this segment, or default)
+        if (s.navigation.conditionalNext && s.navigation.conditionalNext.length > 0) {
+          let matched = false;
+          for (const rule of s.navigation.conditionalNext) {
+            if (rule.value === segLabel || rule.value === opt.id) {
+              currentId = rule.targetStepId;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            currentId = s.navigation.next || (idx < funnel.steps.length - 1 ? funnel.steps[idx + 1].id : "");
+          }
+        } else if (s.navigation.next) {
+          currentId = s.navigation.next;
+        } else if (idx < funnel.steps.length - 1) {
+          currentId = funnel.steps[idx + 1].id;
+        } else {
+          break;
+        }
+      }
+
+      result[segLabel] = count;
+      if (opt.id && opt.id !== segLabel) result[opt.id] = count;
+    }
+  }
+
+  return result;
+}
+
 export function generateFunnelJSX(funnel: FunnelDefinition): string {
   const lines: string[] = [];
 
@@ -1307,8 +1373,18 @@ function generateMainFunnel(
   lines.push(`  const progressSteps = [${stepLabels.join(", ")}];`);
   lines.push(`  const stepIcons = [${stepIconTypes.map(t => `'${t}'`).join(", ")}];`);
   lines.push(`  const stepOrder = [${stepNames.map((s) => `'${s}'`).join(", ")}];`);
+
+  // Build path-length map: for each segment value, trace the actual path to get step count
+  const pathLengths = computePathLengths(funnel);
+  const pathLengthEntries = Object.entries(pathLengths).map(([seg, len]) => `'${escapeJsString(seg)}': ${len}`).join(", ");
+  const defaultPathLen = Math.min(...Object.values(pathLengths).filter(v => v > 0), funnel.steps.length);
+
+  lines.push(`  const pathLengths = {${pathLengthEntries}};`);
+  lines.push(`  const myPathLength = pathLengths[selectedSegment] || ${defaultPathLen || funnel.steps.length};`);
   lines.push(`  const currentIdx = stepOrder.indexOf(step);`);
-  lines.push(`  const pPct = stepOrder.length > 1 && currentIdx >= 0 ? Math.min(100, Math.round((currentIdx / (stepOrder.length - 1)) * 100)) : 0;`);
+  // Count steps in the user's actual path up to current position
+  lines.push(`  const stepsInPath = Math.min(currentIdx + 1, myPathLength);`);
+  lines.push(`  const pPct = myPathLength > 1 && currentIdx >= 0 ? Math.min(100, Math.round((stepsInPath / myPathLength) * 100)) : 0;`);
   lines.push(`  const [showCelebration, setShowCelebration] = useState(false);`);
   lines.push(``);
 
@@ -1342,14 +1418,14 @@ function generateMainFunnel(
     // Immersive: floating pill only
     lines.push(`      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full shadow-lg" style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)' }}>`);
     lines.push(`        <span className="text-xs font-medium" style={{ color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
-    if (layout.showStepCounter) lines.push(`        <span className="text-[10px] ml-2" style={{ color: THEME.outline }}>{currentIdx + 1}/{stepOrder.length}</span>`);
+    if (layout.showStepCounter) lines.push(`        <span className="text-[10px] ml-2" style={{ color: THEME.outline }}>{stepsInPath}/{myPathLength}</span>`);
     lines.push(`      </div>`);
   } else if (dh === "magazine") {
     // Magazine: large editorial venue name
     lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.97)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
     lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center">`);
     lines.push(`          <div className="text-2xl lg:text-3xl font-bold" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</div>`);
-    if (layout.showStepCounter) lines.push(`          {currentIdx >= 0 && <div className="text-xs mt-1" style={{ color: THEME.outline }}>Step {currentIdx + 1} of {stepOrder.length}${layout.showTimeEstimate ? ` · ~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left` : ""}</div>}`);
+    if (layout.showStepCounter) lines.push(`          {currentIdx >= 0 && <div className="text-xs mt-1" style={{ color: THEME.outline }}>Step {stepsInPath} of {myPathLength}${layout.showTimeEstimate ? ` · ~{Math.max(1, Math.ceil((myPathLength - stepsInPath) * 0.25))} min left` : ""}</div>}`);
     lines.push(`        </div>`);
     lines.push(`        {step !== 'confirmation' && <div className="h-0.5 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700" style={{ width: \`\${pPct}%\`, background: THEME.primary }} /></div>}`);
     lines.push(`      </div>`);
@@ -1359,7 +1435,7 @@ function generateMainFunnel(
     lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between">`);
     lines.push(`          <span className="text-base font-bold" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
     lines.push(`          {step !== 'confirmation' && <div className="flex items-center gap-1">{stepOrder.map((s, i) => <div key={i} className="w-2 h-2 rounded-full transition-all" style={{ background: i <= currentIdx ? THEME.primary : THEME.surfaceContainerHigh, transform: i === currentIdx ? 'scale(1.3)' : 'scale(1)' }} />)}</div>}`);
-    if (layout.showStepCounter) lines.push(`          <span className="text-xs" style={{ color: THEME.outline }}>{currentIdx + 1}/{stepOrder.length}</span>`);
+    if (layout.showStepCounter) lines.push(`          <span className="text-xs" style={{ color: THEME.outline }}>{stepsInPath}/{myPathLength}</span>`);
     lines.push(`        </div>`);
     lines.push(`      </div>`);
   } else if (dh === "hero-banner") {
@@ -1384,8 +1460,8 @@ function generateMainFunnel(
     lines.push(`          <span className="text-lg font-bold italic" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
     if (layout.showStepCounter || layout.showTimeEstimate) {
       const parts: string[] = [];
-      if (layout.showStepCounter) parts.push("Step {currentIdx + 1} of {stepOrder.length}");
-      if (layout.showTimeEstimate) parts.push("~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left");
+      if (layout.showStepCounter) parts.push("Step {stepsInPath} of {myPathLength}");
+      if (layout.showTimeEstimate) parts.push("~{Math.max(1, Math.ceil((myPathLength - stepsInPath) * 0.25))} min left");
       lines.push(`          {currentIdx >= 0 && <span className="text-xs font-medium hidden sm:block" style={{ color: THEME.outline }}>${parts.join(" · ")}</span>}`);
     }
     lines.push(`        </div>`);
@@ -1396,7 +1472,7 @@ function generateMainFunnel(
     if (mh === "dots") {
       lines.push(`            <div className="md:hidden flex items-center justify-center gap-1 py-1">{stepOrder.map((s, i) => <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: i <= currentIdx ? THEME.primary : THEME.surfaceContainerHigh }} />)}</div>`);
     } else if (mh === "minimal") {
-      lines.push(`            <div className="md:hidden text-center py-1 text-[10px] font-medium" style={{ color: THEME.outline }}>{currentIdx + 1} of {stepOrder.length}</div>`);
+      lines.push(`            <div className="md:hidden text-center py-1 text-[10px] font-medium" style={{ color: THEME.outline }}>{stepsInPath} of {myPathLength}</div>`);
     } else if (mh === "hidden") {
       // No mobile header
     } else {
