@@ -123,6 +123,7 @@ export interface StepNavigation {
   back?: string | null;
   nextLabel?: string;
   backLabel?: string;
+  hideBack?: boolean; // if true, Back button is hidden — user cannot go backward past this step
   conditionalNext?: ConditionalNavRule[]; // evaluated in order, first match wins
 }
 

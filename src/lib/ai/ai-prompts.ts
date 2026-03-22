@@ -245,6 +245,7 @@ You are an EXPERT at building branching funnels. When creating a funnel with a s
 3. **Individual guests use SEPARATE steps** from group guests for: dates, guest count, rooms, meals, activities. Use conditionalNext or separate branch paths.
 4. **Every segment-specific step MUST be reachable** — if you create a step for "wedding venue space", there MUST be a conditionalNext rule somewhere that routes to it. NEVER create orphan steps.
 5. **After every segment-specific step, set navigation.next** to rejoin the main flow at the next shared step.
+6. **Use hideBack: true** on steps where going backward would break the flow — payment steps, confirmation steps, invoice steps, and any step after an irreversible action (e.g., after generating an invoice). The first step (welcome/segment picker) should also have hideBack since there's nothing to go back to.
 
 **Example: Wilderness Edge retreat center with 5 segments**
 The AI should AUTOMATICALLY build this structure:

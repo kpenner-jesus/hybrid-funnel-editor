@@ -918,8 +918,17 @@ function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("
         <input type="text" value={step.navigation.backLabel || ""}
           onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, backLabel: e.target.value } })}
           placeholder="Back"
-          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white" />
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white"
+          disabled={!!step.navigation.hideBack} />
       </div>
+
+      {/* Hide Back Button toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={!!step.navigation.hideBack}
+          onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, hideBack: e.target.checked || undefined } })}
+          className="rounded border-gray-300 text-primary focus:ring-primary" />
+        <span className="text-xs text-on-surface-variant">Hide Back button on this step</span>
+      </label>
 
       {/* Default Next Step */}
       <div>

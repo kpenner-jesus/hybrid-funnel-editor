@@ -58,6 +58,7 @@ export const aiTools: AiToolDefinition[] = [
                   nextLabel: { type: "string" },
                   backLabel: { type: "string" },
                   next: { type: "string", description: "Default step ID to navigate to. Used as fallback when no conditionalNext rule matches." },
+                  hideBack: { type: "boolean", description: "If true, hides the Back button on this step. Users cannot navigate backward past this step. Use on payment/confirmation steps or after irreversible actions." },
                   conditionalNext: {
                     type: "array",
                     description: "Conditional navigation rules. Evaluated in order — first match wins. Use this to route to different steps based on a variable value (e.g., eventSegment). Example: [{variable:'eventSegment', operator:'equals', value:'wedding', targetStepId:'venue-space'}]",

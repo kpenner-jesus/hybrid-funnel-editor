@@ -1189,7 +1189,7 @@ function generateMainFunnel(
   // --- Step rendering ---
   for (let i = 0; i < funnel.steps.length; i++) {
     const step = funnel.steps[i];
-    const prevStepId = i > 0 ? funnel.steps[i - 1].id : null;
+    const prevStepId = (i > 0 && !step.navigation.hideBack) ? funnel.steps[i - 1].id : null;
     // Determine next step: explicit navigation.next > default next in list
     let nextStepId = step.navigation.next || (i < funnel.steps.length - 1 ? funnel.steps[i + 1].id : null);
     const hasConditionalNav = step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0;
