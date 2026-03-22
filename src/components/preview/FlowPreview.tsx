@@ -314,8 +314,8 @@ export function FlowPreview() {
     hasInitialized.current = true;
 
     const cw = containerRef.current.clientWidth;
-    // Zoom to fill 85% of viewport width, cap at 65%
-    const targetZoom = Math.min(0.65, (cw * 0.85) / contentWidth);
+    // Zoom to fill 85% of viewport width, cap at 80%
+    const targetZoom = Math.min(0.80, (cw * 0.85) / contentWidth);
     const scaledW = contentWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
 
@@ -413,8 +413,8 @@ export function FlowPreview() {
       onWheel={handleWheel} onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
     >
-      {/* Zoom controls + Wired toggle */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-1 py-0.5">
+      {/* Zoom controls + Wired toggle — top-left so always visible */}
+      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-1 py-0.5">
         <button onClick={() => setZoom((z) => Math.max(0.05, z - 0.1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold">−</button>
         <span className="text-[10px] text-gray-500 w-10 text-center font-mono">{Math.round(zoom * 100)}%</span>
         <button onClick={() => setZoom((z) => Math.min(1.5, z + 0.1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold">+</button>
