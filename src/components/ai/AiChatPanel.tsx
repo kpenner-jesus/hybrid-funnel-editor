@@ -792,14 +792,19 @@ export function AiChatPanel() {
     return (
       <div
         ref={panelRef}
-        className="fixed z-50 flex flex-col bg-white rounded-2xl overflow-hidden group/panel transition-all duration-200"
+        className={`fixed z-50 flex flex-col bg-white overflow-hidden group/panel transition-all duration-200 ${
+          isMinimized ? "rounded-t-xl" : "rounded-2xl"
+        }`}
         style={{
-          left: livePos.x,
-          top: livePos.y,
+          left: isMinimized ? undefined : livePos.x,
+          right: isMinimized ? 16 : undefined,
+          top: isMinimized ? undefined : livePos.y,
+          bottom: isMinimized ? 0 : undefined,
           width: isMinimized ? 280 : liveSize.width,
           height: isMinimized ? 48 : liveSize.height,
-          boxShadow:
-            "0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)",
+          boxShadow: isMinimized
+            ? "0 -4px 20px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)"
+            : "0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)",
         }}
       >
         {/* Draggable header */}
@@ -858,9 +863,10 @@ export function AiChatPanel() {
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`fixed top-0 right-0 h-full w-[360px] bg-white border-l border-outline-variant z-50 flex flex-col shadow-xl transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 bg-white border-l border-outline-variant z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out ${
           aiPanelOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        } ${isMinimized ? "bottom-0 rounded-tl-xl" : "top-0 h-full"}`}
+        style={{ width: isMinimized ? 280 : 360 }}
       >
         {/* Header */}
         <div
