@@ -113,7 +113,12 @@ export function FunnelPreview() {
       <div className="h-full flex flex-col">
         {modeToggle}
         <div className="flex-1 overflow-hidden">
-          <FlowPreview />
+          <FlowPreview onEditWidget={(stepId, widgetId) => {
+            setPreviewStep(stepId);
+            selectStep(stepId);
+            selectWidget(widgetId);
+            setPreviewMode("step");
+          }} />
         </div>
       </div>
     );

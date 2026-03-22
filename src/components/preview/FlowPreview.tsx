@@ -151,6 +151,7 @@ function StepCard({
   borderColor,
   onStepClick,
   onWidgetClick,
+  onWidgetDoubleClick,
   resolveWidgetInputs,
   setWidgetOutput,
   stepRef,
@@ -163,6 +164,7 @@ function StepCard({
   borderColor?: string;
   onStepClick: () => void;
   onWidgetClick: (widgetId: string) => void;
+  onWidgetDoubleClick?: (widgetId: string) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
   stepRef: (el: HTMLDivElement | null) => void;
@@ -213,15 +215,22 @@ function StepCard({
           <div className="text-center py-4 text-gray-300 text-xs border border-dashed border-gray-200 rounded-lg">No widgets</div>
         ) : (
           step.widgets.map((widget) => (
-            <FlowWidgetRenderer
+            <div
               key={widget.instanceId}
-              widget={widget}
-              theme={theme}
-              isSelected={selectedWidgetId === widget.instanceId}
-              onClick={() => onWidgetClick(widget.instanceId)}
-              resolveWidgetInputs={resolveWidgetInputs}
-              setWidgetOutput={setWidgetOutput}
-            />
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onWidgetDoubleClick?.(widget.instanceId);
+              }}
+            >
+              <FlowWidgetRenderer
+                widget={widget}
+                theme={theme}
+                isSelected={selectedWidgetId === widget.instanceId}
+                onClick={() => onWidgetClick(widget.instanceId)}
+                resolveWidgetInputs={resolveWidgetInputs}
+                setWidgetOutput={setWidgetOutput}
+              />
+            </div>
           ))
         )}
       </div>
@@ -241,7 +250,7 @@ function StepCard({
 }
 
 // --- Main Flow Preview ---
-export function FlowPreview() {
+export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, widgetId: string) => void } = {}) {
   const {
     funnel, previewStep, setPreviewStep, selectedWidgetId,
     selectWidget, selectStep, setWidgetOutput, resolveWidgetInputs,
@@ -479,6 +488,7 @@ export function FlowPreview() {
                 selectedWidgetId={selectedWidgetId}
                 onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
+                onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -516,6 +526,7 @@ export function FlowPreview() {
                       borderColor={color}
                       onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
+                      onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
                       stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
