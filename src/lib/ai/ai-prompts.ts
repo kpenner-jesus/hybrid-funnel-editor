@@ -230,7 +230,7 @@ The meal-picker is a **timeslot-based booking grid** (dates as rows × meals as 
 7. Confirmation (headline + text-block)
 
 **IMPORTANT: Use content widgets liberally.** Every step should have context — an image, a description, or a headline — not just a bare functional widget. Steps with only a widget and no context feel cold and impersonal. Add:
-- image-block with venue photos before room/meal/activity pickers
+- image-block with venue photos before room/meal/activity pickers. Use \`search_images\` to find relevant stock photos if the venue hasn't provided images. Search for terms related to the step's purpose and the venue type.
 - text-block with helpful descriptions and instructions
 - headline for clear section titles
 

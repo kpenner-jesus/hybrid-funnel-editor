@@ -81,6 +81,27 @@ export async function POST(request: Request) {
       ? `\n**Focused item:** "${focusedItem}" — The user double-clicked THIS specific item. ALL commands apply to this item unless they explicitly say otherwise.\n`
       : "";
 
+    // Extract step title and venue context for image search intelligence
+    let stepTitle = "";
+    let stepContext = "";
+    try {
+      const funnelState = context.currentFunnelState;
+      if (funnelState && funnelState.steps[dc.stepIndex]) {
+        const step = funnelState.steps[dc.stepIndex];
+        stepTitle = step.title || "";
+        // Build context from all widgets on this step
+        stepContext = step.widgets.map((w: Record<string, unknown>) => {
+          const cfg = w.config as Record<string, unknown>;
+          return [cfg?.title, cfg?.headline, cfg?.text, cfg?.subtitle].filter(Boolean).join(" ");
+        }).join(" ").slice(0, 500);
+      }
+    } catch {}
+
+    const venueContext = context.account || {};
+    const venueName = (venueContext as Record<string, unknown>).venueName || "";
+    const venueType = (venueContext as Record<string, unknown>).venueType || "";
+    const location = (venueContext as Record<string, unknown>).location || "";
+
     systemPrompt = `## OBJECT EDIT MODE — SCOPED TO A SINGLE WIDGET
 
 You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and expects ALL commands to apply ONLY to this widget.
@@ -88,6 +109,9 @@ You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and
 **Docked widget:** ${dc.label}
 **Step index:** ${dc.stepIndex} (use this for tool calls)
 **Widget index:** ${dc.widgetIndex} (use this for tool calls)
+**Step title:** "${stepTitle}"
+${stepContext ? `**Step context:** ${stepContext.slice(0, 300)}\n` : ""}
+${venueName ? `**Venue:** ${venueName}` : ""}${venueType ? ` (${venueType})` : ""}${location ? ` — ${location}` : ""}
 ${focusedItemSection}
 **Current widget config (this is what the widget currently contains):**
 \`\`\`json
@@ -103,8 +127,13 @@ RULES:
 6. ${focusedItem ? `The user is focused on "${focusedItem}". When they say "change the price", "update the description", etc., apply it to "${focusedItem}" specifically. Find it in the config JSON and modify only that item.` : "When the user refers to a specific product, option, or item, find it in the config above and modify it."}
 7. When modifying options/categories JSON, preserve the existing structure and only change the specific field requested. Output the COMPLETE updated JSON string, not just the changed field.
 8. **NEVER use suggest_improvements when docked.** You are here to EDIT this widget, not analyze the whole funnel. If the user's request is unclear, ask a clarifying question instead.
-9. **For image widgets:** You CAN search for professional stock photos using the \`search_images\` tool. If the user says "get a better picture" or "find a photo of X", use search_images to find options, then apply the best one with update_widget_config. You can also use venue data image URLs if available.
-10. **For any widget:** If the user's edit request requires information you don't have (a URL, a price, a name), ASK for it. Do not guess or use placeholder data.
+9. **For image search:** Use \`search_images\` to find professional stock photos. When crafting search queries, use the step title, step context, and venue info above to find RELEVANT images. Examples:
+   - Step "What type of retreat?" for a lakeside venue → search "retreat center lakeside nature"
+   - Step "Select Catered Meals" → search "chef buffet dining hall group catering"
+   - Step "Add Activities" for a Manitoba venue → search "outdoor adventure kayaking nature"
+   - Hero section for a wedding venue → search "wedding venue outdoor tented reception"
+   After getting results, pick the BEST match and apply it with update_widget_config. For hero-section use backgroundImageUrl, for image-block use imageUrl or url.
+10. **For any widget:** If the user's edit request requires information you don't have (a price, a name), ASK for it. Do not guess or use placeholder data.
 
 ---
 
