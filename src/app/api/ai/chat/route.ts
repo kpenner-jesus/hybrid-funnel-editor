@@ -98,9 +98,9 @@ export async function POST(request: Request) {
     } catch {}
 
     const venueContext = context.account || {};
-    const venueName = (venueContext as Record<string, unknown>).venueName || "";
-    const venueType = (venueContext as Record<string, unknown>).venueType || "";
-    const location = (venueContext as Record<string, unknown>).location || "";
+    const venueName = (venueContext as unknown as Record<string, unknown>).venueName || "";
+    const venueType = (venueContext as unknown as Record<string, unknown>).venueType || "";
+    const location = (venueContext as unknown as Record<string, unknown>).location || "";
 
     systemPrompt = `## OBJECT EDIT MODE — SCOPED TO A SINGLE WIDGET
 
