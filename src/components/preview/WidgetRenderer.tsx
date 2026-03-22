@@ -120,7 +120,7 @@ function DatePickerPreview({
   const fmtDisplay = (s: string) => s ? new Date(s + "T00:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) : null;
 
   return (
-    <div className="space-y-3">
+    <div data-item-label="Date Picker" className="space-y-3">
       <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
         {(config.title as string) || "Select your dates"}
       </h3>
@@ -247,7 +247,7 @@ function GuestCounterPreview({
   );
 
   return (
-    <div className="space-y-3">
+    <div data-item-label="Guest Counter" className="space-y-3">
       <h3
         style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
         className="text-lg font-semibold"
@@ -722,7 +722,7 @@ function ContactFormPreview({
   const fieldStyle = { borderRadius: `${theme.borderRadius / 2}px` };
 
   return (
-    <div className="space-y-3">
+    <div data-item-label="Contact Form" className="space-y-3">
       <h3
         style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
         className="text-lg font-semibold"
@@ -942,7 +942,7 @@ function InvoicePreview({
   };
 
   return (
-    <div className="space-y-3">
+    <div data-item-label="Invoice" className="space-y-3">
       <div
         className="p-3 rounded-t-lg text-white text-center"
         style={{
@@ -1364,7 +1364,7 @@ function HeroSectionPreview({ config, theme }: { config: Record<string, unknown>
   const opacity = typeof config.overlayOpacity === "number" ? config.overlayOpacity / 100 : 0.4;
 
   return (
-    <div style={{
+    <div data-item-label="Hero Section" style={{
       position: "relative", borderRadius: theme.borderRadius, overflow: "hidden",
       height, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
@@ -1391,7 +1391,7 @@ function HeadlinePreview({ config, theme }: { config: Record<string, unknown>; t
   const variant = (config as Record<string, unknown>).variant;
 
   return (
-    <div style={{ textAlign: alignment as "left" | "center" | "right" }}>
+    <div data-item-label="Headline" style={{ textAlign: alignment as "left" | "center" | "right" }}>
       <h2 style={{
         fontSize: size, fontWeight: 700, fontFamily: theme.headlineFont,
         color: useTheme ? theme.primaryColor : "#1a1a1a",
@@ -1416,7 +1416,7 @@ function TextBlockPreview({ config, theme, variant }: { config: Record<string, u
     : {};
 
   return (
-    <div style={{ maxWidth, ...wrapStyle }}>
+    <div data-item-label="Text Block" style={{ maxWidth, ...wrapStyle }}>
       <div style={{ fontSize, lineHeight: 1.7, color: "#374151", fontFamily: theme.bodyFont }}
         dangerouslySetInnerHTML={{ __html: content }} />
     </div>
@@ -1442,7 +1442,7 @@ function ImageBlockPreview({ config, theme, variant }: { config: Record<string, 
   }
 
   return (
-    <figure style={{ margin: 0, maxWidth: typeof width === "number" ? width : "100%", ...(isCard ? { boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderRadius, overflow: "hidden", border: "1px solid #e5e7eb" } : {}) }}>
+    <figure data-item-label="Image" style={{ margin: 0, maxWidth: typeof width === "number" ? width : "100%", ...(isCard ? { boxShadow: "0 2px 8px rgba(0,0,0,0.1)", borderRadius, overflow: "hidden", border: "1px solid #e5e7eb" } : {}) }}>
       <img src={imageUrl} alt={altText} style={{ width: "100%", display: "block", borderRadius: isCard ? 0 : borderRadius, objectFit: "cover" }}
         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
       {caption && <figcaption style={{ fontSize: 12, color: "#6b7280", textAlign: "center", padding: "8px 12px" }}>{caption}</figcaption>}
