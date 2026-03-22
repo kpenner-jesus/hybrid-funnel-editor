@@ -4,6 +4,40 @@
 
 // --- Theme ---
 
+export type HeaderPreset = "journey-icons" | "sticky-bar" | "hero-banner" | "sidebar-nav" | "immersive" | "magazine";
+export type FooterPreset = "frosted-glass" | "action-bar" | "floating-buttons" | "progress-footer";
+export type MobileHeaderPreset = "progress-bar" | "dots" | "minimal" | "hidden";
+
+export interface FunnelLayout {
+  // Header
+  desktopHeader: HeaderPreset;
+  tabletHeader: HeaderPreset | "auto"; // "auto" = follow desktop
+  mobileHeader: MobileHeaderPreset;
+  // Footer
+  footerStyle: FooterPreset;
+  showRunningTotal: boolean;
+  showTrustBadges: boolean; // trust bar on payment step
+  showTimeEstimate: boolean; // "~3 min left" in header
+  showStepCounter: boolean; // "Step 3 of 22"
+  // Contextual labels
+  useContextualNextLabels: boolean; // auto "Choose Your Rooms →" etc.
+  // Celebrations
+  showMicroCelebrations: boolean;
+}
+
+export const DEFAULT_LAYOUT: FunnelLayout = {
+  desktopHeader: "journey-icons",
+  tabletHeader: "auto",
+  mobileHeader: "progress-bar",
+  footerStyle: "frosted-glass",
+  showRunningTotal: false,
+  showTrustBadges: true,
+  showTimeEstimate: true,
+  showStepCounter: true,
+  useContextualNextLabels: true,
+  showMicroCelebrations: true,
+};
+
 export interface ThemeConfig {
   primaryColor: string;
   secondaryColor: string;
@@ -15,6 +49,7 @@ export interface ThemeConfig {
   cardStyle: "flat" | "elevated" | "outlined";
   logoUrl?: string; // account/venue logo URL
   timezone?: string; // e.g., "America/Chicago"
+  layout?: FunnelLayout; // header/footer/navigation presets
 }
 
 // --- Variables ---

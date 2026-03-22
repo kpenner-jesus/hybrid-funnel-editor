@@ -337,20 +337,46 @@ export const aiTools: AiToolDefinition[] = [
   {
     name: "set_theme",
     description:
-      "Updates the funnel theme. Provide any combination of: primaryColor, secondaryColor, surfaceColor, headlineFont, bodyFont, borderRadius, cardStyle.",
+      "Updates the funnel theme including colors, fonts, shape, logo, and navigation layout. Use the 'layout' object to configure headers, footers, and navigation features per screen size.",
     input_schema: {
       type: "object",
       properties: {
         primaryColor: { type: "string", description: "Primary brand color (hex)" },
         secondaryColor: { type: "string", description: "Secondary brand color (hex)" },
+        accentColor: { type: "string", description: "Accent/highlight color (hex)" },
         surfaceColor: { type: "string", description: "Surface/background color (hex)" },
         headlineFont: { type: "string", description: "Headline font family" },
         bodyFont: { type: "string", description: "Body font family" },
         borderRadius: { type: "number", description: "Border radius in pixels" },
-        cardStyle: {
-          type: "string",
-          enum: ["flat", "elevated", "outlined"],
-          description: "Card style",
+        cardStyle: { type: "string", enum: ["flat", "elevated", "outlined"], description: "Card style" },
+        logoUrl: { type: "string", description: "Venue logo URL" },
+        timezone: { type: "string", description: "Timezone (e.g., 'America/Chicago')" },
+        layout: {
+          type: "object",
+          description: "Navigation layout configuration for different screen sizes",
+          properties: {
+            desktopHeader: {
+              type: "string",
+              enum: ["journey-icons", "sticky-bar", "hero-banner", "sidebar-nav", "immersive", "magazine"],
+              description: "Desktop header style. journey-icons = emoji step icons with progress line (default). sticky-bar = logo + dots. hero-banner = full-width image. sidebar-nav = vertical step list on left. immersive = floating pill only. magazine = editorial large venue name.",
+            },
+            mobileHeader: {
+              type: "string",
+              enum: ["progress-bar", "dots", "minimal", "hidden"],
+              description: "Mobile header style. progress-bar = gradient fill (default). dots = step dot indicators. minimal = text only. hidden = no header.",
+            },
+            footerStyle: {
+              type: "string",
+              enum: ["frosted-glass", "action-bar", "floating-buttons", "progress-footer"],
+              description: "Footer navigation style. frosted-glass = blur backdrop (default). action-bar = bold full-width CTA. floating-buttons = pill buttons in corner. progress-footer = gradient bar above buttons.",
+            },
+            showRunningTotal: { type: "boolean", description: "Show estimated total in footer" },
+            showTrustBadges: { type: "boolean", description: "Show security badges on payment step" },
+            showTimeEstimate: { type: "boolean", description: "Show '~3 min left' in header" },
+            showStepCounter: { type: "boolean", description: "Show 'Step 3 of 22' in header" },
+            useContextualNextLabels: { type: "boolean", description: "Auto-label Next button based on upcoming step ('Choose Your Rooms →')" },
+            showMicroCelebrations: { type: "boolean", description: "Pulse animation on step completion" },
+          },
         },
       },
       required: [],

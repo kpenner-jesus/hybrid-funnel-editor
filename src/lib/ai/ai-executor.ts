@@ -329,8 +329,28 @@ export function executeAiToolCall(
         if (args.bodyFont) themeUpdates.bodyFont = args.bodyFont as string;
         if (args.borderRadius !== undefined) themeUpdates.borderRadius = args.borderRadius as number;
         if (args.cardStyle) themeUpdates.cardStyle = args.cardStyle as ThemeConfig["cardStyle"];
+        if (args.logoUrl) themeUpdates.logoUrl = args.logoUrl as string;
+        if (args.accentColor) themeUpdates.accentColor = args.accentColor as string;
+        if (args.timezone) themeUpdates.timezone = args.timezone as string;
+
+        // Layout settings
+        if (args.layout) {
+          const layoutInput = args.layout as Record<string, unknown>;
+          const currentLayout = funnel.theme.layout || {
+            desktopHeader: "journey-icons", tabletHeader: "auto", mobileHeader: "progress-bar",
+            footerStyle: "frosted-glass", showRunningTotal: false, showTrustBadges: true,
+            showTimeEstimate: true, showStepCounter: true, useContextualNextLabels: true, showMicroCelebrations: true,
+          };
+          themeUpdates.layout = {
+            ...currentLayout,
+            ...Object.fromEntries(Object.entries(layoutInput).filter(([, v]) => v !== undefined)),
+          } as import("@/lib/types").FunnelLayout;
+        }
+
         store.setTheme(themeUpdates);
-        return { success: true, message: `Updated theme: ${Object.keys(themeUpdates).join(", ")}.` };
+        const updatedFields = Object.keys(themeUpdates);
+        if (themeUpdates.layout) updatedFields.push(...Object.keys(args.layout as Record<string, unknown>).map(k => `layout.${k}`));
+        return { success: true, message: `Updated theme: ${updatedFields.join(", ")}.` };
       }
 
       case "configure_segment_picker": {

@@ -330,6 +330,160 @@ export function ThemeEditor() {
           </div>
         </div>
       </div>
+
+      {/* ═══════ NAVIGATION LAYOUT ═══════ */}
+      <NavigationLayoutEditor />
+    </div>
+  );
+}
+
+// --- Navigation Layout Editor ---
+function NavigationLayoutEditor() {
+  const { funnel, setTheme } = useFunnelStore();
+  if (!funnel) return null;
+
+  const layout = funnel.theme.layout || {
+    desktopHeader: "journey-icons" as const,
+    tabletHeader: "auto" as const,
+    mobileHeader: "progress-bar" as const,
+    footerStyle: "frosted-glass" as const,
+    showRunningTotal: false,
+    showTrustBadges: true,
+    showTimeEstimate: true,
+    showStepCounter: true,
+    useContextualNextLabels: true,
+    showMicroCelebrations: true,
+  };
+
+  const updateLayout = (updates: Record<string, unknown>) => {
+    setTheme({ layout: { ...layout, ...updates } as import("@/lib/types").FunnelLayout });
+  };
+
+  const headerOptions = [
+    { value: "journey-icons", label: "Journey Icons", desc: "Emoji icons per step with progress line", icon: "🗺️" },
+    { value: "sticky-bar", label: "Sticky Bar", desc: "Logo + progress dots, always visible", icon: "📌" },
+    { value: "hero-banner", label: "Hero Banner", desc: "Full-width image with overlay text", icon: "🖼️" },
+    { value: "sidebar-nav", label: "Sidebar Nav", desc: "Vertical step list on the left (wide screens)", icon: "📋" },
+    { value: "immersive", label: "Immersive", desc: "No header — floating progress pill only", icon: "✨" },
+    { value: "magazine", label: "Magazine", desc: "Editorial style with large venue name", icon: "📰" },
+  ];
+
+  const footerOptions = [
+    { value: "frosted-glass", label: "Frosted Glass", desc: "Blur backdrop with rounded top", icon: "🧊" },
+    { value: "action-bar", label: "Action Bar", desc: "Bold full-width button, prominent CTA", icon: "🎯" },
+    { value: "floating-buttons", label: "Floating", desc: "Pill buttons in bottom-right corner", icon: "💊" },
+    { value: "progress-footer", label: "Progress Bar", desc: "Gradient fill bar above navigation", icon: "📊" },
+  ];
+
+  const mobileHeaderOptions = [
+    { value: "progress-bar", label: "Progress Bar", desc: "Gradient fill bar" },
+    { value: "dots", label: "Step Dots", desc: "Dot indicators per step" },
+    { value: "minimal", label: "Minimal", desc: "Just step count text" },
+    { value: "hidden", label: "Hidden", desc: "No header on mobile" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
+        Navigation Layout
+      </div>
+
+      {/* Desktop Header */}
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-2">Desktop Header</label>
+        <div className="grid grid-cols-2 gap-2">
+          {headerOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => updateLayout({ desktopHeader: opt.value })}
+              className={`text-left p-2.5 rounded-lg border-2 transition-all ${
+                layout.desktopHeader === opt.value
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">{opt.icon}</span>
+                <span className="text-xs font-semibold text-on-surface">{opt.label}</span>
+              </div>
+              <p className="text-[10px] text-on-surface-variant mt-0.5 leading-tight">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile Header */}
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-2">Mobile Header</label>
+        <div className="grid grid-cols-2 gap-2">
+          {mobileHeaderOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => updateLayout({ mobileHeader: opt.value })}
+              className={`text-left p-2 rounded-lg border-2 transition-all ${
+                layout.mobileHeader === opt.value
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant hover:border-primary/40"
+              }`}
+            >
+              <span className="text-xs font-semibold text-on-surface">{opt.label}</span>
+              <p className="text-[10px] text-on-surface-variant leading-tight">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer Style */}
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-2">Footer Style</label>
+        <div className="grid grid-cols-2 gap-2">
+          {footerOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => updateLayout({ footerStyle: opt.value })}
+              className={`text-left p-2.5 rounded-lg border-2 transition-all ${
+                layout.footerStyle === opt.value
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">{opt.icon}</span>
+                <span className="text-xs font-semibold text-on-surface">{opt.label}</span>
+              </div>
+              <p className="text-[10px] text-on-surface-variant mt-0.5 leading-tight">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Feature Toggles */}
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-2">Features</label>
+        <div className="space-y-2">
+          {[
+            { key: "useContextualNextLabels", label: "Smart Next labels", desc: "Auto 'Choose Your Rooms →' based on next step" },
+            { key: "showRunningTotal", label: "Running total", desc: "Show estimated price in footer" },
+            { key: "showTrustBadges", label: "Trust badges", desc: "Security badges on payment step" },
+            { key: "showTimeEstimate", label: "Time estimate", desc: "'~3 min left' in header" },
+            { key: "showStepCounter", label: "Step counter", desc: "'Step 3 of 22' in header" },
+            { key: "showMicroCelebrations", label: "Celebrations", desc: "Pulse animation on step complete" },
+          ].map(toggle => (
+            <label key={toggle.key} className="flex items-start gap-2.5 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={!!(layout as unknown as Record<string, unknown>)[toggle.key]}
+                onChange={(e) => updateLayout({ [toggle.key]: e.target.checked })}
+                className="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <div>
+                <div className="text-xs font-medium text-on-surface group-hover:text-primary transition-colors">{toggle.label}</div>
+                <div className="text-[10px] text-on-surface-variant leading-tight">{toggle.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
