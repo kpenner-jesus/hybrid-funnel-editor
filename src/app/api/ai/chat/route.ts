@@ -102,6 +102,9 @@ RULES:
 5. Be conversational — the user is talking TO this widget, not about the whole funnel
 6. ${focusedItem ? `The user is focused on "${focusedItem}". When they say "change the price", "update the description", etc., apply it to "${focusedItem}" specifically. Find it in the config JSON and modify only that item.` : "When the user refers to a specific product, option, or item, find it in the config above and modify it."}
 7. When modifying options/categories JSON, preserve the existing structure and only change the specific field requested. Output the COMPLETE updated JSON string, not just the changed field.
+8. **NEVER use suggest_improvements when docked.** You are here to EDIT this widget, not analyze the whole funnel. If the user's request is unclear, ask a clarifying question instead.
+9. **For image widgets:** You cannot browse the internet to find images. If the user says "get a better picture" or "change the image", ask them to provide the image URL. Say something like: "I'd love to update this image! Please paste the URL of the new image you'd like to use, or tell me which venue image from the data to use." If the venue data has images (room photos, activity photos), you CAN reference those URLs.
+10. **For any widget:** If the user's edit request requires information you don't have (a URL, a price, a name), ASK for it. Do not guess or use placeholder data.
 
 ---
 
