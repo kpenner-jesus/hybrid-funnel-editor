@@ -505,42 +505,115 @@ export function WidgetConfig() {
 }
 
 function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("@/lib/types").Step }) {
-  const { updateStep } = useFunnelStore();
+  const { updateStep, funnel } = useFunnelStore();
+  const [showAdvancedNav, setShowAdvancedNav] = useState(false);
+  const condRules = step.navigation.conditionalNext || [];
+
+  const updateCondRules = (newRules: import("@/lib/types").ConditionalNavRule[]) => {
+    updateStep(stepId, {
+      navigation: { ...step.navigation, conditionalNext: newRules.length > 0 ? newRules : undefined },
+    });
+  };
 
   return (
     <div className="pt-2 border-t border-outline-variant space-y-3">
       <div className="text-xs font-medium text-on-surface-variant">Step Navigation</div>
+
+      {/* Button labels */}
       <div>
-        <label className="block text-xs text-on-surface-variant mb-1">
-          Next Button Label
-        </label>
-        <input
-          type="text"
-          value={step.navigation.nextLabel || ""}
-          onChange={(e) =>
-            updateStep(stepId, {
-              navigation: { ...step.navigation, nextLabel: e.target.value },
-            })
-          }
+        <label className="block text-xs text-on-surface-variant mb-1">Next Button Label</label>
+        <input type="text" value={step.navigation.nextLabel || ""}
+          onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, nextLabel: e.target.value } })}
           placeholder="Continue"
-          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white"
-        />
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white" />
       </div>
       <div>
-        <label className="block text-xs text-on-surface-variant mb-1">
-          Back Button Label
-        </label>
-        <input
-          type="text"
-          value={step.navigation.backLabel || ""}
-          onChange={(e) =>
-            updateStep(stepId, {
-              navigation: { ...step.navigation, backLabel: e.target.value },
-            })
-          }
+        <label className="block text-xs text-on-surface-variant mb-1">Back Button Label</label>
+        <input type="text" value={step.navigation.backLabel || ""}
+          onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, backLabel: e.target.value } })}
           placeholder="Back"
-          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white"
-        />
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white" />
+      </div>
+
+      {/* Default Next Step */}
+      <div>
+        <label className="block text-xs text-on-surface-variant mb-1">Default Next Step</label>
+        <select value={step.navigation.next || ""}
+          onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, next: e.target.value || undefined } })}
+          className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white">
+          <option value="">→ Next step in list (default)</option>
+          {funnel?.steps.map((s, si) => (
+            <option key={s.id} value={s.id}>→ Step {si + 1}: {s.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Conditional Navigation (Multi-Jump) */}
+      <div className="pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-on-surface-variant">Conditional Routing</label>
+          {condRules.length > 0 && (
+            <button onClick={() => setShowAdvancedNav(!showAdvancedNav)}
+              className="text-[9px] text-gray-400 hover:text-gray-600">
+              {showAdvancedNav ? "Visual" : "{ } JSON"}
+            </button>
+          )}
+        </div>
+
+        {showAdvancedNav ? (
+          /* Advanced JSON view */
+          <textarea
+            value={JSON.stringify(condRules, null, 2)}
+            onChange={(e) => { try { updateCondRules(JSON.parse(e.target.value)); } catch {} }}
+            rows={6}
+            className="w-full px-3 py-1.5 text-[11px] border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white font-mono resize-y"
+          />
+        ) : (
+          /* Visual editor */
+          <div className="space-y-2">
+            {condRules.map((rule, ri) => (
+              <div key={ri} className="border border-blue-200 rounded-lg p-2 bg-blue-50/50 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-blue-600 shrink-0">IF</span>
+                  <input type="text" value={rule.variable} placeholder="variable"
+                    onChange={(e) => { const nr = [...condRules]; nr[ri] = { ...nr[ri], variable: e.target.value }; updateCondRules(nr); }}
+                    className="flex-1 px-2 py-0.5 text-xs border border-blue-200 rounded focus:outline-none focus:border-primary bg-white" />
+                  <select value={rule.operator}
+                    onChange={(e) => { const nr = [...condRules]; nr[ri] = { ...nr[ri], operator: e.target.value as "equals" | "not_equals" | "contains" }; updateCondRules(nr); }}
+                    className="px-1 py-0.5 text-xs border border-blue-200 rounded bg-white">
+                    <option value="equals">=</option>
+                    <option value="not_equals">≠</option>
+                    <option value="contains">contains</option>
+                  </select>
+                  <input type="text" value={rule.value} placeholder="value"
+                    onChange={(e) => { const nr = [...condRules]; nr[ri] = { ...nr[ri], value: e.target.value }; updateCondRules(nr); }}
+                    className="flex-1 px-2 py-0.5 text-xs border border-blue-200 rounded focus:outline-none focus:border-primary bg-white" />
+                  <button onClick={() => updateCondRules(condRules.filter((_, i) => i !== ri))}
+                    className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-blue-600 shrink-0">→</span>
+                  <select value={rule.targetStepId}
+                    onChange={(e) => { const nr = [...condRules]; nr[ri] = { ...nr[ri], targetStepId: e.target.value }; updateCondRules(nr); }}
+                    className="flex-1 px-2 py-0.5 text-xs border border-blue-200 rounded bg-white">
+                    <option value="">Select step...</option>
+                    {funnel?.steps.map((s, si) => (
+                      <option key={s.id} value={s.id}>Step {si + 1}: {s.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+
+            <button onClick={() => updateCondRules([...condRules, { variable: "eventSegment", operator: "equals", value: "", targetStepId: "", label: "" }])}
+              className="w-full py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+              + Add Routing Rule
+            </button>
+            {condRules.length === 0 && (
+              <p className="text-[10px] text-gray-400">No conditional routing. All guests go to the same next step.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
