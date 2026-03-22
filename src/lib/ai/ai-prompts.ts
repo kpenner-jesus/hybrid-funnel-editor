@@ -87,10 +87,11 @@ ${stepsSummary || "    (no steps)"}${truncNote}${orphanNote}
   Theme: primary=${currentFunnelState.theme.primaryColor}, secondary=${currentFunnelState.theme.secondaryColor}, cardStyle=${currentFunnelState.theme.cardStyle}`;
   }
 
-  // Venue context
+  // Venue context — prominently placed so AI uses it for layout decisions
+  const venueTypeLabel = account.venueType || "resort";
   const venueInfo = account.venueName
-    ? `The venue is "${account.venueName}" (${account.venueType}) in ${account.location || "unknown location"}.`
-    : "No venue information set yet.";
+    ? `The venue is "${account.venueName}" (type: ${venueTypeLabel}) in ${account.location || "unknown location"}. USE THIS VENUE TYPE to select the correct layout preset from the "Match theme AND layout to venue type" table when setting the theme.`
+    : "No venue information set yet. When the user describes their venue, identify the venue type (resort, conference, retreat, wedding, spa, hotel, hostel, etc.) and use it for theme and layout decisions.";
 
   const toneGuide: Record<string, string> = {
     professional: "Use clear, business-appropriate language. Focus on efficiency and ROI.",

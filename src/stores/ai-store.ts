@@ -505,7 +505,29 @@ export const useAiStore = create<AiStore>((set, get) => {
                     venueData.meals.length > 0 ? `${venueData.meals.length} meals` : null,
                     venueData.activities.length > 0 ? `${venueData.activities.length} activities` : null,
                   ].filter(Boolean).join(", ");
-                  result = { success: true, message: `Loaded venue data for "${venueData.venueName}": ${counts}. Preview now shows real products.` };
+                  // Auto-detect venue type from name for layout decisions
+                  const vn = (venueData.venueName || "").toLowerCase();
+                  let detectedType = "resort";
+                  if (vn.includes("retreat") || vn.includes("camp")) detectedType = "retreat-center";
+                  else if (vn.includes("conference") || vn.includes("convention")) detectedType = "conference-center";
+                  else if (vn.includes("wedding") || vn.includes("banquet")) detectedType = "wedding-venue";
+                  else if (vn.includes("spa") || vn.includes("wellness")) detectedType = "spa";
+                  else if (vn.includes("hostel") || vn.includes("budget")) detectedType = "hostel";
+                  else if (vn.includes("boutique") || vn.includes("b&b") || vn.includes("inn")) detectedType = "boutique";
+                  else if (vn.includes("hotel") || vn.includes("lodge")) detectedType = "hotel";
+                  else if (vn.includes("villa") || vn.includes("cabin")) detectedType = "villa";
+
+                  // Update account context with venue name and detected type
+                  const currentCtx = get().accountContext;
+                  set({
+                    accountContext: {
+                      ...currentCtx,
+                      venueName: venueData.venueName || currentCtx.venueName,
+                      venueType: detectedType as typeof currentCtx.venueType,
+                    },
+                  });
+
+                  result = { success: true, message: `Loaded venue data for "${venueData.venueName}" (detected type: ${detectedType}): ${counts}. Preview now shows real products. Use this venue type to select the correct layout preset.` };
                 } catch (err) {
                   result = { success: false, message: `Failed to set venue data: ${err instanceof Error ? err.message : "unknown error"}` };
                 }

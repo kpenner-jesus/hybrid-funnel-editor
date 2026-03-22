@@ -5,7 +5,7 @@ import { widgetTemplateRegistry } from "@/lib/widget-templates";
 
 export interface AccountContext {
   venueName: string;
-  venueType: "resort" | "hotel" | "retreat-center" | "conference-center" | "camp" | "villa" | "other";
+  venueType: "resort" | "hotel" | "retreat-center" | "conference-center" | "camp" | "villa" | "wedding-venue" | "spa" | "hostel" | "boutique" | "restaurant" | "other";
   location: string;
   brandColors: { primary: string; secondary: string };
   tone: "professional" | "warm" | "luxury" | "casual" | "adventurous";
