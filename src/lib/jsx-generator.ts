@@ -329,32 +329,51 @@ function generateDateRangePickerComponent(): string {
   const toDS = (y, m, d) => \`\${y}-\${String(m + 1).padStart(2, '0')}-\${String(d).padStart(2, '0')}\`;
   const pD = s => s ? new Date(s + 'T00:00:00') : null;
   const sD = pD(startDate), eD = pD(endDate);
+  const nightCount = startDate && endDate ? Math.max(0, Math.round((new Date(endDate + 'T00:00:00').getTime() - new Date(startDate + 'T00:00:00').getTime()) / 86400000)) : 0;
   function click(ds) { const c = new Date(ds + 'T00:00:00'); if (c < today) return; if (!startDate || !selEnd) { onStartDate(ds); onEndDate(''); setSelEnd(true); } else { if (c <= sD) { onStartDate(ds); onEndDate(''); setSelEnd(true); } else { onEndDate(ds); setSelEnd(false); } } }
-  function state(ds) { const d = new Date(ds + 'T00:00:00'), hD = hover ? new Date(hover + 'T00:00:00') : null; return { isPast: d < today, isStart: startDate === ds, isEnd: endDate === ds, inRange: startDate && endDate && d > sD && d < eD, inHover: startDate && !endDate && hD && selEnd && d > sD && d < hD }; }
+  function dayState(ds) { const d = new Date(ds + 'T00:00:00'), hD = hover ? new Date(hover + 'T00:00:00') : null; return { isPast: d < today, isStart: startDate === ds, isEnd: endDate === ds, inRange: startDate && endDate && sD && eD && d > sD && d < eD, inHover: startDate && !endDate && hD && selEnd && sD && d > sD && d < hD }; }
   const prev = () => { if (vm === 0) { setVY(y => y - 1); setVM(11); } else setVM(m => m - 1); };
   const next = () => { if (vm === 11) { setVY(y => y + 1); setVM(0); } else setVM(m => m + 1); };
-  const td = new Date(vy, vm + 1, 0).getDate(), fd = new Date(vy, vm, 1).getDay();
-  const cells = []; for (let i = 0; i < fd; i++) cells.push(null); for (let d = 1; d <= td; d++) cells.push(d);
+  const m2 = vm === 11 ? 0 : vm + 1, y2 = vm === 11 ? vy + 1 : vy;
   const fmt = s => s ? new Date(s + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+
+  function renderMonth(year, month) {
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const cells = []; for (let i = 0; i < firstDay; i++) cells.push(null); for (let d = 1; d <= totalDays; d++) cells.push(d);
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-center font-bold text-sm mb-2" style={{ color: THEME.primary, fontFamily: THEME.serif }}>{MONTHS[month]} {year}</div>
+        <div className="grid grid-cols-7 mb-1">{DAYS.map(d => <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider py-0.5" style={{ color: THEME.outlineVariant }}>{d}</div>)}</div>
+        <div className="grid grid-cols-7 gap-y-0.5">{cells.map((day, i) => {
+          if (!day) return <div key={\`e-\${i}\`} />;
+          const ds = toDS(year, month, day);
+          const { isPast, isStart, isEnd, inRange, inHover } = dayState(ds);
+          const isSel = isStart || isEnd, isIR = inRange || inHover;
+          let bg = 'transparent', col = isPast ? THEME.outlineVariant : THEME.onSurface, fw = '500', br = '50%';
+          if (isSel) { bg = THEME.primary; col = '#fff'; fw = '700'; } else if (isIR) { bg = \`\${THEME.primary}15\`; col = THEME.primary; br = '0'; }
+          if (isStart && (inRange || inHover)) br = '50% 0 0 50%'; if (isEnd && inRange) br = '0 50% 50% 0';
+          return <div key={ds} className="flex items-center justify-center" style={{ height: 34 }}><button disabled={isPast} onClick={() => click(ds)} onMouseEnter={() => { if (selEnd && startDate && !isPast) setHover(ds); }} onMouseLeave={() => setHover(null)} className="w-8 h-8 text-xs flex items-center justify-center disabled:cursor-not-allowed transition-colors" style={{ background: bg, color: col, fontWeight: fw, borderRadius: br, fontSize: 12 }}>{day}</button></div>;
+        })}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-5">
       <div className="grid grid-cols-2 gap-3 mb-4">{[{ l: 'Check-In', v: startDate }, { l: 'Check-Out', v: endDate }].map(({ l, v }) => <div key={l} className="p-3.5 rounded-2xl text-center" style={{ background: v ? \`\${THEME.primary}08\` : THEME.surfaceContainerLow, border: \`1.5px solid \${v ? THEME.primary : THEME.outlineVariant}\` }}><div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-0.5" style={{ color: v ? THEME.primary : THEME.outline }}>{l}</div><div className="text-sm font-semibold" style={{ color: v ? THEME.onPrimaryContainer : THEME.outlineVariant, fontFamily: THEME.serif }}>{v ? fmt(v) : 'Select date'}</div></div>)}</div>
       <div className="rounded-[2rem] overflow-hidden" style={{ background: THEME.surfaceContainerLowest, border: \`1px solid \${THEME.surfaceContainerHigh}4D\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>
-          <button onClick={prev} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100" style={{ color: THEME.outline }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>
+          <button onClick={prev} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100" style={{ color: THEME.outline }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
           <span className="font-bold text-base" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{MONTHS[vm]} {vy}</span>
-          <button onClick={next} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100" style={{ color: THEME.outline }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+          <button onClick={next} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100" style={{ color: THEME.outline }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
         </div>
-        <div className="grid grid-cols-7 px-3 pt-3 pb-1">{DAYS.map(d => <div key={d} className="text-center text-[11px] font-bold uppercase tracking-wider py-1" style={{ color: THEME.outlineVariant }}>{d}</div>)}</div>
-        <div className="grid grid-cols-7 px-3 pb-4 gap-y-1">{cells.map((day, i) => {
-          if (!day) return <div key={\`e-\${i}\`} />;
-          const ds = toDS(vy, vm, day), { isPast, isStart, isEnd, inRange, inHover } = state(ds), isSel = isStart || isEnd, isIR = inRange || inHover;
-          let bg = 'transparent', col = isPast ? THEME.outlineVariant : THEME.onSurface, fw = '500', br = '50%';
-          if (isSel) { bg = THEME.primary; col = '#fff'; fw = '700'; } else if (isIR) { bg = \`\${THEME.primary}10\`; col = THEME.primary; br = '0'; }
-          if (isStart && (inRange || inHover)) br = '50% 0 0 50%'; if (isEnd && inRange) br = '0 50% 50% 0';
-          return <div key={ds} className="flex items-center justify-center" style={{ height: '38px' }}><button disabled={isPast} onClick={() => click(ds)} onMouseEnter={() => { if (selEnd && startDate && !isPast) setHover(ds); }} onMouseLeave={() => setHover(null)} className="w-9 h-9 text-sm flex items-center justify-center disabled:cursor-not-allowed" style={{ background: bg, color: col, fontWeight: fw, borderRadius: br, fontSize: '13px' }}>{day}</button></div>;
-        })}</div>
-        <div className="px-5 pb-4 text-center"><p className="text-xs" style={{ color: THEME.outlineVariant }}>{!startDate ? 'Tap to select your arrival date' : !endDate ? 'Now tap your departure date' : '✓ Dates selected'}</p></div>
+        <div className="flex gap-4 px-3 py-3">
+          {renderMonth(vy, vm)}
+          <div className="hidden sm:block w-px shrink-0" style={{ background: THEME.outlineVariant + '40' }} />
+          <div className="hidden sm:flex flex-1 min-w-0">{renderMonth(y2, m2)}</div>
+        </div>
+        <div className="px-5 pb-3 text-center"><p className="text-xs" style={{ color: THEME.outlineVariant }}>{!startDate ? 'Tap to select your arrival date' : !endDate ? 'Now tap your departure date' : \`\${nightCount} night\${nightCount !== 1 ? 's' : ''} selected\`}</p></div>
       </div>
     </div>
   );
