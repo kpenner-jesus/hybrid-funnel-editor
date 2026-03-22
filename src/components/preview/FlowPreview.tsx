@@ -262,15 +262,26 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load
+  // Center on initial load — delayed to let content lay out
   useEffect(() => {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
-    hasInitialized.current = true;
-    const cw = containerRef.current.clientWidth;
-    const contentW = contentRef.current?.scrollWidth || 800;
-    const scaledW = contentW * zoom;
-    setPan({ x: Math.max(20, (cw - scaledW) / 2), y: 30 });
-  }, [funnel?.steps.length, zoom]);
+    // Wait for content to render before measuring
+    const timer = setTimeout(() => {
+      if (!containerRef.current || !contentRef.current) return;
+      hasInitialized.current = true;
+      const cw = containerRef.current.clientWidth;
+      const ch = containerRef.current.clientHeight;
+      const contentW = contentRef.current.scrollWidth || 800;
+      const contentH = contentRef.current.scrollHeight || 2000;
+      // Calculate zoom to fit width, then center horizontally
+      const fitZoom = Math.min(0.4, (cw * 0.85) / contentW);
+      const scaledW = contentW * fitZoom;
+      const centerX = Math.max(20, (cw - scaledW) / 2);
+      setZoom(fitZoom);
+      setPan({ x: centerX, y: 30 });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [funnel?.steps.length]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
