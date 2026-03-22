@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 
-function makeToken(password: string): string {
-  return crypto.createHash("sha256").update(`funnel-editor-session:${password}`).digest("hex");
+// Edge-compatible hash — no Node.js crypto module
+async function makeToken(password: string): Promise<string> {
+  const data = new TextEncoder().encode(`funnel-editor-session:${password}`);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Always allow: login page, auth API, static assets, Next.js internals
@@ -30,7 +34,7 @@ export function middleware(req: NextRequest) {
 
   // Check for valid session cookie
   const session = req.cookies.get("editor-session")?.value;
-  const expectedToken = makeToken(editorPassword);
+  const expectedToken = await makeToken(editorPassword);
 
   if (session === expectedToken || session === "dev-mode") {
     return NextResponse.next();
