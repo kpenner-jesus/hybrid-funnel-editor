@@ -159,7 +159,7 @@ export default function EditorPage() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-surface">
+    <div className="h-screen flex flex-col bg-surface overflow-auto md:overflow-hidden">
       {/* Top Bar */}
       <Header
         title={funnel.name}
@@ -266,7 +266,7 @@ export default function EditorPage() {
       />
 
       {/* Editor Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-auto md:overflow-hidden min-h-0">
         {/* Left Panel - Editor */}
         <div
           style={{ width: `${panelWidth}%`, minWidth: '300px', maxWidth: '70%' }}
@@ -326,7 +326,7 @@ export default function EditorPage() {
           {/* Preview header removed — Step/Flow toggle is inside FunnelPreview */}
 
           {/* Preview content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-h-[500px]">
             <FunnelPreview />
           </div>
         </div>
