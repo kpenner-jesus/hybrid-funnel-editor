@@ -216,7 +216,7 @@ function GuestCounterPreview({
     max: number;
     onChange: (v: number) => void;
   }) => (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+    <div data-item-label={label} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
       <span className="text-sm">{label}</span>
       <div className="flex items-center gap-3">
         <button
@@ -368,6 +368,7 @@ function RoomSelectionPreview({
           return (
             <div
               key={room.id}
+              data-item-label={room.name}
               onClick={(e) => {
                 e.stopPropagation();
                 toggle(room.id);
@@ -505,6 +506,7 @@ function MealPickerPreview({
                 return (
                   <div
                     key={meal.id}
+                    data-item-label={meal.name}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggle(meal.id);
@@ -611,6 +613,7 @@ function ActivityPickerPreview({
           return (
             <div
               key={act.id}
+              data-item-label={act.name}
               onClick={(e) => {
                 e.stopPropagation();
                 toggle(act.id);
@@ -727,7 +730,7 @@ function ContactFormPreview({
         {(config.title as string) || "Your Details"}
       </h3>
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div data-item-label="First Name">
           <label className="block text-xs text-gray-500 mb-1">
             First Name *
           </label>
@@ -741,7 +744,7 @@ function ContactFormPreview({
             style={fieldStyle}
           />
         </div>
-        <div>
+        <div data-item-label="Last Name">
           <label className="block text-xs text-gray-500 mb-1">
             Last Name *
           </label>
@@ -756,7 +759,7 @@ function ContactFormPreview({
           />
         </div>
       </div>
-      <div>
+      <div data-item-label="Email">
         <label className="block text-xs text-gray-500 mb-1">Email *</label>
         <input
           type="email"
@@ -1107,6 +1110,7 @@ function OptionPickerPreview({
           return (
             <div
               key={opt.id}
+              data-item-label={opt.label}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClick(opt.id);
@@ -1227,6 +1231,7 @@ function SegmentPickerPreview({
             return (
               <button
                 key={opt.id}
+                data-item-label={opt.label}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleClick(opt.id);
