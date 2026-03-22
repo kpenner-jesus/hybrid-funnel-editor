@@ -321,7 +321,7 @@ export function FlowPreview() {
 
     setZoom(targetZoom);
     setPan({ x: Math.max(10, centerX), y: 15 });
-    console.log("[FlowPreview center]", { cw, contentWidth, targetZoom, scaledW: contentWidth * targetZoom, centerX });
+    // centering confirmed working — viewport, contentWidth, zoom, pan all verified
   }, [funnel?.steps.length, contentWidth, layoutRows.length]);
 
   if (!funnel || funnel.steps.length === 0) {
@@ -528,16 +528,7 @@ export function FlowPreview() {
         })}
       </div>
 
-      {/* Debug bar — remove after centering is fixed */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-[10px] font-mono px-3 py-1 flex gap-4 z-20">
-        <span>viewport: {containerRef.current?.clientWidth ?? "?"}px</span>
-        <span>contentW: {contentWidth}px</span>
-        <span>zoom: {(zoom * 100).toFixed(0)}%</span>
-        <span>pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})</span>
-        <span>scaledW: {(contentWidth * zoom).toFixed(0)}px</span>
-        <span>ideal-centerX: {containerRef.current ? ((containerRef.current.clientWidth - contentWidth * zoom) / 2).toFixed(0) : "?"}px</span>
-        <span>rows: {layoutRows.length} ({layoutRows.filter(r => r.type === "parallel").length} parallel)</span>
-      </div>
+      {/* Debug bar removed — centering confirmed working */}
     </div>
   );
 }
