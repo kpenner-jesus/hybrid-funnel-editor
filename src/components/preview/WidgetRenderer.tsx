@@ -5,6 +5,7 @@ import type { WidgetInstance, ThemeConfig } from "@/lib/types";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { mockRooms, mockMeals, mockActivities } from "@/lib/mock-data";
 import { useVenueDataStore } from "@/stores/venue-data-store";
+import { ImageCarousel, PriceDisplay, AvailabilityBadge, ExpandableDetails } from "./ImageCarousel";
 
 interface WidgetRendererProps {
   widget: WidgetInstance;
@@ -298,6 +299,7 @@ function RoomSelectionPreview({
   const venueData = useVenueDataStore((s) => s.venueData);
   const rooms = venueData?.rooms && venueData.rooms.length > 0 ? venueData.rooms : mockRooms.slice(0, 4);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const checkIn = resolvedInputs?.checkIn as string | undefined;
   const checkOut = resolvedInputs?.checkOut as string | undefined;
@@ -317,21 +319,17 @@ function RoomSelectionPreview({
   }
 
   useEffect(() => {
-    const selected = rooms.filter((r) => selectedIds.has(r.id));
-    const roomTotal = selected.reduce(
-      (sum, r) => sum + r.pricePerNight * nightCount,
-      0
-    );
-    onOutput({
-      selectedRooms: selected.map((r) => ({
+    const selectedRooms = rooms
+      .filter((r) => (quantities[r.id] || 0) > 0 || selectedIds.has(r.id))
+      .map((r) => ({
         ...r,
-        quantity: 1,
+        quantity: quantities[r.id] || 1,
         nights: nightCount,
-        lineTotal: r.pricePerNight * nightCount,
-      })),
-      roomTotal,
-    });
-  }, [selectedIds, nightCount, onOutput]);
+        lineTotal: r.pricePerNight * (quantities[r.id] || 1) * nightCount,
+      }));
+    const roomTotal = selectedRooms.reduce((sum, r) => sum + r.lineTotal, 0);
+    onOutput({ selectedRooms, roomTotal });
+  }, [selectedIds, quantities, nightCount, onOutput, rooms]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -358,79 +356,112 @@ function RoomSelectionPreview({
           {checkIn && checkOut && ` | ${nightCount} night${nightCount !== 1 ? "s" : ""}`}
         </div>
       )}
-      <div
-        className={
-          config.layout === "list" ? "space-y-2" : "grid grid-cols-2 gap-3"
-        }
-      >
+      <div className={config.layout === "list" ? "space-y-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"}>
         {rooms.map((room) => {
           const isSelected = selectedIds.has(room.id);
+          const qty = quantities[room.id] || 0;
+          const images = room.imageUrl ? [room.imageUrl] : [];
+          // Add extra images if available (venue store may have multiple)
+          if ((room as unknown as Record<string, unknown>).images) {
+            const extraImages = (room as unknown as Record<string, unknown>).images as string[];
+            if (extraImages.length > 0) images.push(...extraImages.filter((img: string) => img !== room.imageUrl));
+          }
+
           return (
             <div
               key={room.id}
               data-item-label={room.name}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggle(room.id);
-              }}
-              className="border overflow-hidden transition-shadow hover:shadow-md cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); toggle(room.id); }}
+              className="border overflow-hidden transition-all hover:shadow-lg cursor-pointer"
               style={{
                 borderRadius: `${theme.borderRadius}px`,
                 borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
                 borderWidth: isSelected ? "2px" : "1px",
-                backgroundColor: isSelected
-                  ? `${theme.primaryColor}08`
-                  : "#fff",
+                backgroundColor: isSelected ? `${theme.primaryColor}05` : "#fff",
               }}
             >
+              {/* Image Carousel */}
               {showImages && (
-                <div className="h-28 bg-gray-200 relative overflow-hidden">
-                  <img
-                    src={room.imageUrl}
-                    alt={room.name}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative">
+                  <ImageCarousel images={images} alt={room.name} height={160} borderRadius={theme.borderRadius} />
                   {isSelected && (
-                    <div
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-                      style={{ backgroundColor: theme.primaryColor }}
-                    >
-                      ✓
+                    <div className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-md" style={{ backgroundColor: theme.primaryColor }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5" /></svg>
                     </div>
                   )}
                 </div>
               )}
+
               <div className="p-3">
-                <div className="font-medium text-sm">{room.name}</div>
-                <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                  {room.description}
-                </div>
-                {config.showTags !== false && (
-                  <div className="flex gap-1 mt-2 flex-wrap">
-                    {room.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600"
-                      >
+                {/* Room name */}
+                <div className="font-semibold text-sm">{room.name}</div>
+
+                {/* Tags */}
+                {config.showTags !== false && room.tags && room.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1.5 flex-wrap">
+                    {room.tags.slice(0, 5).map((tag) => (
+                      <span key={tag} className="px-1.5 py-0.5 bg-gray-100 rounded text-[9px] text-gray-500 font-medium">
                         {tag}
                       </span>
                     ))}
                   </div>
                 )}
-                <div className="flex items-center justify-between mt-2">
-                  <span
-                    className="font-semibold text-sm"
-                    style={{ color: theme.primaryColor }}
-                  >
-                    {room.currency || "CAD"} {room.pricePerNight}
-                  </span>
-                  <span className="text-[10px] text-gray-400">per night</span>
+
+                {/* Description */}
+                <div className="text-[11px] text-gray-500 mt-1.5 line-clamp-2">{room.description}</div>
+
+                {/* Expandable details */}
+                <ExpandableDetails
+                  details={(room as unknown as Record<string, unknown>).details as string}
+                  moreDetails={(room as unknown as Record<string, unknown>).moreDetails as string}
+                />
+
+                {/* Quantity Picker */}
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setQuantities(prev => ({ ...prev, [room.id]: Math.max(0, qty - 1) })); }}
+                      className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-lg font-bold"
+                    >−</button>
+                    <span className="w-8 text-center text-sm font-bold">{qty}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setQuantities(prev => ({ ...prev, [room.id]: Math.min(qty + 1, room.stock || 50) })); }}
+                      className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 text-lg font-bold"
+                    >+</button>
+                  </div>
+                  <PriceDisplay
+                    price={room.pricePerNight}
+                    salePrice={(room as unknown as Record<string, unknown>).salePrice as number}
+                    currency={room.currency || "CAD"}
+                    unit="night"
+                    primaryColor={theme.primaryColor}
+                  />
+                </div>
+
+                {/* Availability */}
+                <div className="mt-1.5 text-right">
+                  <AvailabilityBadge
+                    available={room.stock}
+                    total={room.stock}
+                    unavailableUntil={(room as unknown as Record<string, unknown>).unavailableUntil as string}
+                  />
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Subtotal */}
+      {Object.values(quantities).some(q => q > 0) && (
+        <div className="mt-3 p-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between">
+          <span className="text-xs text-gray-500">Room Subtotal</span>
+          <span className="font-bold text-sm" style={{ color: theme.primaryColor }}>
+            {(rooms as Array<typeof rooms[0]>).reduce((sum, r) => sum + (quantities[r.id] || 0) * r.pricePerNight * (nightCount || 1), 0).toLocaleString("en-CA", { style: "currency", currency: "CAD" })}
+            {nightCount > 0 && <span className="text-[10px] font-normal text-gray-400 ml-1">× {nightCount} nights</span>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -806,69 +837,50 @@ function ActivityPickerPreview({
       >
         {(config.title as string) || "Activities & Excursions"}
       </h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {activities.map((act) => {
           const isSelected = selectedIds.has(act.id);
+          const images = act.imageUrl ? [act.imageUrl] : [];
+          const isFree = !act.pricePerPerson || act.pricePerPerson === 0;
+
           return (
             <div
               key={act.id}
               data-item-label={act.name}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggle(act.id);
-              }}
-              className="border overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); toggle(act.id); }}
+              className="border overflow-hidden hover:shadow-lg transition-all cursor-pointer"
               style={{
                 borderRadius: `${theme.borderRadius}px`,
                 borderColor: isSelected ? theme.primaryColor : "#e5e7eb",
                 borderWidth: isSelected ? "2px" : "1px",
-                backgroundColor: isSelected
-                  ? `${theme.primaryColor}08`
-                  : "#fff",
+                backgroundColor: isSelected ? `${theme.primaryColor}05` : "#fff",
               }}
             >
               {config.showImages !== false && (
-                <div className="h-24 bg-gray-200 overflow-hidden relative">
-                  <img
-                    src={act.imageUrl}
-                    alt={act.name}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative">
+                  <ImageCarousel images={images} alt={act.name} height={130} borderRadius={theme.borderRadius} />
+                  {/* Price badge on image */}
+                  <div className="absolute top-2 right-2 px-2 py-1 rounded-lg text-xs font-bold text-white shadow-md"
+                    style={{ backgroundColor: isFree ? "rgba(0,128,0,0.85)" : "rgba(0,0,0,0.7)" }}>
+                    {isFree ? "Free" : `$${act.pricePerPerson}`}
+                  </div>
                   {isSelected && (
-                    <div
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-                      style={{ backgroundColor: theme.primaryColor }}
-                    >
-                      ✓
+                    <div className="absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: theme.primaryColor }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5" /></svg>
                     </div>
                   )}
                 </div>
               )}
-              <div className="p-2.5">
-                <div className="font-medium text-sm">{act.name}</div>
-                {config.showDuration !== false && (
-                  <div
-                    className="inline-block px-1.5 py-0.5 rounded text-[10px] mt-1"
-                    style={{
-                      backgroundColor: `${theme.primaryColor}15`,
-                      color: theme.primaryColor,
-                    }}
-                  >
-                    {Math.floor(act.durationMinutes / 60)}h{" "}
-                    {act.durationMinutes % 60 > 0
-                      ? `${act.durationMinutes % 60}m`
-                      : ""}
+              <div className="p-3" style={{ backgroundColor: isSelected ? `${theme.primaryColor}08` : "transparent" }}>
+                <div className="font-semibold text-sm">{act.name}</div>
+                {config.showDuration !== false && act.durationMinutes > 0 && (
+                  <div className="inline-block px-1.5 py-0.5 rounded text-[9px] mt-1 font-medium"
+                    style={{ backgroundColor: `${theme.primaryColor}12`, color: theme.primaryColor }}>
+                    {Math.floor(act.durationMinutes / 60)}h{act.durationMinutes % 60 > 0 ? ` ${act.durationMinutes % 60}m` : ""}
+                    {act.maxParticipants && <span className="ml-1 opacity-60">· max {act.maxParticipants}</span>}
                   </div>
                 )}
-                <div className="flex items-center justify-between mt-2">
-                  <span
-                    className="font-semibold text-sm"
-                    style={{ color: theme.primaryColor }}
-                  >
-                    {act.currency || "CAD"} {act.pricePerPerson}
-                  </span>
-                  <span className="text-[10px] text-gray-400">per person</span>
-                </div>
+                <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{act.description}</div>
               </div>
             </div>
           );
