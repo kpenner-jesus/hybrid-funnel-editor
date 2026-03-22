@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { WidgetInstance, ThemeConfig } from "@/lib/types";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { mockRooms, mockMeals, mockActivities } from "@/lib/mock-data";
@@ -311,23 +311,20 @@ function UniqueInventorySection({
   units: RoomUnit[];
   onUnitsChange: (units: RoomUnit[]) => void;
 }) {
-  // Auto-grow/shrink units array to match qty
+  // Auto-grow/shrink units array to match qty — use ref to prevent infinite loop
+  const lastQtyRef = useRef(qty);
   useEffect(() => {
+    if (lastQtyRef.current === qty && units.length === qty) return;
+    lastQtyRef.current = qty;
+    if (units.length === qty) return;
     const current = [...units];
     while (current.length < qty) {
-      current.push({
-        unitId: "",
-        adults: [{ name: "" }],
-        children: [],
-      });
+      current.push({ unitId: "", adults: [{ name: "" }], children: [] });
     }
-    if (current.length > qty) {
-      current.length = qty;
-    }
-    if (current.length !== units.length) {
-      onUnitsChange(current);
-    }
-  }, [qty, units.length]);
+    if (current.length > qty) current.length = qty;
+    onUnitsChange(current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qty]);
 
   // Generate mock room unit names (e.g., "101 - Main Floor", "201W - Upper Floor")
   const availableUnits = Array.from({ length: stock }, (_, i) => ({
@@ -2216,11 +2213,15 @@ export function WidgetRenderer({
   const template = widgetTemplateRegistry[widget.templateId];
 
   // Stable callback to avoid infinite re-render loops
+  // Use ref to stabilize onOutput — prevents infinite re-render loops
+  // when parent re-creates the callback on every render
+  const onOutputRef = useRef(onOutput);
+  onOutputRef.current = onOutput;
   const stableOnOutput = useCallback(
     (outputs: Record<string, unknown>) => {
-      onOutput?.(outputs);
+      onOutputRef.current?.(outputs);
     },
-    [onOutput]
+    []
   );
 
   const cardStyle: React.CSSProperties = {
