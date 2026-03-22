@@ -664,13 +664,17 @@ function generateMainFunnel(
   catInfo: CategoryInfo,
   usedTemplates: Set<string>,
 ): string {
-  const componentName = funnel.name
+  let componentName = funnel.name
     .replace(/[^a-zA-Z0-9 ]/g, "")
     .split(" ")
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join("")
     + "Funnel";
+  // JS identifiers can't start with a number — prefix with "The" if needed
+  if (/^[0-9]/.test(componentName)) {
+    componentName = "The" + componentName;
+  }
 
   const stepNames = funnel.steps.map((s) => s.id);
   const hasRooms = usedTemplates.has("guest-rooms");
