@@ -77,7 +77,7 @@ export function FunnelPreview() {
   const showThumbnails = railWidth >= RAIL_THUMB;
 
   // Preview mode: "step" (single step) or "flow" (all steps with connections)
-  const [previewMode, setPreviewMode] = useState<"step" | "flow">("step");
+  const [previewMode, setPreviewMode] = useState<"step" | "flow">("flow");
 
   // --- Preview mode toggle bar (always visible) ---
   const modeToggle = (

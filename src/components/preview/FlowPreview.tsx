@@ -249,7 +249,7 @@ export function FlowPreview() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.3);
+  const [zoom, setZoom] = useState(0.25);
   const [pan, setPan] = useState({ x: 0, y: 20 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -276,7 +276,7 @@ export function FlowPreview() {
       const contentW = contentRef.current.scrollWidth || 800;
       const contentH = contentRef.current.scrollHeight || 2000;
       // Calculate zoom to fit width, then center horizontally
-      const fitZoom = Math.min(0.4, (cw * 0.85) / contentW);
+      const fitZoom = Math.min(0.3, (cw * 0.85) / contentW);
       const scaledW = contentW * fitZoom;
       const centerX = Math.max(20, (cw - scaledW) / 2);
       setZoom(fitZoom);
