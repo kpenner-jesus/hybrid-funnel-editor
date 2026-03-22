@@ -476,13 +476,23 @@ function StepCard({
                 onWidgetDoubleClick?.(widget.instanceId, focusedItem);
               }}
               className="relative"
-              style={{
-                backgroundColor: widgetBgHighlight ? `${theme.primaryColor}25` : undefined,
-                borderRadius: "8px",
-                boxShadow: widgetBgHighlight ? `inset 0 0 0 3px ${theme.primaryColor}50, 0 0 16px ${theme.primaryColor}20` : undefined,
-                transition: "background-color 0.2s ease, box-shadow 0.2s ease",
-              }}
+              style={{ borderRadius: "8px" }}
             >
+              {/* Widget-level highlight overlay — renders ON TOP of the widget content */}
+              {widgetBgHighlight && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundColor: `${theme.primaryColor}18`,
+                    border: `3px solid ${theme.primaryColor}60`,
+                    borderRadius: "8px",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                    transition: "opacity 0.2s ease",
+                  }}
+                />
+              )}
               {/* Item-level highlighting: scoped to THIS widget via data-widget-scope */}
               {hasItemFocus && (
                 <style>{`
