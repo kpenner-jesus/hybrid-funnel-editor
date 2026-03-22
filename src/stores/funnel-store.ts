@@ -181,6 +181,8 @@ interface FunnelStore {
   loadFunnel: (id: string) => void;
   saveFunnel: () => void;
   createFunnel: (name: string) => string;
+  cloneFunnel: (sourceId: string, newName?: string) => string;
+  renameFunnel: (id: string, newName: string) => void;
   deleteFunnel: (id: string) => void;
 
   // Step operations
@@ -339,6 +341,41 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     saveFunnelsToStorage(newFunnels);
     set({ funnels: newFunnels });
     return newFunnel.id;
+  },
+
+  cloneFunnel: (sourceId, newName) => {
+    const { funnels } = get();
+    const source = funnels.find((f) => f.id === sourceId);
+    if (!source) return sourceId;
+    const cloned: FunnelDefinition = JSON.parse(JSON.stringify(source));
+    cloned.id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    cloned.name = newName || `${source.name} (Copy)`;
+    cloned.createdAt = new Date().toISOString();
+    cloned.updatedAt = new Date().toISOString();
+    // Regenerate all step and widget IDs to avoid conflicts
+    const prefix = Date.now().toString(36);
+    cloned.steps.forEach((step, si) => {
+      step.id = `${prefix}-s${si}-${Math.random().toString(36).slice(2, 6)}`;
+      step.widgets.forEach((w, wi) => {
+        w.instanceId = `${prefix}-w${si}${wi}-${Math.random().toString(36).slice(2, 6)}`;
+      });
+    });
+    const newFunnels = [...funnels, cloned];
+    saveFunnelsToStorage(newFunnels);
+    set({ funnels: newFunnels });
+    return cloned.id;
+  },
+
+  renameFunnel: (id, newName) => {
+    const { funnels, funnel } = get();
+    const newFunnels = funnels.map((f) =>
+      f.id === id ? { ...f, name: newName, updatedAt: new Date().toISOString() } : f
+    );
+    saveFunnelsToStorage(newFunnels);
+    set({
+      funnels: newFunnels,
+      funnel: funnel?.id === id ? { ...funnel, name: newName, updatedAt: new Date().toISOString() } : funnel,
+    });
   },
 
   deleteFunnel: (id) => {
