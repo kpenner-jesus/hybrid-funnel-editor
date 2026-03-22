@@ -487,8 +487,7 @@ function StepCard({
               />
             </div>
             );
-          }
-          ))
+          })
         )}
       </div>
 
