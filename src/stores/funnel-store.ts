@@ -125,7 +125,42 @@ function loadFunnelsFromStorage(): FunnelDefinition[] {
 
 function saveFunnelsToStorage(funnels: FunnelDefinition[]) {
   if (typeof window === "undefined") return;
+  // Save to localStorage (instant, works offline)
   localStorage.setItem("hybrid-funnel-editor-funnels", JSON.stringify(funnels));
+  // Also save to Vercel KV (shared across computers)
+  syncToKV(funnels);
+}
+
+// Debounced KV sync — saves to cloud after 2s of inactivity
+let kvSyncTimer: ReturnType<typeof setTimeout> | null = null;
+function syncToKV(funnels: FunnelDefinition[]) {
+  if (kvSyncTimer) clearTimeout(kvSyncTimer);
+  kvSyncTimer = setTimeout(async () => {
+    try {
+      const venueRaw = localStorage.getItem("everybooking-venue-data");
+      const venueData = venueRaw ? JSON.parse(venueRaw) : null;
+      await fetch("/api/funnels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ funnels, venueData }),
+      });
+    } catch (e) {
+      console.warn("[KV sync] Failed to save to cloud:", e);
+    }
+  }, 2000);
+}
+
+// Load from KV (called once on initialize)
+async function loadFromKV(): Promise<{ funnels: FunnelDefinition[]; venueData: unknown } | null> {
+  try {
+    const res = await fetch("/api/funnels");
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.funnels && data.funnels.length > 0) return data;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // Auto-save: debounced save to localStorage after every mutation
@@ -140,7 +175,7 @@ function scheduleAutoSave(getFn: () => { funnel: FunnelDefinition | null; funnel
       ? funnels.map((f) => (f.id === updated.id ? updated : f))
       : [...funnels, updated];
     saveFunnelsToStorage(newFunnels);
-  }, 500); // 500ms debounce — won't thrash localStorage during rapid AI tool calls
+  }, 500);
 }
 
 // --- Undo/Redo History ---
@@ -281,18 +316,15 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   },
 
   initialize: () => {
-    const stored = loadFunnelsFromStorage();
-    if (stored.length === 0) {
-      const example = createExampleFunnel();
-      saveFunnelsToStorage([example]);
-      set({ funnels: [example], initialized: true });
-    } else {
-      set({ funnels: stored, initialized: true });
+    // First: load from localStorage (instant)
+    const localStored = loadFunnelsFromStorage();
+    const setFunnels = (funnels: FunnelDefinition[]) => {
+      set({ funnels, initialized: true });
       // Auto-load last active funnel
       try {
         const lastId = localStorage.getItem("hybrid-funnel-editor-active-funnel");
         if (lastId) {
-          const funnel = stored.find((f) => f.id === lastId);
+          const funnel = funnels.find((f) => f.id === lastId);
           if (funnel) {
             set({
               funnel,
@@ -303,7 +335,47 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
           }
         }
       } catch { /* ignore */ }
+    };
+
+    if (localStored.length > 0) {
+      setFunnels(localStored);
+    } else {
+      // Show empty state immediately, then check KV
+      set({ initialized: true });
     }
+
+    // Then: try loading from KV (cloud, shared across computers)
+    // If KV has newer data, merge/replace
+    loadFromKV().then((kvData) => {
+      if (!kvData) return;
+      const { funnels: kvFunnels, venueData } = kvData;
+      if (kvFunnels && kvFunnels.length > 0) {
+        const current = get().funnels;
+        // KV has funnels — merge: keep whichever is newer per funnel ID
+        const merged = new Map<string, FunnelDefinition>();
+        for (const f of current) merged.set(f.id, f);
+        for (const f of kvFunnels as FunnelDefinition[]) {
+          const existing = merged.get(f.id);
+          if (!existing || new Date(f.updatedAt) > new Date(existing.updatedAt)) {
+            merged.set(f.id, f);
+          }
+        }
+        const mergedFunnels = Array.from(merged.values());
+        // Save merged result to localStorage
+        localStorage.setItem("hybrid-funnel-editor-funnels", JSON.stringify(mergedFunnels));
+        setFunnels(mergedFunnels);
+      }
+      // Also load venue data from KV
+      if (venueData) {
+        try {
+          const { useVenueDataStore } = require("@/stores/venue-data-store");
+          const currentVenue = useVenueDataStore.getState().venueData;
+          if (!currentVenue?.venueName && (venueData as Record<string, unknown>).venueName) {
+            useVenueDataStore.getState().setVenueData(venueData);
+          }
+        } catch { /* ignore if venue store not available */ }
+      }
+    }).catch(() => { /* KV not available — that's fine, localStorage works */ });
   },
 
   loadFunnel: (id) => {
