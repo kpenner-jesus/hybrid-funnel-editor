@@ -47,12 +47,12 @@ export interface AiMessage {
 export type ClaudeModel =
   | "claude-sonnet-4-20250514"
   | "claude-opus-4-20250514"
-  | "claude-haiku-4-20250514";
+  | "claude-haiku-3-5-20241022";
 
 export const CLAUDE_MODELS: { id: ClaudeModel; label: string; description: string }[] = [
   { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4.6", description: "Fast & capable — best balance" },
   { id: "claude-opus-4-20250514", label: "Claude Opus 4.6", description: "Most powerful — complex tasks" },
-  { id: "claude-haiku-4-20250514", label: "Claude Haiku 4.5", description: "Fastest — simple edits" },
+  { id: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5", description: "Fastest — simple edits" },
 ];
 
 interface AiStore {
