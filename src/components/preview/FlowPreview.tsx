@@ -457,6 +457,7 @@ function StepCard({
           step.widgets.map((widget) => (
             <div
               key={widget.instanceId}
+              onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // Check if user double-clicked a specific item within the widget
@@ -470,7 +471,7 @@ function StepCard({
                 widget={widget}
                 theme={theme}
                 isSelected={selectedWidgetId === widget.instanceId}
-                onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
+                onClick={() => onWidgetClick(widget.instanceId)}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
               />
