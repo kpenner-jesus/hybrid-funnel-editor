@@ -13,11 +13,10 @@ import { FunnelPreview } from "@/components/preview/FunnelPreview";
 import { PublishModal } from "@/components/editor/PublishModal";
 import { DiagnosticsPanel } from "@/components/editor/DiagnosticsPanel";
 import { AiChatPanel } from "@/components/ai/AiChatPanel";
-import { FlowGraph } from "@/components/editor/FlowGraph";
 import { useAiStore } from "@/stores/ai-store";
 import { generateFunnelJSX } from "@/lib/jsx-generator";
 
-type EditorTab = "steps" | "theme" | "variables" | "flow";
+type EditorTab = "steps" | "theme" | "variables";
 
 export default function EditorPage() {
   const params = useParams();
@@ -155,7 +154,6 @@ export default function EditorPage() {
 
   const tabs: { id: EditorTab; label: string }[] = [
     { id: "steps", label: "Steps" },
-    { id: "flow", label: "Flow" },
     { id: "theme", label: "Theme" },
     { id: "variables", label: "Variables" },
   ];
@@ -295,7 +293,7 @@ export default function EditorPage() {
           </div>
 
           {/* Tab content */}
-          <div className={`flex-1 overflow-y-auto ${activeTab === "flow" ? "p-0" : "p-4"}`}>
+          <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "steps" && (
               <div className="space-y-4">
                 <StepList />
@@ -307,11 +305,6 @@ export default function EditorPage() {
                     <WidgetConfig />
                   </div>
                 )}
-              </div>
-            )}
-            {activeTab === "flow" && (
-              <div className="h-full -m-4">
-                <FlowGraph />
               </div>
             )}
             {activeTab === "theme" && <ThemeEditor />}

@@ -55,6 +55,9 @@ export function AiChatPanel() {
   const resizeEdge = useRef<string>(""); // e.g. "n", "se", "w", etc.
   const resizeStart = useRef({ mouseX: 0, mouseY: 0, width: 0, height: 0, posX: 0, posY: 0 });
 
+  // Minimized state — collapses to just the title bar
+  const [isMinimized, setIsMinimized] = useState(false);
+
   // Live position/size during drag/resize for smooth updates
   const [livePos, setLivePos] = useState(undockedPosition);
   const [liveSize, setLiveSize] = useState(undockedSize);
@@ -466,6 +469,20 @@ export function AiChatPanel() {
             </svg>
           </button>
         )}
+        {/* Minimize toggle */}
+        <button
+          onClick={() => setIsMinimized((prev) => !prev)}
+          className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-dim transition-colors"
+          title={isMinimized ? "Expand" : "Minimize"}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            {isMinimized ? (
+              <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            ) : (
+              <path d="M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            )}
+          </svg>
+        </button>
         {/* Dock/Undock toggle */}
         <button
           onClick={toggleDock}
@@ -775,36 +792,41 @@ export function AiChatPanel() {
     return (
       <div
         ref={panelRef}
-        className="fixed z-50 flex flex-col bg-white rounded-2xl overflow-hidden group/panel"
+        className="fixed z-50 flex flex-col bg-white rounded-2xl overflow-hidden group/panel transition-all duration-200"
         style={{
           left: livePos.x,
           top: livePos.y,
-          width: liveSize.width,
-          height: liveSize.height,
+          width: isMinimized ? 280 : liveSize.width,
+          height: isMinimized ? 48 : liveSize.height,
           boxShadow:
             "0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)",
         }}
       >
         {/* Draggable header */}
         <div
-          className="h-14 border-b border-outline-variant px-4 flex items-center justify-between shrink-0 bg-surface-dim/60 backdrop-blur-sm"
+          className="h-12 border-b border-outline-variant px-4 flex items-center justify-between shrink-0 bg-surface-dim/60 backdrop-blur-sm"
           style={{ cursor: "grab" }}
           onMouseDown={onDragStart}
+          onDoubleClick={() => setIsMinimized((prev) => !prev)}
         >
           {headerContent}
         </div>
 
-        {/* Model selector */}
-        {modelBar}
+        {!isMinimized && (
+          <>
+            {/* Model selector */}
+            {modelBar}
 
-        {/* Messages */}
-        {messageList}
+            {/* Messages */}
+            {messageList}
 
-        {/* Quick suggestions */}
-        {suggestions}
+            {/* Quick suggestions */}
+            {suggestions}
 
-        {/* Input */}
-        {inputArea}
+            {/* Input */}
+            {inputArea}
+          </>
+        )}
 
         {/* Resize edges — invisible 6px hit zones along each side */}
         <div className="absolute top-0 left-2 right-2 h-1.5 cursor-n-resize" onMouseDown={onEdgeResizeStart("n")} />
@@ -841,21 +863,28 @@ export function AiChatPanel() {
         }`}
       >
         {/* Header */}
-        <div className="h-14 border-b border-outline-variant px-4 flex items-center justify-between shrink-0">
+        <div
+          className="h-14 border-b border-outline-variant px-4 flex items-center justify-between shrink-0"
+          onDoubleClick={() => setIsMinimized((prev) => !prev)}
+        >
           {headerContent}
         </div>
 
-        {/* Model selector */}
-        {modelBar}
+        {!isMinimized && (
+          <>
+            {/* Model selector */}
+            {modelBar}
 
-        {/* Messages */}
-        {messageList}
+            {/* Messages */}
+            {messageList}
 
-        {/* Quick suggestions */}
-        {suggestions}
+            {/* Quick suggestions */}
+            {suggestions}
 
-        {/* Input */}
-        {inputArea}
+            {/* Input */}
+            {inputArea}
+          </>
+        )}
       </div>
     </>
   );
