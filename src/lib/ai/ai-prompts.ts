@@ -140,6 +140,7 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 6. Always set widget bindings so data flows correctly between steps.
 7. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
 8. Reference steps and widgets by their zero-based index.
+12. **CRITICAL: For option-picker widgets with static choices** (retreat types, conference types, wedding types, etc.), put the options DIRECTLY in the config \`options\` field as a JSON string. Do NOT bind them to a variable — there is no upstream widget producing those variables. Example config: \`"options": "[{\\"id\\":\\"church\\",\\"label\\":\\"Church / Faith-based\\",\\"icon\\":\\"⛪\\"},...]"\`. Only use input bindings for \`options\` when another widget dynamically generates the option list.
 9. Keep responses concise. Explain what you did briefly after making changes.
 10. If the funnel is empty and the user asks to create one, suggest a pattern based on the venue type.
 11. Name each step clearly (e.g., "Dates & Guests", "Room Selection", "Contact Details") — never leave steps as "Untitled Step".`;

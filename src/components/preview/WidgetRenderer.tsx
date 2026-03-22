@@ -958,6 +958,7 @@ function InvoicePreview({
 function OptionPickerPreview({
   config,
   theme,
+  resolvedInputs,
   onOutput,
 }: {
   config: Record<string, unknown>;
@@ -965,11 +966,36 @@ function OptionPickerPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  const mockOptions = [
-    { id: "standard", label: "Standard", desc: "Basic package" },
-    { id: "premium", label: "Premium", desc: "Extra amenities" },
-    { id: "deluxe", label: "Deluxe", desc: "All-inclusive" },
+  // Priority: resolved inputs > config options > mock fallback
+  const mockFallback = [
+    { id: "standard", label: "Standard", description: "Basic package" },
+    { id: "premium", label: "Premium", description: "Extra amenities" },
+    { id: "deluxe", label: "Deluxe", description: "All-inclusive" },
   ];
+
+  let parsedOptions: Array<{ id: string; label: string; description?: string; icon?: string }> = mockFallback;
+
+  // Check resolved inputs first (from variable binding)
+  if (resolvedInputs.options && Array.isArray(resolvedInputs.options)) {
+    parsedOptions = resolvedInputs.options as typeof parsedOptions;
+  } else {
+    // Check config options (embedded JSON)
+    try {
+      const configOpts = config.options;
+      if (typeof configOpts === "string" && configOpts.trim().startsWith("[")) {
+        parsedOptions = JSON.parse(configOpts);
+      } else if (Array.isArray(configOpts)) {
+        parsedOptions = configOpts as typeof parsedOptions;
+      }
+    } catch { /* fall back to mock */ }
+  }
+
+  const mockOptions = parsedOptions.map((o) => ({
+    id: o.id,
+    label: o.label,
+    desc: o.description || "",
+    icon: o.icon,
+  }));
 
   const isMulti = !!config.multiSelect;
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1036,10 +1062,13 @@ function OptionPickerPreview({
                   : "#fff",
               }}
             >
+              {opt.icon && <div className="text-lg mb-1">{opt.icon}</div>}
               <div className="font-medium text-sm">{opt.label}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">
-                {opt.desc}
-              </div>
+              {opt.desc && (
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  {opt.desc}
+                </div>
+              )}
             </div>
           );
         })}
