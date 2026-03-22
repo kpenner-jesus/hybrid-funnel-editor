@@ -2,6 +2,7 @@
 
 import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
+import { useAiStore } from "@/stores/ai-store";
 import { WidgetRenderer } from "./WidgetRenderer";
 import type { WidgetInstance, ThemeConfig, Step, FunnelDefinition } from "@/lib/types";
 
@@ -501,6 +502,10 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
     selectWidget, selectStep, setWidgetOutput, resolveWidgetInputs,
   } = useFunnelStore();
 
+  // Use docked widget ID for highlight persistence — this stays set even when clicks clear selectedWidgetId
+  const dockedWidgetId = useAiStore((s) => s.dockedWidgetId);
+  const effectiveSelectedWidgetId = dockedWidgetId || selectedWidgetId;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(0.25);
@@ -730,7 +735,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 stepIndex={idx}
                 isActive={previewStep === stepId}
                 theme={funnel.theme}
-                selectedWidgetId={selectedWidgetId}
+                selectedWidgetId={effectiveSelectedWidgetId}
                 onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
@@ -768,7 +773,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         stepIndex={idx}
                         isActive={previewStep === stepId}
                         theme={funnel.theme}
-                        selectedWidgetId={selectedWidgetId}
+                        selectedWidgetId={effectiveSelectedWidgetId}
                         borderColor="#dc2626"
                         onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
@@ -810,7 +815,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       stepIndex={idx}
                       isActive={previewStep === stepId}
                       theme={funnel.theme}
-                      selectedWidgetId={selectedWidgetId}
+                      selectedWidgetId={effectiveSelectedWidgetId}
                       borderColor={color}
                       onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
