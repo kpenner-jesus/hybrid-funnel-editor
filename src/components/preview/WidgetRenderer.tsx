@@ -28,90 +28,148 @@ function DatePickerPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  const today = new Date();
-  const defaultCheckIn = new Date(today);
-  defaultCheckIn.setDate(today.getDate() + 7);
-  const defaultCheckOut = new Date(defaultCheckIn);
-  defaultCheckOut.setDate(defaultCheckIn.getDate() + 4);
-
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const fmt = (d: Date) => d.toISOString().split("T")[0];
+  const defaultIn = new Date(today); defaultIn.setDate(today.getDate() + 7);
+  const defaultOut = new Date(defaultIn); defaultOut.setDate(defaultIn.getDate() + 4);
 
-  const [checkIn, setCheckIn] = useState<string>(
-    (resolvedInputs?.checkIn as string) || fmt(defaultCheckIn)
-  );
-  const [checkOut, setCheckOut] = useState<string>(
-    (resolvedInputs?.checkOut as string) || fmt(defaultCheckOut)
-  );
+  const [startDate, setStartDate] = useState<string>((resolvedInputs?.checkIn as string) || fmt(defaultIn));
+  const [endDate, setEndDate] = useState<string>((resolvedInputs?.checkOut as string) || fmt(defaultOut));
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [hover, setHover] = useState<string | null>(null);
+  const [selEnd, setSelEnd] = useState(!!startDate);
 
-  const nightCount = Math.max(
-    0,
-    Math.round(
-      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
-        (1000 * 60 * 60 * 24)
-    )
-  );
+  const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const toDS = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const pD = (s: string) => s ? new Date(s + "T00:00:00") : null;
+  const sD = pD(startDate), eD = pD(endDate);
 
-  // Emit on mount and on change
+  const nightCount = startDate && endDate ? Math.max(0, Math.round((new Date(endDate + "T00:00:00").getTime() - new Date(startDate + "T00:00:00").getTime()) / 86400000)) : 0;
+
   useEffect(() => {
-    onOutput({ checkIn, checkOut, nightCount });
-  }, [checkIn, checkOut, nightCount, onOutput]);
+    onOutput({ checkIn: startDate, checkOut: endDate, nightCount });
+  }, [startDate, endDate, nightCount, onOutput]);
 
-  const formatDisplay = (dateStr: string) => {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  const click = (ds: string) => {
+    const c = new Date(ds + "T00:00:00");
+    if (c < today) return;
+    if (!startDate || !selEnd) { setStartDate(ds); setEndDate(""); setSelEnd(true); }
+    else { if (c <= sD!) { setStartDate(ds); setEndDate(""); setSelEnd(true); } else { setEndDate(ds); setSelEnd(false); } }
   };
+
+  const prev = () => { if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); } else setViewMonth(m => m - 1); };
+  const next = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); } else setViewMonth(m => m + 1); };
+
+  const renderMonth = (y: number, m: number) => {
+    const totalDays = new Date(y, m + 1, 0).getDate();
+    const firstDay = new Date(y, m, 1).getDay();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= totalDays; d++) cells.push(d);
+
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-center font-bold text-sm mb-2" style={{ color: theme.primaryColor, fontFamily: theme.headlineFont }}>{MONTHS[m]} {y}</div>
+        <div className="grid grid-cols-7 mb-1">
+          {DAYS.map(d => <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider py-0.5" style={{ color: "#9ca3af" }}>{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-y-0.5">
+          {cells.map((day, i) => {
+            if (!day) return <div key={`e-${i}`} />;
+            const ds = toDS(y, m, day);
+            const d = new Date(ds + "T00:00:00");
+            const hD = hover ? new Date(hover + "T00:00:00") : null;
+            const isPast = d < today;
+            const isStart = startDate === ds;
+            const isEnd = endDate === ds;
+            const inRange = startDate && endDate && sD && eD && d > sD && d < eD;
+            const inHover = startDate && !endDate && hD && selEnd && sD && d > sD && d < hD;
+            const isSel = isStart || isEnd;
+            const isIR = inRange || inHover;
+
+            let bg = "transparent", col = isPast ? "#d1d5db" : "#1f2937", fw = "500", br = "50%";
+            if (isSel) { bg = theme.primaryColor; col = "#fff"; fw = "700"; }
+            else if (isIR) { bg = theme.primaryColor + "15"; col = theme.primaryColor; br = "0"; }
+            if (isStart && (inRange || inHover)) br = "50% 0 0 50%";
+            if (isEnd && inRange) br = "0 50% 50% 0";
+
+            return (
+              <div key={ds} className="flex items-center justify-center" style={{ height: 32 }}>
+                <button
+                  disabled={isPast}
+                  onClick={() => click(ds)}
+                  onMouseEnter={() => { if (selEnd && startDate && !isPast) setHover(ds); }}
+                  onMouseLeave={() => setHover(null)}
+                  className="w-8 h-8 text-xs flex items-center justify-center disabled:cursor-not-allowed transition-colors"
+                  style={{ background: bg, color: col, fontWeight: fw, borderRadius: br, fontSize: 12 }}
+                >
+                  {day}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const m2 = viewMonth === 11 ? 0 : viewMonth + 1;
+  const y2 = viewMonth === 11 ? viewYear + 1 : viewYear;
+  const fmtDisplay = (s: string) => s ? new Date(s + "T00:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" }) : null;
 
   return (
     <div className="space-y-3">
-      <h3
-        style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }}
-        className="text-lg font-semibold"
-      >
-        {(config.title as string) || "Select Your Dates"}
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
+        {(config.title as string) || "Select your dates"}
       </h3>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Check-in</label>
-          <input
-            type="date"
-            value={checkIn}
-            onChange={(e) => {
-              setCheckIn(e.target.value);
-              // Ensure checkout is after checkin
-              if (e.target.value >= checkOut) {
-                const next = new Date(e.target.value + "T00:00:00");
-                next.setDate(next.getDate() + 1);
-                setCheckOut(fmt(next));
-              }
-            }}
-            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
-            style={{
-              borderRadius: `${theme.borderRadius / 2}px`,
-              borderColor: theme.primaryColor + "40",
-            }}
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Check-out</label>
-          <input
-            type="date"
-            value={checkOut}
-            min={checkIn}
-            onChange={(e) => setCheckOut(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-current"
-            style={{
-              borderRadius: `${theme.borderRadius / 2}px`,
-              borderColor: theme.primaryColor + "40",
-            }}
-          />
-        </div>
+
+      {/* Check-in / Check-out summary cards */}
+      <div className="grid grid-cols-2 gap-2">
+        {[{ l: "Check-In", v: startDate }, { l: "Check-Out", v: endDate }].map(({ l, v }) => (
+          <div key={l} className="p-3 rounded-xl text-center" style={{
+            background: v ? `${theme.primaryColor}08` : "#f9fafb",
+            border: `1.5px solid ${v ? theme.primaryColor : "#e5e7eb"}`,
+          }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] mb-0.5" style={{ color: v ? theme.primaryColor : "#9ca3af" }}>{l}</div>
+            <div className="text-sm font-semibold" style={{ color: v ? theme.primaryColor : "#d1d5db", fontFamily: theme.headlineFont }}>
+              {v ? fmtDisplay(v) : "Select date"}
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="text-xs text-gray-500 text-center">
-        {nightCount} night{nightCount !== 1 ? "s" : ""}
+
+      {/* Calendar */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: "#fafafa", border: "1px solid #e5e7eb", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}>
+        {/* Navigation */}
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid #f3f4f6" }}>
+          <button onClick={prev} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 text-gray-400">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span className="font-bold text-sm" style={{ color: theme.primaryColor, fontFamily: theme.headlineFont }}>
+            {MONTHS[viewMonth]} {viewYear}
+          </span>
+          <button onClick={next} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 text-gray-400">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        {/* Dual calendar grid — 2 months side by side on wide, 1 on narrow */}
+        <div className="flex gap-4 px-3 py-3">
+          {renderMonth(viewYear, viewMonth)}
+          <div className="hidden sm:block w-px bg-gray-200 shrink-0" />
+          <div className="hidden sm:flex flex-1 min-w-0">
+            {renderMonth(y2, m2)}
+          </div>
+        </div>
+
+        {/* Status text */}
+        <div className="px-4 pb-3 text-center">
+          <p className="text-[11px]" style={{ color: "#9ca3af" }}>
+            {!startDate ? "Tap to select your arrival date" : !endDate ? "Now tap your departure date" : `${nightCount} night${nightCount !== 1 ? "s" : ""} selected`}
+          </p>
+        </div>
       </div>
     </div>
   );
