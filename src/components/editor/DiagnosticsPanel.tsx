@@ -141,9 +141,40 @@ export function DiagnosticsPanel({ open, onClose }: { open: boolean; onClose: ()
           });
         });
 
+        // Detect orphan steps (not reachable from step 0)
+        const reachableSet = new Set<number>();
+        const queue = [0];
+        while (queue.length > 0) {
+          const idx = queue.shift()!;
+          if (reachableSet.has(idx)) continue;
+          reachableSet.add(idx);
+          const entry = flowMap[idx];
+          if (entry) {
+            for (const conn of entry.connectsTo) {
+              if (conn.targetIndex >= 0 && !reachableSet.has(conn.targetIndex)) {
+                queue.push(conn.targetIndex);
+              }
+            }
+          }
+        }
+        const orphanSteps = flowMap.filter((_, idx) => !reachableSet.has(idx));
+
+        if (orphanSteps.length > 0) {
+          asciiLines.push("");
+          asciiLines.push("⚠️ DISCONNECTED STEPS (not reachable from Step 0):");
+          asciiLines.push("==================================================");
+          orphanSteps.forEach((entry) => {
+            asciiLines.push(`  [${entry.index}] ${entry.step} — NO incoming navigation path`);
+          });
+          asciiLines.push("");
+          asciiLines.push("FIX: These steps need a navigation.next from another step pointing to them,");
+          asciiLines.push("     or a segment-picker option with nextStep targeting their step ID.");
+        }
+
         sections["flowMap"] = {
           ascii: asciiLines.join("\n"),
           connections: flowMap,
+          orphanSteps: orphanSteps.map((e) => ({ index: e.index, title: e.step })),
         };
       }
     }
