@@ -470,7 +470,7 @@ function StepCard({
                 widget={widget}
                 theme={theme}
                 isSelected={selectedWidgetId === widget.instanceId}
-                onClick={() => onWidgetClick(widget.instanceId)}
+                onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
               />

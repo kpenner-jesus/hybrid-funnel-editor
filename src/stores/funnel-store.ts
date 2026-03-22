@@ -497,18 +497,28 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
 
   selectStep: (id) => {
     // When the AI is docked to a widget, don't clear the widget selection
-    // (importing ai-store dynamically to avoid circular deps)
     try {
-      const aiStore = require("@/stores/ai-store").useAiStore;
-      const docked = aiStore.getState().dockedWidgetId;
-      if (docked) {
+      const { useAiStore } = require("@/stores/ai-store");
+      if (useAiStore.getState().dockedWidgetId) {
         set({ selectedStepId: id });
         return;
       }
     } catch {}
     set({ selectedStepId: id, selectedWidgetId: null });
   },
-  selectWidget: (id) => set({ selectedWidgetId: id }),
+  selectWidget: (id) => {
+    // When the AI is docked, keep the docked widget selected (don't toggle off)
+    try {
+      const { useAiStore } = require("@/stores/ai-store");
+      const dockedId = useAiStore.getState().dockedWidgetId;
+      if (dockedId) {
+        // Always keep the docked widget selected, ignore other selections
+        set({ selectedWidgetId: dockedId });
+        return;
+      }
+    } catch {}
+    set({ selectedWidgetId: id });
+  },
   setPreviewStep: (id) => set({ previewStep: id }),
   setDataMode: (mode) => set({ dataMode: mode }),
   setWidgetOutput: (key, outputs) =>
