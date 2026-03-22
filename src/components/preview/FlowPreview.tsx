@@ -264,26 +264,35 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load — find the first step card and center it
+  // Center on initial load — measure content after it renders, then center
   useEffect(() => {
-    if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
+    if (hasInitialized.current || !funnel?.steps.length) return;
 
-    const timer = setTimeout(() => {
-      if (!containerRef.current) return;
+    // Use multiple timeouts to catch when content is ready
+    const checkAndCenter = () => {
+      if (!containerRef.current || !contentRef.current) return false;
+      const contentW = contentRef.current.scrollWidth;
+      if (contentW < 200) return false; // not rendered yet
+
       hasInitialized.current = true;
-
       const cw = containerRef.current.clientWidth;
-      // The first step card is 380px wide. Center it in the viewport.
-      const CARD_W = 380;
       const targetZoom = 0.28;
-      const scaledCardW = CARD_W * targetZoom;
-      // Center the card horizontally in the available space
-      const centerX = (cw - scaledCardW) / 2;
+      const scaledContentW = contentW * targetZoom;
+      const centerX = (cw - scaledContentW) / 2;
 
       setZoom(targetZoom);
-      setPan({ x: centerX, y: 20 });
-    }, 100);
-    return () => clearTimeout(timer);
+      setPan({ x: Math.max(10, centerX), y: 20 });
+      return true;
+    };
+
+    // Try at 200ms, 500ms, 1000ms
+    const t1 = setTimeout(() => { if (!checkAndCenter()) {
+      const t2 = setTimeout(() => { if (!checkAndCenter()) {
+        setTimeout(checkAndCenter, 500);
+      }}, 300);
+    }}, 200);
+
+    return () => clearTimeout(t1);
   }, [funnel?.steps.length]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
