@@ -494,13 +494,23 @@ function StepCard({
                 />
               )}
               {/* Item-level highlighting: scoped to THIS widget via data-widget-scope */}
+              {/* Uses ::after overlay so it works on images, cards, buttons, etc. */}
               {hasItemFocus && (
                 <style>{`
                   [data-widget-scope="${widget.instanceId}"] [data-item-label="${(dockedFocusedItem || "").replace(/"/g, '\\"')}"] {
-                    background-color: ${theme.primaryColor}20 !important;
-                    box-shadow: inset 0 0 0 2px ${theme.primaryColor}60 !important;
+                    position: relative !important;
+                    z-index: 0 !important;
+                  }
+                  [data-widget-scope="${widget.instanceId}"] [data-item-label="${(dockedFocusedItem || "").replace(/"/g, '\\"')}"]::after {
+                    content: "" !important;
+                    position: absolute !important;
+                    inset: 0 !important;
+                    background-color: ${theme.primaryColor}25 !important;
+                    border: 3px solid ${theme.primaryColor}60 !important;
                     border-radius: 8px !important;
-                    transition: background-color 0.2s ease, box-shadow 0.2s ease !important;
+                    pointer-events: none !important;
+                    z-index: 100 !important;
+                    transition: opacity 0.2s ease !important;
                   }
                 `}</style>
               )}
