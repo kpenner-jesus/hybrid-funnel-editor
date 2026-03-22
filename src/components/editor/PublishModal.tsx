@@ -64,7 +64,7 @@ export function PublishModal({ jsxCode, funnelName, onClose }: PublishModalProps
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
