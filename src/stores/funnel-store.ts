@@ -495,7 +495,19 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     set({ funnel: { ...funnel, variables }, isDirty: true });
   },
 
-  selectStep: (id) => set({ selectedStepId: id, selectedWidgetId: null }),
+  selectStep: (id) => {
+    // When the AI is docked to a widget, don't clear the widget selection
+    // (importing ai-store dynamically to avoid circular deps)
+    try {
+      const aiStore = require("@/stores/ai-store").useAiStore;
+      const docked = aiStore.getState().dockedWidgetId;
+      if (docked) {
+        set({ selectedStepId: id });
+        return;
+      }
+    } catch {}
+    set({ selectedStepId: id, selectedWidgetId: null });
+  },
   selectWidget: (id) => set({ selectedWidgetId: id }),
   setPreviewStep: (id) => set({ previewStep: id }),
   setDataMode: (mode) => set({ dataMode: mode }),
