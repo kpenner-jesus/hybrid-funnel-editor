@@ -472,7 +472,7 @@ function StepCard({
                 widget={widget}
                 theme={theme}
                 isSelected={selectedWidgetId === widget.instanceId}
-                onClick={() => onWidgetClick(widget.instanceId)}
+                onClick={() => {/* handled by wrapper div */}}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
               />
