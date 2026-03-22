@@ -296,6 +296,54 @@ export function executeAiToolCall(
         };
       }
 
+      case "configure_meal_widget": {
+        if (!funnel) return { success: false, message: "No funnel loaded." };
+        const mwStepIdx = args.stepIndex as number;
+        const mwWidgetIdx = args.widgetIndex as number;
+        const mwStep = resolveStepByIndex(funnel, mwStepIdx);
+        if (!mwStep) return { success: false, message: `Step index ${mwStepIdx} is out of range.` };
+        const mwWidget = resolveWidgetByIndex(mwStep, mwWidgetIdx);
+        if (!mwWidget) return { success: false, message: `Widget index ${mwWidgetIdx} is out of range.` };
+        if (mwWidget.templateId !== "meal-picker") {
+          return { success: false, message: `Widget at index ${mwWidgetIdx} is a ${mwWidget.templateId}, not a meal-picker.` };
+        }
+
+        // Build meal definitions with defaults
+        const mealDefs = (args.meals as Array<Record<string, unknown>>).map((m, i) => ({
+          id: (m.id as string) || `meal-${i}`,
+          name: (m.name as string) || `Meal ${i + 1}`,
+          sortOrder: (m.sortOrder as number) || i + 1,
+          adultPrice: (m.adultPrice as number) || 15,
+          timeslots: (m.timeslots as Array<{ startTime: string; endTime: string }>) || [{ startTime: "12:00", endTime: "13:00" }],
+          timeslotLocked: !!(m.timeslotLocked),
+          allowCheckIn: (m.allowCheckIn as string) || "selectable",
+          allowMiddle: (m.allowMiddle as string) || "selectable",
+          allowCheckOut: (m.allowCheckOut as string) || "selectable",
+          cascadeFrom: (m.cascadeFrom as string[]) || [],
+        }));
+
+        // Build config update
+        const mealConfig: Record<string, unknown> = {
+          meals: JSON.stringify(mealDefs, null, 2),
+        };
+        if (args.title) mealConfig.title = args.title;
+        if (args.subtitle) mealConfig.subtitle = args.subtitle;
+        if (args.currency) mealConfig.currency = args.currency;
+        if (args.singleDate !== undefined) mealConfig.singleDate = args.singleDate;
+        if (args.kidsEnabled !== undefined) mealConfig.kidsEnabled = args.kidsEnabled;
+        if (args.kidsPricingModel) mealConfig.kidsPricingModel = args.kidsPricingModel;
+        if (args.kidsPercentage !== undefined) mealConfig.kidsPercentage = args.kidsPercentage;
+        if (args.kidsAgeMultiplier !== undefined) mealConfig.kidsAgeMultiplier = args.kidsAgeMultiplier;
+
+        store.updateWidgetConfig(mwStep.id, mwWidget.instanceId, mealConfig);
+
+        const priceList = mealDefs.map((m) => `${m.name} $${m.adultPrice}`).join(", ");
+        return {
+          success: true,
+          message: `Configured meal widget with ${mealDefs.length} meals: ${priceList}. Kids meals: ${args.kidsEnabled !== false ? "enabled" : "disabled"}.`,
+        };
+      }
+
       case "suggest_improvements": {
         // This tool doesn't modify the funnel - the AI just returns text
         return {

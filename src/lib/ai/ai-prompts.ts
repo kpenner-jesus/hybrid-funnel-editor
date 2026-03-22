@@ -120,7 +120,7 @@ When building funnels, follow these binding patterns so data flows correctly bet
 - date-picker outputs: checkIn -> "checkIn", checkOut -> "checkOut"
 - guest-counter outputs: guests -> "guests"
 - guest-rooms: inputs checkIn, checkOut, guests from variables; outputs selectedRooms -> "selectedRooms"
-- meal-picker: inputs guests from variable; outputs selectedMeals -> "selectedMeals"
+- meal-picker: inputs guests, nightCount, checkIn, checkOut from variables; outputs selectedMeals -> "selectedMeals", mealTotal -> "mealTotal", kidsMealTotal -> "kidsMealTotal"
 - activity-picker: inputs checkIn, checkOut, guests from variables; outputs selectedActivities -> "selectedActivities"
 - contact-form outputs: contactInfo -> "contactInfo"
 - invoice inputs: checkIn, checkOut, guests, selectedRooms, selectedMeals, selectedActivities, contactInfo from variables; outputs totalPrice -> "totalPrice"
@@ -144,6 +144,33 @@ Use these widgets to create visually rich, professional funnels:
 - **category-picker**: Grouped product selection (wedding venues, meeting rooms, AV equipment). Config: title, categories (JSON with products), multiSelect, showImages, showQuantity, currency.
 - **booking-widget**: Hidden backend widget that creates an actual booking. Config: categoryName, visible (usually false), products (JSON of extra items). Place on contact step.
 - **payment-widget**: Payment collection for deposits. Config: title, amount, amountType (percent/fixed/full), description, acceptedMethods.
+
+## Meal Widget — Expert Configuration Guide
+
+The meal-picker is a **timeslot-based booking grid** (dates as rows × meals as columns). It is the most complex widget and MUST be configured correctly for invoice integration.
+
+**Default 4 meals with smart day rules:**
+- Breakfast ($18): unavailable on check-in day (guests arrive mid-day), available on middle + check-out days
+- Lunch ($20): available ALL days
+- Supper ($25): available on check-in + middle days, unavailable on check-out day (guests leave)
+- Night Snack ($8): available on check-in + middle days, unavailable on check-out day
+
+**When creating meal widgets, ALWAYS set the "meals" config as a JSON string with this structure:**
+\`\`\`json
+[{"id":"breakfast","name":"Breakfast","sortOrder":1,"adultPrice":18,"timeslots":[{"startTime":"07:00","endTime":"09:00"}],"timeslotLocked":false,"allowCheckIn":"unselectable","allowMiddle":"selectable","allowCheckOut":"selectable","cascadeFrom":[]},...]
+\`\`\`
+
+**Key configuration rules:**
+1. Set prices from the venue's actual meal pricing. Group meal prices are typically different from individual.
+2. For **individual guests** (small parties): often meals are optional, set lower prices, keep all meals selectable.
+3. For **groups** (20+): meals are usually required, higher per-person prices, kitchen opens for the whole group.
+4. Use **cascadeFrom** for venues where selecting one meal auto-selects others. Example: selecting Lunch on check-in day auto-selects Supper and Night Snack (kitchen staff won't come for just one meal). Set cascadeFrom on Lunch to include ["supper","night-snack"].
+5. **Kids meals**: set kidsEnabled=true. Use "percentage" model (default 10% of adult) for most venues, or "age-based" ($1.50 × child age) for retreat centers that track kids ages.
+6. A venue may need **custom meals**: Brunch (replaces breakfast+lunch), Afternoon Tea, Nutrition Break, Wedding Feast, Open Bar — add them with "Add Meal" in config.
+7. **Timeslots**: most venues have one timeslot per meal. Conference centers may have 2 options (early/late breakfast). Wedding venues may have special timing.
+8. **timeslotLocked=true**: shows the time window but doesn't let guests change it. Use for buffet-style where everyone eats at the same time.
+
+**CRITICAL: Create SEPARATE meal steps for group vs individual paths.** Groups and individuals often have different meal pricing, different meal selections, and different day rules.
 
 ## Standalone Input Widgets
 

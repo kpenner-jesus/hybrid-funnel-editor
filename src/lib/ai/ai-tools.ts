@@ -306,6 +306,70 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "configure_meal_widget",
+    description:
+      "Configures a meal-picker widget with meal definitions, pricing, kids settings, and cascade rules. " +
+      "This is a convenience tool — it sets the 'meals' config field as a properly structured JSON string, " +
+      "plus kids pricing and other settings. Use this instead of manually building the meals JSON in update_widget_config.",
+    input_schema: {
+      type: "object",
+      properties: {
+        stepIndex: {
+          type: "number",
+          description: "Zero-based index of the step containing the meal widget",
+        },
+        widgetIndex: {
+          type: "number",
+          description: "Zero-based index of the meal widget within the step",
+        },
+        meals: {
+          type: "array",
+          description: "Array of meal definitions",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Unique meal ID (e.g., 'breakfast', 'lunch', 'supper', 'night-snack', 'brunch', 'afternoon-tea')" },
+              name: { type: "string", description: "Display name" },
+              sortOrder: { type: "number", description: "Order in the grid (1=first column)" },
+              adultPrice: { type: "number", description: "Price per adult per timeslot" },
+              timeslots: {
+                type: "array",
+                description: "Timeslot windows (most meals have 1, some have 2 for early/late)",
+                items: {
+                  type: "object",
+                  properties: {
+                    startTime: { type: "string", description: "24h format, e.g., '07:00'" },
+                    endTime: { type: "string", description: "24h format, e.g., '09:00'" },
+                  },
+                  required: ["startTime", "endTime"],
+                },
+              },
+              timeslotLocked: { type: "boolean", description: "If true, time shown but not changeable (buffet style). Default false." },
+              allowCheckIn: { type: "string", enum: ["selectable", "unselectable", "preselected"], description: "Availability on check-in day. Breakfast is usually 'unselectable' on check-in." },
+              allowMiddle: { type: "string", enum: ["selectable", "unselectable", "preselected"], description: "Availability on middle days. Usually 'selectable' for all meals." },
+              allowCheckOut: { type: "string", enum: ["selectable", "unselectable", "preselected"], description: "Availability on check-out day. Supper/snack usually 'unselectable' on checkout." },
+              cascadeFrom: {
+                type: "array",
+                items: { type: "string" },
+                description: "IDs of other meals to auto-select when this meal is picked. E.g., selecting Lunch cascades to ['supper','night-snack'].",
+              },
+            },
+            required: ["id", "name", "adultPrice"],
+          },
+        },
+        kidsEnabled: { type: "boolean", description: "Enable kids meals (default true)" },
+        kidsPricingModel: { type: "string", enum: ["percentage", "age-based"], description: "How kids meals are priced" },
+        kidsPercentage: { type: "number", description: "Kids meal price as % of adult (default 10)" },
+        kidsAgeMultiplier: { type: "number", description: "Kids meal price per year of age in $ (default 1.50)" },
+        title: { type: "string", description: "Widget title (e.g., 'Select Catered Meals for Your Group')" },
+        subtitle: { type: "string", description: "Optional subtitle text" },
+        currency: { type: "string", description: "Currency code (default: CAD)" },
+        singleDate: { type: "boolean", description: "True for single-date events (no check-in/out logic)" },
+      },
+      required: ["stepIndex", "widgetIndex", "meals"],
+    },
+  },
+  {
     name: "suggest_improvements",
     description:
       "Returns text-only suggestions for improving the funnel. Does not make any changes. Use this when the user asks for feedback or 'what am I missing'.",
