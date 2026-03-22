@@ -11,6 +11,7 @@ import { ThemeEditor } from "@/components/editor/ThemeEditor";
 import { VariableFlow } from "@/components/editor/VariableFlow";
 import { FunnelPreview } from "@/components/preview/FunnelPreview";
 import { PublishModal } from "@/components/editor/PublishModal";
+import { DiagnosticsPanel } from "@/components/editor/DiagnosticsPanel";
 import { AiChatPanel } from "@/components/ai/AiChatPanel";
 import { useAiStore } from "@/stores/ai-store";
 import { generateFunnelJSX } from "@/lib/jsx-generator";
@@ -41,6 +42,7 @@ export default function EditorPage() {
   const [activeTab, setActiveTab] = useState<EditorTab>("steps");
   const [saveFlash, setSaveFlash] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
   const [generatedJSX, setGeneratedJSX] = useState("");
 
   // Resizable panel divider
@@ -233,6 +235,15 @@ export default function EditorPage() {
               </button>
             </div>
 
+            {/* Diagnostics */}
+            <button
+              onClick={() => setDiagOpen(true)}
+              title="Diagnostics — copy debug info"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors border border-outline-variant"
+            >
+              🔧
+            </button>
+
             {/* AI Assistant */}
             <Button
               size="sm"
@@ -338,6 +349,9 @@ export default function EditorPage() {
           onClose={() => setPublishModalOpen(false)}
         />
       )}
+
+      {/* Diagnostics Panel */}
+      <DiagnosticsPanel open={diagOpen} onClose={() => setDiagOpen(false)} />
 
       {/* AI Chat Panel */}
       <AiChatPanel />
