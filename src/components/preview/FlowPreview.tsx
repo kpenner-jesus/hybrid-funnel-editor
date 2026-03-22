@@ -297,30 +297,15 @@ export function FlowPreview() {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
     hasInitialized.current = true;
 
-    const CARD_W = 380;
-    const PARALLEL_GAP = 30;
-
-    // Find the widest row
-    let maxRowWidth = CARD_W;
-    for (const row of layoutRows) {
-      if (row.type === "parallel") {
-        const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
-        if (rowW > maxRowWidth) maxRowWidth = rowW;
-      }
-    }
-
     const cw = containerRef.current.clientWidth;
-    // Zoom: fit the widest row in 95% of viewport, allow up to 50%
-    const targetZoom = Math.min(0.5, (cw * 0.95) / maxRowWidth);
-    // The content div centers items via alignItems:center, so the
-    // first card is at (maxRowWidth - CARD_W) / 2 within the content.
-    // Center the CONTENT in the viewport:
-    const scaledW = maxRowWidth * targetZoom;
+    // contentWidth is calculated in render from layoutRows
+    const targetZoom = Math.min(0.5, (cw * 0.95) / contentWidth);
+    const scaledW = contentWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
 
     setZoom(targetZoom);
     setPan({ x: Math.max(10, centerX), y: 15 });
-  }, [funnel?.steps.length, layoutRows]);
+  }, [funnel?.steps.length, contentWidth]);
 
   if (!funnel || funnel.steps.length === 0) {
     return <div className="h-full flex items-center justify-center text-sm text-gray-400">No steps to preview.</div>;
@@ -402,6 +387,17 @@ export function FlowPreview() {
   });
 
   const ROW_GAP = 50;
+  const CARD_W = 380;
+  const PARALLEL_GAP = 30;
+
+  // Calculate the actual content width for the layout
+  let contentWidth = CARD_W;
+  for (const row of layoutRows) {
+    if (row.type === "parallel") {
+      const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
+      if (rowW > contentWidth) contentWidth = rowW;
+    }
+  }
 
   return (
     <div
@@ -446,7 +442,7 @@ export function FlowPreview() {
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>{svgLines}</g>
       </svg>
 
-      {/* Content */}
+      {/* Content — explicit width so centering works correctly */}
       <div
         ref={contentRef}
         style={{
@@ -458,6 +454,7 @@ export function FlowPreview() {
           gap: ROW_GAP,
           paddingTop: 20,
           paddingBottom: 100,
+          width: contentWidth,
         }}
       >
         {layoutRows.map((row, ri) => {
