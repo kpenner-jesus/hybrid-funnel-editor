@@ -1239,6 +1239,93 @@ function generateWidgetInStep(
       // Handled at step level
       return "";
 
+    // --- Content widgets ---
+    case "hero-section": {
+      const bgUrl = (cfg.backgroundImageUrl as string) || "";
+      const headline = (cfg.headline as string) || "";
+      const subtitle = (cfg.subtitle as string) || "";
+      const heroLines: string[] = [];
+      heroLines.push(`            <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundImage: 'url(${escapeJsx(bgUrl)})', backgroundSize: 'cover', backgroundPosition: 'center' }}>`);
+      heroLines.push(`              <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} />`);
+      heroLines.push(`              <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: 24, maxWidth: 600 }}>`);
+      if (headline) heroLines.push(`                <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, fontFamily: THEME.serif, lineHeight: 1.2, marginBottom: 8 }}>${escapeJsx(headline)}</h1>`);
+      if (subtitle) heroLines.push(`                <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, lineHeight: 1.5 }}>${escapeJsx(subtitle)}</p>`);
+      heroLines.push(`              </div>`);
+      heroLines.push(`            </div>`);
+      return heroLines.join("\n");
+    }
+
+    case "headline": {
+      const headlineText = (cfg.text as string) || "Section Title";
+      const level = (cfg.level as string) || "h2";
+      const Tag = level === "h1" ? "h1" : level === "h3" ? "h3" : "h2";
+      const fontSize = Tag === "h1" ? 28 : Tag === "h3" ? 18 : 22;
+      return `            <${Tag} style={{ fontFamily: THEME.serif, color: THEME.primary, fontSize: ${fontSize}, fontWeight: 700, margin: '8px 0' }}>${escapeJsx(headlineText)}</${Tag}>`;
+    }
+
+    case "text-block": {
+      const html = (cfg.html as string) || (cfg.text as string) || "";
+      if (!html) return "";
+      return `            <div style={{ fontSize: 14, lineHeight: 1.7, color: THEME.onSurface }} dangerouslySetInnerHTML={{ __html: ${JSON.stringify(html)} }} />`;
+    }
+
+    case "image-block": {
+      const imgUrl = (cfg.url as string) || (cfg.imageUrl as string) || "";
+      const alt = (cfg.alt as string) || "";
+      const imgWidth = (cfg.width as string) || "100%";
+      if (!imgUrl) return "";
+      return `            <img src="${escapeJsx(imgUrl)}" alt="${escapeJsx(alt)}" style={{ width: '${imgWidth}', maxWidth: '100%', borderRadius: 12, margin: '8px auto', display: 'block' }} />`;
+    }
+
+    case "text-input": {
+      const inputLabel = (cfg.label as string) || "Text";
+      const inputPlaceholder = (cfg.placeholder as string) || "";
+      return `            <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>${escapeJsx(inputLabel)}</label><input type="text" placeholder="${escapeJsx(inputPlaceholder)}" className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} /></div>`;
+    }
+
+    case "textarea-input": {
+      const taLabel = (cfg.label as string) || "Notes";
+      const taPlaceholder = (cfg.placeholder as string) || "";
+      return `            <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>${escapeJsx(taLabel)}</label><textarea rows={3} placeholder="${escapeJsx(taPlaceholder)}" className={inputCls + ' resize-none'} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} /></div>`;
+    }
+
+    case "category-picker": {
+      const catTitle = (cfg.title as string) || "Select Products";
+      const catCurrency = (cfg.currency as string) || "CAD";
+      let catData: Array<{ name: string; products: Array<{ id: string; name: string; description?: string; price: number; unit?: string; imageUrl?: string; tags?: string[] }> }> = [];
+      try {
+        const raw = cfg.categories;
+        if (typeof raw === "string") catData = JSON.parse(raw);
+        else if (Array.isArray(raw)) catData = raw as typeof catData;
+      } catch {}
+      const catLines: string[] = [];
+      catLines.push(`            <h3 className="font-semibold text-lg mb-3" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(catTitle)}</h3>`);
+      catLines.push(`            <div className="space-y-4">`);
+      for (const cat of catData) {
+        catLines.push(`              <div>`);
+        catLines.push(`                <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 pb-1 border-b border-gray-200">${escapeJsx(cat.name)}</div>`);
+        for (const p of cat.products) {
+          catLines.push(`                <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 mb-2 cursor-pointer hover:border-gray-400">`);
+          if (p.imageUrl) catLines.push(`                  <img src="${escapeJsx(p.imageUrl)}" alt="${escapeJsx(p.name)}" style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />`);
+          catLines.push(`                  <div className="flex-1"><div className="font-semibold text-sm">${escapeJsx(p.name)}</div>${p.description ? `<div className="text-xs text-gray-500">${escapeJsx(p.description)}</div>` : ""}</div>`);
+          catLines.push(`                  <div className="font-bold text-sm" style={{ color: THEME.primary }}>${new Intl.NumberFormat("en-CA", { style: "currency", currency: catCurrency }).format(p.price)}${p.unit ? `/${p.unit}` : ""}</div>`);
+          catLines.push(`                </div>`);
+        }
+        catLines.push(`              </div>`);
+      }
+      catLines.push(`            </div>`);
+      return catLines.join("\n");
+    }
+
+    case "booking-widget":
+      // Booking widget is rendered by the Everybooking runtime, not in generated JSX
+      // The booking_widget JSON element is added to the step data directly
+      return `            {/* Booking widget — handled by Everybooking runtime */}`;
+
+    case "payment-widget":
+      // Payment widget uses the Everybooking payment SDK
+      return `            {/* Payment widget — handled by Everybooking runtime */}`;
+
     default:
       return `            {/* Unknown widget: ${widget.templateId} */}`;
   }
