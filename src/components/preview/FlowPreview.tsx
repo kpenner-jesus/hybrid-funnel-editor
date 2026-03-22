@@ -264,33 +264,6 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load — calculate from layout data, no DOM measurement needed
-  useEffect(() => {
-    if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
-    hasInitialized.current = true;
-
-    const CARD_W = 380;
-    const PARALLEL_GAP = 30;
-
-    // Find the widest row from layout data
-    let maxRowWidth = CARD_W; // at minimum, single card
-    for (const row of layoutRows) {
-      if (row.type === "parallel") {
-        const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
-        if (rowW > maxRowWidth) maxRowWidth = rowW;
-      }
-    }
-
-    const cw = containerRef.current.clientWidth;
-    // Zoom so the widest row fits in 90% of viewport width
-    const targetZoom = Math.min(0.35, (cw * 0.9) / maxRowWidth);
-    const scaledW = maxRowWidth * targetZoom;
-    const centerX = (cw - scaledW) / 2;
-
-    setZoom(targetZoom);
-    setPan({ x: Math.max(10, centerX), y: 20 });
-  }, [funnel?.steps.length, layoutRows]);
-
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     setZoom((prev) => Math.max(0.05, Math.min(1.5, prev + (e.deltaY > 0 ? -0.05 : 0.05))));
@@ -318,6 +291,32 @@ export function FlowPreview() {
     funnel.steps.forEach((s, i) => idxMap.set(s.id, i));
     return { layoutRows: rows, connections: conns, stepIndexMap: idxMap };
   }, [funnel]);
+
+  // Center on initial load — calculate from layout data, no DOM measurement needed
+  useEffect(() => {
+    if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
+    hasInitialized.current = true;
+
+    const CARD_W = 380;
+    const PARALLEL_GAP = 30;
+
+    // Find the widest row from layout data
+    let maxRowWidth = CARD_W;
+    for (const row of layoutRows) {
+      if (row.type === "parallel") {
+        const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
+        if (rowW > maxRowWidth) maxRowWidth = rowW;
+      }
+    }
+
+    const cw = containerRef.current.clientWidth;
+    const targetZoom = Math.min(0.35, (cw * 0.9) / maxRowWidth);
+    const scaledW = maxRowWidth * targetZoom;
+    const centerX = (cw - scaledW) / 2;
+
+    setZoom(targetZoom);
+    setPan({ x: Math.max(10, centerX), y: 20 });
+  }, [funnel?.steps.length, layoutRows]);
 
   if (!funnel || funnel.steps.length === 0) {
     return <div className="h-full flex items-center justify-center text-sm text-gray-400">No steps to preview.</div>;
