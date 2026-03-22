@@ -188,7 +188,21 @@ function generateHelperFunctions(): string {
 function getMaxPrice(p) { if (p.max_price != null) return parseFloat(p.max_price) || 0; let m = 0; for (const e of Object.values(p.price || {})) { const b = parseFloat(e?.base_price) || 0; if (b > m) m = b; } return m; }
 function calculateGroupPrice(pe, q) { if (!pe) return 0; const b = parseFloat(pe.base_price) || 0; if (pe.group_price) { for (const t of Object.values(pe.group_price)) { if (q >= (parseInt(t.from) || 0) && q <= (parseInt(t.to) || Infinity)) { const a = parseFloat(t.amount) || 0; return t.type === 'quantity' ? a * q : a; } } } return b; }
 function fmtCurrency(v) { return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v); }
-function buildProductEntries(product, qty, startDate, endDate, childAges = []) { const params = product.parameters || []; if (params.some(p => p.report_id === 'childage')) { return childAges.slice(0, qty).map(age => ({ sku: product.sku, startDate, endDate: startDate, quantities: { childage: age, qty: 1 } })); } const k = params[0]?.report_id || 'qty'; return [{ sku: product.sku, startDate, endDate, quantities: { [k]: qty } }]; }`;
+function buildProductEntries(product, qty, startDate, endDate, childAges = []) {
+  const params = product.parameters || [];
+  // Kids meal with childage parameter
+  if (params.some(p => p.report_id === 'childage')) {
+    return childAges.slice(0, qty).map(age => ({ sku: product.sku, startDate, endDate: startDate, quantities: { childage: age, qty: 1 } }));
+  }
+  const k = params[0]?.report_id || 'qty';
+  // Check if product uses timeslots (meal products)
+  const isTimeslot = product.booking_unit === 'Timeslots' || product.booking_unit === 'timeslot' || (product.timeslots && product.timeslots.length > 0);
+  if (isTimeslot) {
+    // For timeslot products, include the timeslot index (0 = first available)
+    return [{ sku: product.sku, startDate, endDate, quantities: { [k]: qty, timeslot: 0 }, bookingUnit: 'timeslot' }];
+  }
+  return [{ sku: product.sku, startDate, endDate, quantities: { [k]: qty } }];
+}`;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -772,9 +786,13 @@ function generateMainFunnel(
       lines.push(`      setMealProducts([]);`);
     }
   }
-  // Meeting meal products — use configured category ID, fallback to 39 for legacy support
-  const meetingMealCatId = catInfo.meetingMealCatIds[0] || 39;
-  lines.push(`      setMealMeetingProducts(cats.find(c => c.id === ${meetingMealCatId})?.products || []);`);
+  // Meeting meal products — use configured category ID from widget config
+  if (catInfo.meetingMealCatIds.length > 0) {
+    const meetingMealCatId = catInfo.meetingMealCatIds[0];
+    lines.push(`      setMealMeetingProducts(cats.find(c => c.id === ${meetingMealCatId})?.products || []);`);
+  } else {
+    lines.push(`      setMealMeetingProducts([]);`);
+  }
 
   if (hasActivities) {
     if (catInfo.activityCatIds.length === 1) {
@@ -1090,7 +1108,7 @@ function generateWidgetInStep(
     case "meal-picker":
       return [
         `            <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2.5 flex items-center gap-2" style={{ color: THEME.outline }}><span className="inline-block w-4 h-px" style={{ background: THEME.outlineVariant }} /> Adult Meals</div>`,
-        `            <div className="space-y-3 mb-5">{adultMeals.map(m => { const q = selectedMeals[m.id] || 0, pr = Object.values(m.price || {})?.[0]?.base_price, pm = (m.parameters || [])[0]; return <div key={m.id} className="p-5 rounded-[2rem]" style={{ background: q > 0 ? \`\${THEME.primary}05\` : THEME.surfaceContainerLowest, border: \`2px solid \${q > 0 ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="flex items-start justify-between mb-3"><div className="flex-1"><div className="font-semibold text-sm" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{m.name}</div>{pr > 0 && <div className="font-bold text-xs mt-0.5" style={{ color: THEME.secondary }}>{fmtCurrency(pr)} <span className="font-normal" style={{ color: THEME.outline }}>/ {pm?.name || 'person'}</span></div>}</div></div><CompactQtyPicker value={q} onChange={v => setSelectedMeals(p => ({ ...p, [m.id]: v }))} min={0} /></div>; })}</div>`,
+        `            <div className="space-y-3 mb-5">{adultMeals.map(m => { const q = selectedMeals[m.id] || 0, pr = Object.values(m.price || {})?.[0]?.base_price, pm = (m.parameters || [])[0], ts = (m.timeslots || [])[0]; return <div key={m.id} className="p-5 rounded-[2rem]" style={{ background: q > 0 ? \`\${THEME.primary}05\` : THEME.surfaceContainerLowest, border: \`2px solid \${q > 0 ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="flex items-start justify-between mb-3"><div className="flex-1"><div className="font-semibold text-sm" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{m.name}</div>{pr > 0 && <div className="font-bold text-xs mt-0.5" style={{ color: THEME.secondary }}>{fmtCurrency(pr)} <span className="font-normal" style={{ color: THEME.outline }}>/ {pm?.name || 'person'}</span></div>}{ts && <div className="text-[10px] mt-0.5" style={{ color: THEME.outline }}>{ts.start_time} - {ts.end_time}</div>}</div></div><CompactQtyPicker value={q} onChange={v => setSelectedMeals(p => ({ ...p, [m.id]: v }))} min={0} /></div>; })}</div>`,
         `            {children > 0 && kidsMeals.length > 0 && <><div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-2.5 flex items-center gap-2" style={{ color: THEME.outline }}><span className="inline-block w-4 h-px" style={{ background: THEME.outlineVariant }} /> Kids Meals</div><div className="space-y-3 mb-5">{kidsMeals.map(m => { const q = selectedMeals[m.id] || 0; return <div key={m.id} className="p-5 rounded-[2rem]" style={{ background: q > 0 ? \`\${THEME.primary}05\` : THEME.surfaceContainerLowest, border: \`2px solid \${q > 0 ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><div className="font-semibold text-sm mb-3" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{m.name}</div><CompactQtyPicker value={q} max={children} onChange={v => setSelectedMeals(p => ({ ...p, [m.id]: v }))} min={0} /></div>; })}</div></>}`,
       ].join("\n");
 
