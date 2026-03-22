@@ -1149,12 +1149,29 @@ function generateMainFunnel(
     lines.push(`  const [endDate, setEndDate] = useState('');`);
   }
   if (hasGuestCounter) {
-    // Check for default values from config
     const guestWidget = findWidgetByTemplate(funnel, "guest-counter");
-    const defaultAdults = (guestWidget?.config as Record<string, unknown>)?.defaultAdults as number || 2;
+    const gcfg = (guestWidget?.config || {}) as Record<string, unknown>;
+    const defaultAdults = (gcfg.defaultAdults as number) || (gcfg.minAdults as number) || 20;
     lines.push(`  const [adults, setAdults] = useState(${defaultAdults});`);
     lines.push(`  const [children, setChildren] = useState(0);`);
     lines.push(`  const [childAges, setChildAges] = useState([]);`);
+    // Parse youth categories for state
+    let youthCats: Array<{ id: string; defaultCount?: number }> = [];
+    try {
+      const raw = gcfg.youthCategories;
+      if (typeof raw === "string") youthCats = JSON.parse(raw);
+      else if (Array.isArray(raw)) youthCats = raw as typeof youthCats;
+    } catch {}
+    if (youthCats.length > 0) {
+      const catStateInit = youthCats.map(c => `'${c.id}': ${c.defaultCount || 0}`).join(", ");
+      lines.push(`  const [youthCounts, setYouthCounts] = useState({${catStateInit}});`);
+      lines.push(`  const [avgAges, setAvgAges] = useState({});`);
+      lines.push(`  const [showIndividualAges, setShowIndividualAges] = useState({});`);
+      lines.push(`  const [individualAges, setIndividualAges] = useState({});`);
+      lines.push(`  const totalYouth = Object.values(youthCounts).reduce((a, b) => a + b, 0);`);
+      // Sync children count from totalYouth for downstream compatibility
+      lines.push(`  useEffect(() => { setChildren(totalYouth); }, [totalYouth]);`);
+    }
   }
   if (hasContactForm) {
     lines.push(`  const [contact, setContact] = useState({ first_name: '', last_name: '', email: '', phone: '', company: '', notes: '', gdprAccepted: false });`);
@@ -1670,16 +1687,87 @@ function generateWidgetInStep(
       ].join("\n");
 
     case "guest-counter": {
-      const maxAdults = (cfg.maxAdults as number) || 400;
-      const maxChildren = (cfg.maxChildren as number) || 200;
-      const minAdults = (cfg.minAdults as number) || 1;
-      return [
-        `            <div className="space-y-3 mb-6">`,
-        `              <BigGuestCounter label="Adults (18+)" value={adults} min={${minAdults}} max={${maxAdults}} onChange={setAdults} />`,
-        `              <BigGuestCounter label="Children / Youth (under 18)" value={children} min={0} max={${maxChildren}} onChange={setChildren} />`,
-        `            </div>`,
-        `            {children > 0 && <div className="mb-5 p-4 rounded-[2rem]" style={{ background: THEME.surfaceContainerLowest, border: \`1px solid \${THEME.surfaceContainerHigh}4D\`, boxShadow: '0 24px 40px rgba(0,0,0,0.04)' }}><p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-3" style={{ color: THEME.outline }}>Child Ages (for meal pricing)</p><div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">{childAges.map((age, i) => <div key={i} className="text-center"><label className="text-xs mb-1 block" style={{ color: THEME.outline }}>Child {i + 1}</label><input type="number" min={1} max={17} value={age} onChange={e => setChildAges(p => { const n = [...p]; n[i] = Math.max(1, Math.min(17, parseInt(e.target.value) || 1)); return n; })} className="w-full text-center rounded-lg py-2 text-sm font-bold focus:outline-none focus:ring-2 border-none" style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface }} /></div>)}</div></div>}`,
-      ].join("\n");
+      const gcMaxAdults = (cfg.maxAdults as number) || 400;
+      const gcMinAdults = (cfg.minAdults as number) || 20;
+      const gcShowSlider = cfg.showSlider !== false;
+      const gcSliderMax = (cfg.sliderMax as number) || 200;
+
+      // Parse youth categories
+      let gcCategories: Array<{ id: string; name: string; ageLabel: string; minAge: number; maxAge: number; min: number; max: number; showSlider?: boolean; sliderMax?: number; enabled?: boolean }> = [];
+      try {
+        const raw = cfg.youthCategories;
+        if (typeof raw === "string") gcCategories = JSON.parse(raw);
+        else if (Array.isArray(raw)) gcCategories = raw as typeof gcCategories;
+      } catch {}
+      if (gcCategories.length === 0) {
+        gcCategories = [
+          { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, showSlider: true, sliderMax: 50, enabled: true },
+          { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, showSlider: true, sliderMax: 50, enabled: true },
+        ];
+      }
+      const enabledCats = gcCategories.filter(c => c.enabled !== false);
+
+      const gcLines: string[] = [];
+
+      // Adults — large display + slider
+      gcLines.push(`            <div className="text-center py-4 mb-4">`);
+      gcLines.push(`              <div className="flex items-center justify-center gap-6 mb-2">`);
+      gcLines.push(`                <button onClick={() => adults > ${gcMinAdults} && setAdults(adults - 1)} disabled={adults <= ${gcMinAdults}} className="w-14 h-14 rounded-full border-2 flex items-center justify-center text-2xl font-bold disabled:opacity-30 transition-all active:scale-90" style={{ borderColor: THEME.primary, color: THEME.primary }}>−</button>`);
+      gcLines.push(`                <div className="text-center" style={{ minWidth: 100 }}><span className="text-7xl font-bold tabular-nums" style={{ fontFamily: THEME.serif, color: THEME.primary }}>{adults}</span></div>`);
+      gcLines.push(`                <button onClick={() => adults < ${gcMaxAdults} && setAdults(adults + 1)} disabled={adults >= ${gcMaxAdults}} className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold disabled:opacity-50 transition-all active:scale-90 shadow-lg" style={{ background: THEME.primary }}>+</button>`);
+      gcLines.push(`              </div>`);
+      gcLines.push(`              <div className="text-lg italic" style={{ fontFamily: THEME.serif, color: THEME.secondary }}>Adults</div>`);
+
+      if (gcShowSlider) {
+        gcLines.push(`              <div className="mt-4 px-4 max-w-md mx-auto">`);
+        gcLines.push(`                <input type="range" min={${gcMinAdults}} max={${gcSliderMax}} value={Math.min(adults, ${gcSliderMax})} onChange={e => setAdults(parseInt(e.target.value))} className="w-full h-3 rounded-full appearance-none cursor-pointer" style={{ background: \`linear-gradient(to right, \${THEME.primary} 0%, \${THEME.primary} \${((adults - ${gcMinAdults}) / ${gcSliderMax - gcMinAdults}) * 100}%, \${THEME.surfaceContainerHigh} \${((adults - ${gcMinAdults}) / ${gcSliderMax - gcMinAdults}) * 100}%, \${THEME.surfaceContainerHigh} 100%)\` }} />`);
+        gcLines.push(`                <div className="flex justify-between mt-2 text-[10px] font-bold tracking-widest uppercase" style={{ color: THEME.outlineVariant }}><span>${gcMinAdults}</span><span>${Math.round(gcSliderMax * 0.25)}</span><span>${Math.round(gcSliderMax * 0.5)}</span><span>${Math.round(gcSliderMax * 0.75)}</span><span>${gcSliderMax}+</span></div>`);
+        gcLines.push(`              </div>`);
+      }
+
+      gcLines.push(`              {adults < ${gcMinAdults} && <p className="text-xs mt-2" style={{ color: THEME.error }}>Minimum ${gcMinAdults} adults required</p>}`);
+      gcLines.push(`            </div>`);
+
+      // Youth/Children categories
+      for (const cat of enabledCats) {
+        const catMin = cat.min || 0;
+        const catSldrMax = cat.sliderMax || 50;
+
+        gcLines.push(`            <div className="pt-4 border-t" style={{ borderColor: THEME.surfaceContainerHigh }}>`);
+        gcLines.push(`              <div className="flex items-center justify-between mb-3">`);
+        gcLines.push(`                <div><div className="font-semibold text-sm" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(cat.name)}</div><div className="text-xs" style={{ color: THEME.outline }}>${escapeJsx(cat.ageLabel)}</div></div>`);
+        gcLines.push(`                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full" style={{ background: \`\${THEME.primary}08\` }}>`);
+        gcLines.push(`                  <button onClick={() => (youthCounts['${cat.id}'] || 0) > ${catMin} && setYouthCounts(p => ({...p, '${cat.id}': (p['${cat.id}'] || 0) - 1}))} disabled={(youthCounts['${cat.id}'] || 0) <= ${catMin}} className="w-9 h-9 rounded-full border flex items-center justify-center text-sm font-bold disabled:opacity-30" style={{ borderColor: THEME.primary + '40', color: THEME.primary }}>−</button>`);
+        gcLines.push(`                  <span className="text-xl font-bold w-8 text-center tabular-nums" style={{ fontFamily: THEME.serif }}>{youthCounts['${cat.id}'] || 0}</span>`);
+        gcLines.push(`                  <button onClick={() => (youthCounts['${cat.id}'] || 0) < ${cat.max} && setYouthCounts(p => ({...p, '${cat.id}': (p['${cat.id}'] || 0) + 1}))} disabled={(youthCounts['${cat.id}'] || 0) >= ${cat.max}} className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold disabled:opacity-50 shadow-sm" style={{ background: THEME.primary }}>+</button>`);
+        gcLines.push(`                </div>`);
+        gcLines.push(`              </div>`);
+
+        // Category slider
+        if (cat.showSlider !== false) {
+          gcLines.push(`              <div className="px-1 mb-2"><input type="range" min={${catMin}} max={${catSldrMax}} value={Math.min(youthCounts['${cat.id}'] || 0, ${catSldrMax})} onChange={e => setYouthCounts(p => ({...p, '${cat.id}': parseInt(e.target.value)}))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{ background: \`linear-gradient(to right, \${THEME.primary} 0%, \${THEME.primary} \${${catSldrMax > catMin ? `((youthCounts['${cat.id}'] || 0) - ${catMin}) / ${catSldrMax - catMin}` : "0"} * 100}%, \${THEME.surfaceContainerHigh} \${${catSldrMax > catMin ? `((youthCounts['${cat.id}'] || 0) - ${catMin}) / ${catSldrMax - catMin}` : "0"} * 100}%, \${THEME.surfaceContainerHigh} 100%)\` }} /><div className="flex justify-between mt-1 text-[9px]" style={{ color: THEME.outlineVariant }}><span>${catMin}</span><span>${catSldrMax}</span></div></div>`);
+        }
+
+        // Age collection (when count > 0)
+        if (cfg.collectAges !== false) {
+          const midAge = Math.round((cat.minAge + cat.maxAge) / 2);
+          gcLines.push(`              {(youthCounts['${cat.id}'] || 0) > 0 && <div className="p-3 rounded-xl mb-2" style={{ background: \`\${THEME.primary}05\`, border: \`1px solid \${THEME.primary}15\` }}>`);
+          gcLines.push(`                <div className="flex items-center justify-between mb-2"><span className="text-xs" style={{ color: THEME.outline }}>{showIndividualAges['${cat.id}'] ? 'Individual ages' : 'Average age'}</span><button onClick={() => setShowIndividualAges(p => ({...p, '${cat.id}': !p['${cat.id}']}))} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ color: THEME.primary, background: \`\${THEME.primary}10\` }}>{showIndividualAges['${cat.id}'] ? 'Use average' : 'Enter individual ages'}</button></div>`);
+          gcLines.push(`                {showIndividualAges['${cat.id}'] ? <div className="flex flex-wrap gap-1.5">{Array.from({length: youthCounts['${cat.id}'] || 0}).map((_, i) => <input key={i} type="number" min={${cat.minAge}} max={${cat.maxAge}} value={individualAges['${cat.id}']?.[i] ?? ${midAge}} onChange={e => { const v = Math.max(${cat.minAge}, Math.min(${cat.maxAge}, parseInt(e.target.value) || ${cat.minAge})); setIndividualAges(p => { const arr = [...(p['${cat.id}'] || [])]; arr[i] = v; return {...p, '${cat.id}': arr}; }); }} className="w-11 h-9 text-center text-xs font-medium border rounded-lg focus:outline-none focus:ring-1" style={{ borderColor: THEME.primary + '30', color: THEME.primary }} />)}</div>`);
+          gcLines.push(`                : <div><div className="flex items-center justify-between mb-1"><span className="text-xs" style={{ color: THEME.outline }}>Average age:</span><span className="text-sm font-bold" style={{ color: THEME.primary }}>{avgAges['${cat.id}'] || ${midAge}} yrs</span></div><input type="range" min={${cat.minAge}} max={${cat.maxAge}} value={avgAges['${cat.id}'] || ${midAge}} onChange={e => setAvgAges(p => ({...p, '${cat.id}': parseInt(e.target.value)}))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ background: \`linear-gradient(to right, \${THEME.primary} 0%, \${THEME.primary} \${((avgAges['${cat.id}'] || ${midAge}) - ${cat.minAge}) / ${cat.maxAge - cat.minAge} * 100}%, #e5e7eb \${((avgAges['${cat.id}'] || ${midAge}) - ${cat.minAge}) / ${cat.maxAge - cat.minAge} * 100}%, #e5e7eb 100%)\` }} /><div className="flex justify-between mt-0.5 text-[9px]" style={{ color: THEME.outlineVariant }}><span>${cat.minAge} yrs</span><span>${cat.maxAge} yrs</span></div></div>}`);
+          gcLines.push(`              </div>}`);
+        }
+
+        gcLines.push(`            </div>`);
+      }
+
+      // Total
+      gcLines.push(`            <div className="pt-3 mt-2 border-t flex items-center justify-between" style={{ borderColor: THEME.surfaceContainerHigh }}>`);
+      gcLines.push(`              <span className="text-xs font-medium" style={{ color: THEME.outline }}>Total guests</span>`);
+      gcLines.push(`              <span className="text-sm font-bold" style={{ color: THEME.primary }}>{adults + ${enabledCats.length > 0 ? "totalYouth" : "children"}}</span>`);
+      gcLines.push(`            </div>`);
+
+      return gcLines.join("\n");
     }
 
     case "guest-rooms":
