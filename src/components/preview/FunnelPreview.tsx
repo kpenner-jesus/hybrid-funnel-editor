@@ -114,7 +114,7 @@ export function FunnelPreview() {
       <div className="h-full flex flex-col">
         {modeToggle}
         <div className="flex-1 overflow-hidden">
-          <FlowPreview onEditWidget={(stepId, widgetId, focusedItemLabel?) => {
+          <FlowPreview onEditWidget={(stepId, widgetId, focusedItemLabel) => {
             // Find step and widget for the label
             const step = funnel?.steps.find((s) => s.id === stepId);
             const widget = step?.widgets.find((w) => w.instanceId === widgetId);
