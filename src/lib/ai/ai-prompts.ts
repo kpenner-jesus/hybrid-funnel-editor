@@ -191,6 +191,23 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
       Step "wedding-type" (id: "wedding-type", navigation.next: "group-dates")
       Step "group-dates" (id: "group-dates") ← convergence point
       \`\`\`
+14. **CONDITIONAL NAVIGATION (multi-jump).** When a step needs to route DIFFERENTLY based on a variable value (e.g., wedding guests need a venue step but retreat guests don't), use \`navigation.conditionalNext\`:
+    \`\`\`json
+    {
+      "navigation": {
+        "conditionalNext": [
+          { "variable": "eventSegment", "operator": "equals", "value": "wedding", "targetStepId": "venue-space", "label": "Wedding" },
+          { "variable": "eventSegment", "operator": "equals", "value": "conference", "targetStepId": "meeting-rooms", "label": "Conference" }
+        ],
+        "next": "group-rooms"
+      }
+    }
+    \`\`\`
+    Rules are evaluated in order. First match wins. If no rule matches, \`next\` is used as fallback.
+    Use this for:
+    - Step after "Group Size" → route weddings to "Venue Space", others to "Group Rooms"
+    - Step after "Group Meals" → route conferences to "Meeting Rooms", weddings to "AV Equipment", others to "Activities"
+    - Any point where different segments need different next steps
 9. **BREVITY IS CRITICAL.** After creating or modifying a funnel:
    - Do NOT list every step, widget, or feature you created. The user can see the result in the preview.
    - Only mention SURPRISES: things you changed from what was requested, problems you encountered, decisions you made, or missing data.

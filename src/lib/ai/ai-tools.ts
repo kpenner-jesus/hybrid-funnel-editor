@@ -54,7 +54,22 @@ export const aiTools: AiToolDefinition[] = [
                 properties: {
                   nextLabel: { type: "string" },
                   backLabel: { type: "string" },
-                  next: { type: "string", description: "Step ID to navigate to when clicking Next. Use this to skip steps in branching funnels (e.g., after Retreat Type, jump to 'group-dates' instead of Conference Type)." },
+                  next: { type: "string", description: "Default step ID to navigate to. Used as fallback when no conditionalNext rule matches." },
+                  conditionalNext: {
+                    type: "array",
+                    description: "Conditional navigation rules. Evaluated in order — first match wins. Use this to route to different steps based on a variable value (e.g., eventSegment). Example: [{variable:'eventSegment', operator:'equals', value:'wedding', targetStepId:'venue-space'}]",
+                    items: {
+                      type: "object",
+                      properties: {
+                        variable: { type: "string", description: "Variable name to check (e.g., 'eventSegment')" },
+                        operator: { type: "string", enum: ["equals", "not_equals", "contains"], description: "Comparison operator" },
+                        value: { type: "string", description: "Value to compare against" },
+                        targetStepId: { type: "string", description: "Step ID to navigate to if condition matches" },
+                        label: { type: "string", description: "Optional label for flow visualization" },
+                      },
+                      required: ["variable", "operator", "value", "targetStepId"],
+                    },
+                  },
                 },
               },
               widgets: {

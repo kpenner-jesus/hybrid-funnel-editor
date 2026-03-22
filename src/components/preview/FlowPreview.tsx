@@ -90,7 +90,32 @@ function deriveConnections(funnel: FunnelDefinition): {
       }
     }
 
-    // Explicit nav
+    // Conditional navigation — multiple targets based on variable values
+    if (step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0) {
+      const condRules = step.navigation.conditionalNext;
+      condRules.forEach((rule, ri) => {
+        if (stepIdToIndex.has(rule.targetStepId)) {
+          connections.push({
+            fromStepId: step.id,
+            toStepId: rule.targetStepId,
+            label: rule.label || `${rule.variable}=${rule.value}`,
+            color: SEGMENT_COLORS[ri % SEGMENT_COLORS.length],
+          });
+        }
+      });
+      // Also add the default fallback
+      if (step.navigation.next && stepIdToIndex.has(step.navigation.next)) {
+        connections.push({
+          fromStepId: step.id,
+          toStepId: step.navigation.next,
+          label: "default",
+          color: "#94a3b8",
+        });
+      }
+      continue;
+    }
+
+    // Explicit nav (simple next)
     if (step.navigation.next && stepIdToIndex.has(step.navigation.next)) {
       connections.push({ fromStepId: step.id, toStepId: step.navigation.next, color: "#64748b" });
       continue;
@@ -118,19 +143,37 @@ function buildLayoutRows(
   funnel.steps.forEach((s, i) => stepIdToIdx.set(s.id, i));
 
   // 1. Build adjacency: for each step, where does it go?
-  const nextMap = new Map<string, string>(); // stepId → next stepId
+  // nextMap = primary next target (for path tracing)
+  // allNextMap = ALL targets including conditional (for reachability)
+  const nextMap = new Map<string, string>(); // stepId → primary next stepId
+  const allNextMap = new Map<string, string[]>(); // stepId → all next stepIds
   for (let i = 0; i < funnel.steps.length; i++) {
     const step = funnel.steps[i];
+    const allTargets: string[] = [];
+
+    // Conditional navigation targets
+    if (step.navigation.conditionalNext) {
+      for (const rule of step.navigation.conditionalNext) {
+        if (stepIdToIdx.has(rule.targetStepId)) {
+          allTargets.push(rule.targetStepId);
+        }
+      }
+    }
+
     // Check navigation.next first
     if (step.navigation.next && stepIdToIdx.has(step.navigation.next)) {
       nextMap.set(step.id, step.navigation.next);
+      allTargets.push(step.navigation.next);
     } else if (i < funnel.steps.length - 1) {
-      // Default: next step in list (unless this step has segment-picker branches)
+      // Default: next step in list (unless this step has segment-picker branches or conditional nav)
       const hasBranch = branchMap.has(step.id);
-      if (!hasBranch) {
+      const hasConditional = step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0;
+      if (!hasBranch && !hasConditional) {
         nextMap.set(step.id, funnel.steps[i + 1].id);
+        allTargets.push(funnel.steps[i + 1].id);
       }
     }
+    if (allTargets.length > 0) allNextMap.set(step.id, allTargets);
   }
 
   // 2. Find the first branching point (segment-picker with multiple targets)
@@ -155,13 +198,21 @@ function buildLayoutRows(
   const branchTargets = branchInfo.targets;
 
   for (let bi = 0; bi < branchTargets.length; bi++) {
-    let current = branchTargets[bi];
+    // BFS to trace all reachable steps from this branch (follows conditional targets too)
+    const queue = [branchTargets[bi]];
     const visited = new Set<string>();
-    while (current && !visited.has(current)) {
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (!current || visited.has(current)) continue;
       visited.add(current);
       if (!stepBranches.has(current)) stepBranches.set(current, new Set());
       stepBranches.get(current)!.add(bi);
-      current = nextMap.get(current) || "";
+      // Follow ALL targets (conditional + default)
+      const targets = allNextMap.get(current) || [];
+      for (const t of targets) queue.push(t);
+      // Also follow primary next if not in allNextMap
+      const primary = nextMap.get(current);
+      if (primary && !targets.includes(primary)) queue.push(primary);
     }
   }
 

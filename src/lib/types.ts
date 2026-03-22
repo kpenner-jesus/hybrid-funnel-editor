@@ -107,11 +107,20 @@ export interface WidgetInstance {
 
 // --- Step ---
 
+export interface ConditionalNavRule {
+  variable: string;      // funnel variable name, e.g. "eventSegment"
+  operator: "equals" | "not_equals" | "contains";
+  value: string;         // value to compare against
+  targetStepId: string;  // step ID to navigate to if condition matches
+  label?: string;        // optional label for flow visualization
+}
+
 export interface StepNavigation {
-  next?: string | null; // step id or null for last
+  next?: string | null; // step id or null for last (default fallback)
   back?: string | null;
   nextLabel?: string;
   backLabel?: string;
+  conditionalNext?: ConditionalNavRule[]; // evaluated in order, first match wins
 }
 
 export interface Step {

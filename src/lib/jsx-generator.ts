@@ -913,7 +913,9 @@ function generateMainFunnel(
   for (let i = 0; i < funnel.steps.length; i++) {
     const step = funnel.steps[i];
     const prevStepId = i > 0 ? funnel.steps[i - 1].id : null;
-    const nextStepId = i < funnel.steps.length - 1 ? funnel.steps[i + 1].id : null;
+    // Determine next step: explicit navigation.next > default next in list
+    let nextStepId = step.navigation.next || (i < funnel.steps.length - 1 ? funnel.steps[i + 1].id : null);
+    const hasConditionalNav = step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0;
     const widgetTemplates = step.widgets.map((w) => w.templateId);
 
     lines.push(`        {step === '${step.id}' && (`);
@@ -977,6 +979,23 @@ function generateMainFunnel(
             lines.push(`              onNext={() => { if (!startDate || !endDate) { setError('Please select both dates.'); return; } goTo('${nextStepId}'); }}`);
           } else if (widgetTemplates.includes("segment-picker")) {
             lines.push(`              onNext={() => { if (!selectedSegment) { setError('Please select an option.'); return; } goTo('${nextStepId}'); }}`);
+          } else if (hasConditionalNav) {
+            // Generate conditional navigation function
+            const condRules = step.navigation.conditionalNext!;
+            const condLines: string[] = [];
+            condLines.push(`              onNext={() => {`);
+            for (const rule of condRules) {
+              if (rule.operator === "equals") {
+                condLines.push(`                if (selectedSegment === '${escapeJsx(rule.value)}') { goTo('${rule.targetStepId}'); return; }`);
+              } else if (rule.operator === "not_equals") {
+                condLines.push(`                if (selectedSegment !== '${escapeJsx(rule.value)}') { goTo('${rule.targetStepId}'); return; }`);
+              } else if (rule.operator === "contains") {
+                condLines.push(`                if (selectedSegment && selectedSegment.includes('${escapeJsx(rule.value)}')) { goTo('${rule.targetStepId}'); return; }`);
+              }
+            }
+            condLines.push(`                goTo('${nextStepId}');`);
+            condLines.push(`              }}`);
+            lines.push(condLines.join("\n"));
           } else {
             lines.push(`              onNext={() => goTo('${nextStepId}')}`);
           }

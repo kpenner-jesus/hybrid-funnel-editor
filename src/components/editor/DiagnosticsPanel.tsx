@@ -110,7 +110,30 @@ export function DiagnosticsPanel({ open, onClose }: { open: boolean; onClose: ()
             }
           }
 
-          // Check explicit navigation
+          // Check conditional navigation
+          if (step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0) {
+            for (const rule of step.navigation.conditionalNext) {
+              const targetIdx = funnel.steps.findIndex((s) => s.id === rule.targetStepId);
+              entry.connectsTo.push({
+                target: targetIdx >= 0 ? funnel.steps[targetIdx].title : `ID:${rule.targetStepId}`,
+                targetIndex: targetIdx,
+                label: rule.label || `${rule.variable}=${rule.value}`,
+                source: `conditionalNext (${rule.variable} ${rule.operator} "${rule.value}")`,
+              });
+            }
+            // Add default fallback
+            if (step.navigation.next) {
+              const targetIdx = funnel.steps.findIndex((s) => s.id === step.navigation.next);
+              entry.connectsTo.push({
+                target: targetIdx >= 0 ? funnel.steps[targetIdx].title : `ID:${step.navigation.next}`,
+                targetIndex: targetIdx,
+                label: "default",
+                source: "navigation.next (default fallback)",
+              });
+            }
+          }
+
+          // Check explicit navigation (simple next, no conditional)
           if (entry.connectsTo.length === 0 && step.navigation.next) {
             const targetIdx = funnel.steps.findIndex((s) => s.id === step.navigation.next);
             entry.connectsTo.push({

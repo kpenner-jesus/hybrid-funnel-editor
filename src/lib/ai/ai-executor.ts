@@ -69,12 +69,13 @@ export function executeAiToolCall(
           }
           if (sd.layout) step.layout = sd.layout as Step["layout"];
           if (sd.navigation) {
-            const nav = sd.navigation as Record<string, string>;
+            const nav = sd.navigation as Record<string, unknown>;
             step.navigation = {
               ...step.navigation,
-              ...(nav.nextLabel !== undefined ? { nextLabel: nav.nextLabel } : {}),
-              ...(nav.backLabel !== undefined ? { backLabel: nav.backLabel } : {}),
-              ...(nav.next !== undefined ? { next: nav.next } : {}),
+              ...(nav.nextLabel !== undefined ? { nextLabel: nav.nextLabel as string } : {}),
+              ...(nav.backLabel !== undefined ? { backLabel: nav.backLabel as string } : {}),
+              ...(nav.next !== undefined ? { next: nav.next as string } : {}),
+              ...(Array.isArray(nav.conditionalNext) ? { conditionalNext: nav.conditionalNext as import("@/lib/types").ConditionalNavRule[] } : {}),
             };
           }
 
