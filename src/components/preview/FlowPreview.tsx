@@ -185,60 +185,64 @@ function buildLayoutRows(
   // Collect steps that haven't been placed yet
   const remaining = funnel.steps.filter((s) => !placed.has(s.id));
 
-  // Group consecutive branch-exclusive steps into parallel columns
+  // Group steps into parallel columns based on branch membership
+  // A step NOT reachable from ALL branches is branch-specific and should be
+  // placed side-by-side with steps from other branches at the same "level"
   let i = 0;
   while (i < remaining.length) {
     const step = remaining[i];
+    if (placed.has(step.id)) { i++; continue; }
     const branches = stepBranches.get(step.id);
 
     if (!branches || branches.size === 0 || branches.size === branchTargets.length) {
-      // This step is reachable from ALL branches (convergence) or not tracked
-      // Check if there are branch-exclusive steps coming up that should be parallel
+      // Reachable from ALL branches = convergence point → single row
       rows.push({ type: "single", stepIds: [step.id] });
       placed.add(step.id);
       i++;
-    } else if (branches.size === 1) {
-      // This step is exclusive to ONE branch — find other single-branch steps at this "level"
-      const branchIdx = [...branches][0];
-      // Collect all consecutive single-branch steps (one per branch) for parallel placement
-      const parallelGroup: { stepId: string; branchIdx: number }[] = [{ stepId: step.id, branchIdx }];
+    } else {
+      // This step is branch-specific (reachable from SOME but not ALL branches)
+      // Collect nearby unplaced steps that cover DIFFERENT branches for parallel layout
+      // Use the "primary branch" = lowest branch index in the set
+      const primaryBranch = Math.min(...branches);
+      const parallelGroup: { stepId: string; branchSet: Set<number>; primaryBranch: number }[] = [
+        { stepId: step.id, branchSet: branches, primaryBranch }
+      ];
       placed.add(step.id);
 
-      // Look ahead for steps belonging to OTHER branches at this same level
+      // Look ahead for steps covering different branches
       for (let j = i + 1; j < remaining.length; j++) {
         const nextStep = remaining[j];
         if (placed.has(nextStep.id)) continue;
         const nb = stepBranches.get(nextStep.id);
-        if (nb && nb.size === 1) {
-          const nextBranchIdx = [...nb][0];
-          // Only group if this branch isn't already represented
-          if (!parallelGroup.some((g) => g.branchIdx === nextBranchIdx)) {
-            parallelGroup.push({ stepId: nextStep.id, branchIdx: nextBranchIdx });
-            placed.add(nextStep.id);
-          }
-        } else {
-          break; // Hit a convergence point, stop collecting
+        if (!nb || nb.size === 0 || nb.size === branchTargets.length) {
+          break; // Hit convergence, stop collecting
+        }
+        const nextPrimary = Math.min(...nb);
+        // Check if this step covers different branches than already collected
+        const overlaps = parallelGroup.some((g) => {
+          for (const b of nb) { if (g.branchSet.has(b)) return true; }
+          return false;
+        });
+        if (!overlaps) {
+          // Non-overlapping branch set — add to parallel group
+          parallelGroup.push({ stepId: nextStep.id, branchSet: nb, primaryBranch: nextPrimary });
+          placed.add(nextStep.id);
         }
       }
 
       if (parallelGroup.length > 1) {
-        // Sort by branch index for consistent ordering
-        parallelGroup.sort((a, b) => a.branchIdx - b.branchIdx);
+        // Sort by primary branch for consistent ordering
+        parallelGroup.sort((a, b) => a.primaryBranch - b.primaryBranch);
         rows.push({
           type: "parallel",
           stepIds: parallelGroup.map((g) => g.stepId),
-          colors: parallelGroup.map((g) => branchInfo!.colors[g.branchIdx] || "#94a3b8"),
-          labels: parallelGroup.map((g) => branchInfo!.labels[g.branchIdx] || ""),
+          colors: parallelGroup.map((g) => branchInfo!.colors[g.primaryBranch] || "#94a3b8"),
+          labels: parallelGroup.map((g) => branchInfo!.labels[g.primaryBranch] || ""),
         });
       } else {
-        // Only one branch-exclusive step found, place as single
+        // Only one step with this branch set — place as single with branch color
         rows.push({ type: "single", stepIds: [step.id] });
       }
-      i++;
-    } else {
-      // Reachable from a SUBSET of branches — place as single for now
-      rows.push({ type: "single", stepIds: [step.id] });
-      placed.add(step.id);
       i++;
     }
   }
