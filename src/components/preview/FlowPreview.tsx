@@ -105,36 +105,148 @@ function deriveConnections(funnel: FunnelDefinition): {
   return { connections, branchMap };
 }
 
-// --- Build layout rows from steps + branch info ---
-function buildLayoutRows(funnel: FunnelDefinition, branchMap: Map<string, { targets: string[]; labels: string[]; colors: string[] }>): LayoutRow[] {
+// --- Build layout rows with full path tracing ---
+// Traces ALL paths through the funnel (not just segment-picker branches)
+// to detect which steps are branch-exclusive vs shared convergence points
+function buildLayoutRows(
+  funnel: FunnelDefinition,
+  branchMap: Map<string, { targets: string[]; labels: string[]; colors: string[] }>
+): LayoutRow[] {
+  if (funnel.steps.length === 0) return [];
+
+  const stepIdToIdx = new Map<string, number>();
+  funnel.steps.forEach((s, i) => stepIdToIdx.set(s.id, i));
+
+  // 1. Build adjacency: for each step, where does it go?
+  const nextMap = new Map<string, string>(); // stepId → next stepId
+  for (let i = 0; i < funnel.steps.length; i++) {
+    const step = funnel.steps[i];
+    // Check navigation.next first
+    if (step.navigation.next && stepIdToIdx.has(step.navigation.next)) {
+      nextMap.set(step.id, step.navigation.next);
+    } else if (i < funnel.steps.length - 1) {
+      // Default: next step in list (unless this step has segment-picker branches)
+      const hasBranch = branchMap.has(step.id);
+      if (!hasBranch) {
+        nextMap.set(step.id, funnel.steps[i + 1].id);
+      }
+    }
+  }
+
+  // 2. Find the first branching point (segment-picker with multiple targets)
+  let branchStepId: string | null = null;
+  let branchInfo: { targets: string[]; labels: string[]; colors: string[] } | null = null;
+  for (const [stepId, info] of branchMap) {
+    if (info.targets.length > 1) {
+      branchStepId = stepId;
+      branchInfo = info;
+      break;
+    }
+  }
+
+  // 3. If no branching, just list all steps linearly
+  if (!branchStepId || !branchInfo) {
+    return funnel.steps.map((s) => ({ type: "single" as const, stepIds: [s.id] }));
+  }
+
+  // 4. Trace each branch path to find which steps are branch-exclusive
+  // Tag each step with which branch indices can reach it
+  const stepBranches = new Map<string, Set<number>>(); // stepId → set of branch indices
+  const branchTargets = branchInfo.targets;
+
+  for (let bi = 0; bi < branchTargets.length; bi++) {
+    let current = branchTargets[bi];
+    const visited = new Set<string>();
+    while (current && !visited.has(current)) {
+      visited.add(current);
+      if (!stepBranches.has(current)) stepBranches.set(current, new Set());
+      stepBranches.get(current)!.add(bi);
+      current = nextMap.get(current) || "";
+    }
+  }
+
+  // 5. Build layout rows by processing steps in order
   const rows: LayoutRow[] = [];
   const placed = new Set<string>();
 
-  for (let i = 0; i < funnel.steps.length; i++) {
-    const step = funnel.steps[i];
+  // Place steps BEFORE the branch point
+  for (const step of funnel.steps) {
+    if (step.id === branchStepId) break;
     if (placed.has(step.id)) continue;
+    rows.push({ type: "single", stepIds: [step.id] });
+    placed.add(step.id);
+  }
 
-    const branch = branchMap.get(step.id);
-    if (branch && branch.targets.length > 1) {
-      // This step is a branching point — place it as single row first
+  // Place the branch point itself
+  rows.push({ type: "single", stepIds: [branchStepId] });
+  placed.add(branchStepId);
+
+  // 6. Process remaining steps, grouping by branch membership
+  // Collect steps that haven't been placed yet
+  const remaining = funnel.steps.filter((s) => !placed.has(s.id));
+
+  // Group consecutive branch-exclusive steps into parallel columns
+  let i = 0;
+  while (i < remaining.length) {
+    const step = remaining[i];
+    const branches = stepBranches.get(step.id);
+
+    if (!branches || branches.size === 0 || branches.size === branchTargets.length) {
+      // This step is reachable from ALL branches (convergence) or not tracked
+      // Check if there are branch-exclusive steps coming up that should be parallel
       rows.push({ type: "single", stepIds: [step.id] });
       placed.add(step.id);
+      i++;
+    } else if (branches.size === 1) {
+      // This step is exclusive to ONE branch — find other single-branch steps at this "level"
+      const branchIdx = [...branches][0];
+      // Collect all consecutive single-branch steps (one per branch) for parallel placement
+      const parallelGroup: { stepId: string; branchIdx: number }[] = [{ stepId: step.id, branchIdx }];
+      placed.add(step.id);
 
-      // Place branch targets side-by-side
-      const validTargets = branch.targets.filter((t) => !placed.has(t));
-      if (validTargets.length > 1) {
+      // Look ahead for steps belonging to OTHER branches at this same level
+      for (let j = i + 1; j < remaining.length; j++) {
+        const nextStep = remaining[j];
+        if (placed.has(nextStep.id)) continue;
+        const nb = stepBranches.get(nextStep.id);
+        if (nb && nb.size === 1) {
+          const nextBranchIdx = [...nb][0];
+          // Only group if this branch isn't already represented
+          if (!parallelGroup.some((g) => g.branchIdx === nextBranchIdx)) {
+            parallelGroup.push({ stepId: nextStep.id, branchIdx: nextBranchIdx });
+            placed.add(nextStep.id);
+          }
+        } else {
+          break; // Hit a convergence point, stop collecting
+        }
+      }
+
+      if (parallelGroup.length > 1) {
+        // Sort by branch index for consistent ordering
+        parallelGroup.sort((a, b) => a.branchIdx - b.branchIdx);
         rows.push({
           type: "parallel",
-          stepIds: validTargets,
-          colors: branch.colors.slice(0, validTargets.length),
-          labels: branch.labels.slice(0, validTargets.length),
+          stepIds: parallelGroup.map((g) => g.stepId),
+          colors: parallelGroup.map((g) => branchInfo!.colors[g.branchIdx] || "#94a3b8"),
+          labels: parallelGroup.map((g) => branchInfo!.labels[g.branchIdx] || ""),
         });
-        validTargets.forEach((t) => placed.add(t));
+      } else {
+        // Only one branch-exclusive step found, place as single
+        rows.push({ type: "single", stepIds: [step.id] });
       }
+      i++;
     } else {
-      // Regular step
+      // Reachable from a SUBSET of branches — place as single for now
       rows.push({ type: "single", stepIds: [step.id] });
       placed.add(step.id);
+      i++;
+    }
+  }
+
+  // 7. Add any steps that weren't placed (shouldn't happen but safety)
+  for (const step of funnel.steps) {
+    if (!placed.has(step.id)) {
+      rows.push({ type: "single", stepIds: [step.id] });
     }
   }
 
