@@ -55,9 +55,26 @@ export async function POST(request: Request) {
 
   let systemPrompt = buildSystemPrompt(context);
 
-  // If docked to a widget, prepend a scoped instruction
+  // If docked to a widget, prepend a scoped instruction WITH the widget's current config
   if (body.dockedContext) {
     const dc = body.dockedContext;
+
+    // Extract the widget's current config from the funnel state
+    let widgetConfigDump = "(config not available)";
+    try {
+      const funnelState = context.currentFunnelState;
+      if (funnelState && funnelState.steps[dc.stepIndex]) {
+        const step = funnelState.steps[dc.stepIndex];
+        const widget = step.widgets[dc.widgetIndex];
+        if (widget) {
+          // Include the full config so the AI can see products, prices, options, etc.
+          const configStr = JSON.stringify(widget.config, null, 2);
+          // Cap at 3000 chars to prevent token overflow
+          widgetConfigDump = configStr.length > 3000 ? configStr.slice(0, 3000) + "\n... (truncated)" : configStr;
+        }
+      }
+    } catch {}
+
     systemPrompt = `## OBJECT EDIT MODE — SCOPED TO A SINGLE WIDGET
 
 You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and expects ALL commands to apply ONLY to this widget.
@@ -66,18 +83,19 @@ You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and
 **Step index:** ${dc.stepIndex} (use this for tool calls)
 **Widget index:** ${dc.widgetIndex} (use this for tool calls)
 
+**Current widget config (this is what the widget currently contains):**
+\`\`\`json
+${widgetConfigDump}
+\`\`\`
+
 RULES:
 1. ONLY use update_widget_config with stepIndex=${dc.stepIndex} and widgetIndex=${dc.widgetIndex}
 2. Do NOT create, remove, or modify other steps or widgets
 3. Do NOT use create_complete_funnel, add_step, remove_step, or add_widget
-4. Focus exclusively on modifying THIS widget's config (options, title, style, etc.)
+4. Focus exclusively on modifying THIS widget's config
 5. Be conversational — the user is talking TO this widget, not about the whole funnel
-
-Example user commands in this mode:
-- "Add a Yoga Retreat option" → update options config to add it
-- "Change the title" → update title config
-- "Make this multi-select" → update multiSelect config
-- "Remove the last option" → update options config
+6. When the user says "change the price on the $500 one", you can SEE the config above to know exactly which product is $500
+7. When modifying options/categories JSON, preserve the existing structure and only change the specific field requested
 
 ---
 
