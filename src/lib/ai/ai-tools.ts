@@ -306,6 +306,33 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "search_images",
+    description:
+      "Searches for professional stock photos using Pexels. Returns up to 8 image URLs with photographer credits. " +
+      "Use this when the user asks for images, photos, or pictures for their funnel — hero backgrounds, room photos, " +
+      "activity images, food/dining photos, etc. After getting results, use update_widget_config to set the image URL " +
+      "on the appropriate widget (hero-section backgroundImageUrl, image-block imageUrl/url, etc.).",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query for the image (e.g., 'lakeside retreat center', 'chef preparing buffet', 'wedding tent outdoor')",
+        },
+        orientation: {
+          type: "string",
+          enum: ["landscape", "portrait", "square"],
+          description: "Image orientation. Use 'landscape' for hero sections and banners, 'portrait' for mobile-focused, 'square' for cards. Default: landscape.",
+        },
+        count: {
+          type: "number",
+          description: "Number of results to return (1-15). Default: 6.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "configure_meal_widget",
     description:
       "Configures a meal-picker widget with meal definitions, pricing, kids settings, and cascade rules. " +

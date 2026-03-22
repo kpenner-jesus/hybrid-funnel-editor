@@ -511,6 +511,32 @@ export const useAiStore = create<AiStore>((set, get) => {
                 }
                 toolCall.result = result;
                 streamToolCalls.push(toolCall);
+              } else if (chunk.name === "search_images") {
+                // Handle image search async
+                try {
+                  const input = chunk.input || {};
+                  const query = (input.query as string) || "nature";
+                  const orientation = (input.orientation as string) || "landscape";
+                  const count = (input.count as number) || 6;
+                  const res = await fetch(`/api/images?q=${encodeURIComponent(query)}&per_page=${count}&orientation=${orientation}`);
+                  if (!res.ok) {
+                    result = { success: false, message: `Image search failed (${res.status}). Is PEXELS_API_KEY set in Vercel env vars?` };
+                  } else {
+                    const data = await res.json() as { total: number; results: Array<{ url: string; urlMedium: string; photographer: string; alt: string; pexelsUrl: string }> };
+                    if (!data.results || data.results.length === 0) {
+                      result = { success: false, message: `No images found for "${query}". Try different search terms.` };
+                    } else {
+                      const imageList = data.results.map((img: { url: string; urlMedium: string; photographer: string; alt: string }, i: number) =>
+                        `${i + 1}. "${img.alt || query}" by ${img.photographer}\n   URL: ${img.url}`
+                      ).join("\n");
+                      result = { success: true, message: `Found ${data.results.length} images for "${query}":\n\n${imageList}\n\nPick one and I'll update the widget with it. Or say "use #1" to apply the first result.` };
+                    }
+                  }
+                } catch (err) {
+                  result = { success: false, message: `Image search error: ${err instanceof Error ? err.message : "unknown"}` };
+                }
+                toolCall.result = result;
+                streamToolCalls.push(toolCall);
               } else {
               // Execute the tool call against the funnel store
               // IMPORTANT: use lambda wrappers that call getState() fresh each time

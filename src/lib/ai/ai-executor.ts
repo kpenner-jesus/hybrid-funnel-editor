@@ -392,6 +392,12 @@ export function executeAiToolCall(
         };
       }
 
+      case "search_images": {
+        // This is handled async in the AI store (ai-store.ts), not here
+        // Return a placeholder — the real result is injected by the store
+        return { success: true, message: "Searching for images..." };
+      }
+
       case "suggest_improvements": {
         // This tool doesn't modify the funnel - the AI just returns text
         return {
