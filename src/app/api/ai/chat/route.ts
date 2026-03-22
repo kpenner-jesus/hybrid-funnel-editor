@@ -90,8 +90,8 @@ export async function POST(request: Request) {
         const step = funnelState.steps[dc.stepIndex];
         stepTitle = step.title || "";
         // Build context from all widgets on this step
-        stepContext = step.widgets.map((w: Record<string, unknown>) => {
-          const cfg = w.config as Record<string, unknown>;
+        stepContext = step.widgets.map((w: { config?: Record<string, unknown> }) => {
+          const cfg = w.config || {};
           return [cfg?.title, cfg?.headline, cfg?.text, cfg?.subtitle].filter(Boolean).join(" ");
         }).join(" ").slice(0, 500);
       }
