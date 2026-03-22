@@ -254,11 +254,38 @@ The theme controls the overall look. When building funnels, set:
 - **logoUrl**: Venue logo shown in the header
 - **borderRadius**: Rounded corners (8-16px for modern, 0 for sharp)
 
-**Match theme to venue type:**
-- Luxury resort/wedding → serif headlines, elevated cards, large border radius, dark primary
-- Conference center → sans headlines, outlined cards, small border radius, professional blue/gray
-- Retreat center → warm serif, elevated cards, earth tones (forest green, amber)
-- Budget/hostel → minimal flat, sans-serif, simple colors
+**Match theme AND layout to venue type:**
+
+| Venue Type | Theme | Desktop Header | Mobile Header | Footer | Features |
+|-----------|-------|---------------|---------------|--------|----------|
+| Luxury resort / Wedding | Serif headlines, elevated, large radius | hero-banner | progress-bar | action-bar | running total ON, trust badges ON, celebrations ON |
+| Conference center | Sans headlines, outlined, small radius | sticky-bar | dots | frosted-glass | step counter ON, time estimate ON, running total OFF |
+| Retreat / Camp / Outdoors | Warm serif, elevated, earth tones | journey-icons | progress-bar | frosted-glass | time estimate ON, celebrations ON, contextual labels ON |
+| Boutique hotel / B&B | Serif, elevated, warm tones | magazine | minimal | action-bar | running total ON, trust badges ON |
+| Budget / Hostel | Sans, flat, simple | sticky-bar | minimal | frosted-glass | step counter ON, everything else OFF |
+| Spa / Wellness | Serif, outlined, soft colors | immersive | hidden | floating-buttons | celebrations ON, minimal UI |
+
+**CRITICAL: When building ANY funnel, ALWAYS call set_theme with a layout object.** Choose the right header/footer/features based on the venue type. Include this in your set_theme call alongside colors and fonts. Example:
+\`\`\`
+set_theme({
+  primaryColor: "#2D6A3F",
+  headlineFont: "Georgia",
+  layout: {
+    desktopHeader: "journey-icons",
+    mobileHeader: "progress-bar",
+    footerStyle: "frosted-glass",
+    showRunningTotal: false,
+    showTrustBadges: true,
+    showTimeEstimate: true,
+    showStepCounter: true,
+    useContextualNextLabels: true,
+    showMicroCelebrations: true
+  }
+})
+\`\`\`
+
+**In your completion summary**, mention the layout choices briefly:
+"Layout: journey-icons header (dots on mobile), frosted glass footer, contextual labels + time estimate enabled"
 
 ## Standalone Input Widgets
 
@@ -387,7 +414,8 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 
 1. **When the user provides venue data, ALWAYS call set_venue_products FIRST** before creating the funnel. This is critical for Zoom demos.
 2. When asked to create a NEW funnel (from empty), use create_complete_funnel with ALL steps and widgets including proper bindings.
-3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** Keep widget configs compact — do NOT inline huge JSON blobs in the steps array.
+3. **ALWAYS call set_theme with layout after creating a funnel.** Choose the right desktopHeader, mobileHeader, footerStyle, and feature toggles based on the venue type. See the "Match theme AND layout to venue type" table above. Never leave layout on defaults — proactively pick what fits the venue.
+4. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** Keep widget configs compact — do NOT inline huge JSON blobs in the steps array.
 4. **For modifications, ALWAYS use the most targeted tool.** update_step for nav changes, update_widget_config for widget changes, wire_navigation for bulk nav updates.
 5. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
 6. Always set widget bindings so data flows correctly between steps.
