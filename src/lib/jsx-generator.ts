@@ -248,28 +248,125 @@ function TypeformStep({ stepNum, stepLabel, title, subtitle, image, children, fo
   );
 }
 
-function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingText, disabled, showBack = true }) {
+function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingText, disabled, showBack = true, runningTotal, backPreview }) {
+  const [showTooltip, setShowTooltip] = useState(false);
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50" style={{
-      background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      borderRadius: '3rem 3rem 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.08)', padding: '16px 20px 24px',
+      background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+      borderRadius: '2rem 2rem 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.1)', padding: '12px 20px 24px',
     }}>
+      {/* Running total */}
+      {runningTotal > 0 && (
+        <div className="max-w-2xl lg:max-w-3xl mx-auto mb-2 text-center">
+          <span className="text-xs font-medium" style={{ color: THEME.outline }}>Estimated Total: </span>
+          <span className="text-sm font-bold" style={{ color: THEME.primary }}>{fmtCurrency(runningTotal)}</span>
+        </div>
+      )}
       <div className="max-w-2xl lg:max-w-3xl mx-auto flex items-center gap-3">
         {showBack && onBack && (
-          <button onClick={onBack} className="text-xs font-bold uppercase tracking-widest px-4 py-3" style={{ color: THEME.outline }}>
-            ← BACK
-          </button>
+          <div className="relative">
+            <button
+              onClick={onBack}
+              onMouseEnter={() => backPreview && setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+              className="text-xs font-bold uppercase tracking-widest px-4 py-3 transition-colors hover:opacity-80"
+              style={{ color: THEME.outline }}
+            >
+              ← BACK
+            </button>
+            {showTooltip && backPreview && (
+              <div className="absolute bottom-full left-0 mb-2 px-3 py-2 rounded-xl text-xs whitespace-nowrap shadow-lg"
+                style={{ background: THEME.onSurface, color: '#fff' }}>
+                ← {backPreview}
+              </div>
+            )}
+          </div>
         )}
         <button
           onClick={onNext} disabled={loading || disabled}
-          className="flex-1 py-4 text-white font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-4 text-white font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           style={{
             background: loading || disabled ? THEME.primary : \`linear-gradient(135deg, \${THEME.primary} 0%, \${THEME.primaryContainer} 100%)\`,
             borderRadius: '9999px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
           }}
         >
-          {loading ? (loadingText || 'Loading...') : nextLabel}
+          {loading ? (loadingText || 'Loading...') : (nextLabel + ' →')}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function StepIcon({ type, completed, active }) {
+  const icons = {
+    welcome: '👋', dates: '📅', guests: '👥', rooms: '🛏️', meals: '🍽️',
+    activities: '🏔️', contact: '📋', invoice: '📄', payment: '💳', confirmation: '🎉',
+    venue: '🏛️', meeting: '🏢', av: '🎤', options: '☑️', default: '📌'
+  };
+  const icon = icons[type] || icons.default;
+  return (
+    <div className="flex flex-col items-center" style={{ minWidth: 32 }}>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300"
+        style={{
+          background: completed ? THEME.primary : active ? \`\${THEME.primary}15\` : THEME.surfaceContainerHigh,
+          border: active ? \`2px solid \${THEME.primary}\` : '2px solid transparent',
+          transform: active ? 'scale(1.15)' : 'scale(1)',
+        }}>
+        {completed ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg> : <span style={{ filter: completed || active ? 'none' : 'grayscale(1) opacity(0.4)' }}>{icon}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ProgressJourney({ steps, currentIndex, stepIcons }) {
+  return (
+    <div className="flex items-center justify-center gap-0.5 py-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {steps.map((label, i) => {
+        const completed = i < currentIndex;
+        const active = i === currentIndex;
+        const iconType = stepIcons[i] || 'default';
+        return (
+          <React.Fragment key={i}>
+            <StepIcon type={iconType} completed={completed} active={active} />
+            {i < steps.length - 1 && (
+              <div className="h-0.5 transition-all duration-500" style={{
+                width: '16px', minWidth: '8px',
+                background: completed ? THEME.primary : THEME.surfaceContainerHigh,
+              }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function MicroCelebration({ show }) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center">
+      <div className="animate-ping" style={{
+        width: 80, height: 80, borderRadius: '50%',
+        background: \`\${THEME.primary}20\`, border: \`3px solid \${THEME.primary}40\`,
+      }} />
+    </div>
+  );
+}
+
+function TrustBar() {
+  return (
+    <div className="flex items-center justify-center gap-4 flex-wrap py-2 px-4">
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: THEME.outline }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <span>Secure & Encrypted</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: THEME.outline }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>256-bit SSL</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: THEME.outline }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        <span>Questions? Call us</span>
       </div>
     </div>
   );
@@ -1142,10 +1239,52 @@ function generateMainFunnel(
 
   // --- Progress calculation (matches wilderness-edge-funnel.jsx pattern) ---
   const stepLabels = funnel.steps.map(s => `'${escapeJsString(deriveStepLabel(s))}'`);
+
+  // Build step icon types for ProgressJourney
+  const stepIconTypes = funnel.steps.map(s => {
+    const templates = s.widgets.map(w => w.templateId);
+    if (templates.includes("segment-picker")) return "welcome";
+    if (templates.includes("date-picker")) return "dates";
+    if (templates.includes("guest-counter")) return "guests";
+    if (templates.includes("guest-rooms")) return "rooms";
+    if (templates.includes("meal-picker")) return "meals";
+    if (templates.includes("activity-picker")) return "activities";
+    if (templates.includes("contact-form")) return s.title.toLowerCase().includes("confirm") ? "confirmation" : "contact";
+    if (templates.includes("invoice")) return "invoice";
+    if (templates.includes("payment-widget")) return "payment";
+    if (templates.includes("option-picker")) {
+      const title = s.title.toLowerCase();
+      if (title.includes("venue") || title.includes("ceremony")) return "venue";
+      if (title.includes("meeting") || title.includes("conference")) return "meeting";
+      if (title.includes("av") || title.includes("sound")) return "av";
+      return "options";
+    }
+    if (templates.includes("category-picker")) return "venue";
+    return "default";
+  });
+
+  // Build contextual Next labels based on what the NEXT step contains
+  const contextualNextLabels: Record<string, string> = {};
+  for (let i = 0; i < funnel.steps.length - 1; i++) {
+    const nextStep = funnel.steps[i + 1];
+    const nextTemplates = nextStep.widgets.map(w => w.templateId);
+    if (nextTemplates.includes("guest-rooms")) contextualNextLabels[funnel.steps[i].id] = "Choose Your Rooms";
+    else if (nextTemplates.includes("meal-picker")) contextualNextLabels[funnel.steps[i].id] = "Select Meals";
+    else if (nextTemplates.includes("activity-picker")) contextualNextLabels[funnel.steps[i].id] = "Add Activities";
+    else if (nextTemplates.includes("contact-form")) contextualNextLabels[funnel.steps[i].id] = "Your Details";
+    else if (nextTemplates.includes("invoice")) contextualNextLabels[funnel.steps[i].id] = "View Your Quote";
+    else if (nextTemplates.includes("payment-widget")) contextualNextLabels[funnel.steps[i].id] = "Secure Your Booking";
+    else if (nextTemplates.includes("date-picker")) contextualNextLabels[funnel.steps[i].id] = "Pick Your Dates";
+    else if (nextTemplates.includes("guest-counter")) contextualNextLabels[funnel.steps[i].id] = "Guest Count";
+    else if (nextTemplates.includes("category-picker")) contextualNextLabels[funnel.steps[i].id] = "Choose Options";
+  }
+
   lines.push(`  const progressSteps = [${stepLabels.join(", ")}];`);
+  lines.push(`  const stepIcons = [${stepIconTypes.map(t => `'${t}'`).join(", ")}];`);
   lines.push(`  const stepOrder = [${stepNames.map((s) => `'${s}'`).join(", ")}];`);
   lines.push(`  const currentIdx = stepOrder.indexOf(step);`);
   lines.push(`  const pPct = stepOrder.length > 1 && currentIdx >= 0 ? Math.min(100, Math.round((currentIdx / (stepOrder.length - 1)) * 100)) : 0;`);
+  lines.push(`  const [showCelebration, setShowCelebration] = useState(false);`);
   lines.push(``);
 
   // --- inputCls for contact form ---
@@ -1169,15 +1308,20 @@ function generateMainFunnel(
   lines.push(`  return (`);
   lines.push(`    <div className="min-h-screen" style={{ background: GRADIENT_BG, fontFamily: THEME.sans }}>`);
 
-  // Header + progress bar
-  lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.90)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>`);
-  lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-center">`);
-  lines.push(`          <span className="text-xl font-bold italic" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
+  // Header + animated progress bar + step journey icons
+  lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
+  lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">`);
+  lines.push(`          <span className="text-lg font-bold italic" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
+  lines.push(`          {currentIdx >= 0 && <span className="text-xs font-medium hidden sm:block" style={{ color: THEME.outline }}>Step {currentIdx + 1} of {stepOrder.length} · ~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left</span>}`);
   lines.push(`        </div>`);
-  lines.push(`        {step !== 'confirmation' && step !== '${findStepIdForTemplate(funnel, "invoice")}' && progressSteps.length > 0 && (`);
-  lines.push(`          <div className="h-1 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-500" style={{ width: \`\${pPct}%\`, background: THEME.primary }} /></div>`);
+  lines.push(`        {step !== 'confirmation' && progressSteps.length > 0 && (`);
+  lines.push(`          <>`);
+  lines.push(`            <div className="hidden md:block max-w-2xl lg:max-w-4xl mx-auto px-4 pb-2"><ProgressJourney steps={progressSteps} currentIndex={currentIdx} stepIcons={stepIcons} /></div>`);
+  lines.push(`            <div className="md:hidden h-1 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700 ease-out" style={{ width: \`\${pPct}%\`, background: \`linear-gradient(90deg, \${THEME.primary} 0%, \${THEME.primaryContainer || THEME.primary} 100%)\`, borderRadius: '0 4px 4px 0' }} /></div>`);
+  lines.push(`          </>`);
   lines.push(`        )}`);
   lines.push(`      </div>`);
+  lines.push(`      <MicroCelebration show={showCelebration} />`);
 
   // Error banner
   lines.push(`      {error && <div className="max-w-2xl lg:max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-4"><div className="p-4 rounded-2xl text-sm flex items-center gap-2" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: THEME.error }}><span>⚠</span><span className="flex-1">{error}</span><button onClick={() => setError(null)} className="ml-auto font-bold opacity-60 hover:opacity-100">✕</button></div></div>}`);
@@ -1277,7 +1421,15 @@ function generateMainFunnel(
             lines.push(`              onNext={() => goTo('${nextStepId}')}`);
           }
         }
-        lines.push(`              nextLabel="${escapeJsx(step.navigation.nextLabel || "Continue")}"`);
+        // Contextual Next label: use explicit label > contextual label > "Continue"
+        const ctxLabel = contextualNextLabels[step.id];
+        const finalNextLabel = step.navigation.nextLabel || ctxLabel || "Continue";
+        lines.push(`              nextLabel="${escapeJsx(finalNextLabel)}"`);
+        // Show back preview tooltip
+        if (prevStepId) {
+          const prevStep = funnel.steps.find(s => s.id === prevStepId);
+          if (prevStep) lines.push(`              backPreview="${escapeJsx(deriveStepLabel(prevStep))}"`);
+        }
         lines.push(`            />`);
       }
 
@@ -1674,6 +1826,7 @@ function generateWidgetInStep(
       payLines.push(`              <div className="inline-block px-6 py-3 rounded-xl font-bold text-lg" style={{ background: THEME.primary + '10', color: THEME.primary }}>${pwType === "percent" ? `${pwAmount}% Deposit Required` : pwType === "full" ? "Full Payment" : `$${pwAmount} Deposit`}</div>`);
       payLines.push(`              <div className="mt-4 text-xs" style={{ color: THEME.outline }}>Secure payment processed by Everybooking</div>`);
       payLines.push(`            </div>`);
+      payLines.push(`            <TrustBar />`);
       return payLines.join("\n");
     }
 
