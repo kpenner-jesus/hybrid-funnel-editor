@@ -443,11 +443,6 @@ export function FlowPreview() {
         >Fit</button>
       </div>
 
-      {/* SVG overlay */}
-      <svg className="absolute inset-0 pointer-events-none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-        <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>{svgLines}</g>
-      </svg>
-
       {/* Content — explicit width so centering works correctly */}
       <div
         ref={contentRef}
@@ -528,7 +523,10 @@ export function FlowPreview() {
         })}
       </div>
 
-      {/* Debug bar removed — centering confirmed working */}
+      {/* SVG overlay — AFTER content so connection lines render ON TOP of cards */}
+      <svg className="absolute inset-0 pointer-events-none z-10" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+        <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>{svgLines}</g>
+      </svg>
     </div>
   );
 }
