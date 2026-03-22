@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { WidgetInstance, ThemeConfig } from "@/lib/types";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { mockRooms, mockMeals, mockActivities } from "@/lib/mock-data";
@@ -51,7 +51,7 @@ function DatePickerPreview({
 
   useEffect(() => {
     onOutput({ checkIn: startDate, checkOut: endDate, nightCount });
-  }, [startDate, endDate, nightCount, onOutput]);
+  }, [startDate, endDate, nightCount]);
 
   const click = (ds: string) => {
     const c = new Date(ds + "T00:00:00");
@@ -202,7 +202,7 @@ function GuestCounterPreview({
       guests: { adults, children, infants },
       totalGuests: adults + children,
     });
-  }, [adults, children, infants, onOutput]);
+  }, [adults, children, infants]);
 
   const CounterRow = ({
     label,
@@ -783,23 +783,26 @@ function MealPickerPreview({
   resolvedInputs: Record<string, unknown>;
   onOutput: (outputs: Record<string, unknown>) => void;
 }) {
-  // Parse meal definitions from config
-  let meals: MealDef[] = [];
-  try {
-    const raw = config.meals;
-    if (typeof raw === "string") meals = JSON.parse(raw);
-    else if (Array.isArray(raw)) meals = raw as MealDef[];
-  } catch { /* use empty */ }
-  if (meals.length === 0) {
-    // Fallback defaults
-    meals = [
-      { id: "breakfast", name: "Breakfast", sortOrder: 1, adultPrice: 18, timeslots: [{ startTime: "07:00", endTime: "09:00" }], allowCheckIn: "unselectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
-      { id: "lunch", name: "Lunch", sortOrder: 2, adultPrice: 20, timeslots: [{ startTime: "12:00", endTime: "14:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
-      { id: "supper", name: "Supper", sortOrder: 3, adultPrice: 25, timeslots: [{ startTime: "17:00", endTime: "19:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
-      { id: "night-snack", name: "Night Snack", sortOrder: 4, adultPrice: 8, timeslots: [{ startTime: "20:00", endTime: "22:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
-    ];
-  }
-  meals.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  // Parse meal definitions from config — MEMOIZED to prevent infinite re-render
+  const mealsConfigStr = typeof config.meals === "string" ? config.meals : JSON.stringify(config.meals || "[]");
+  const meals = useMemo<MealDef[]>(() => {
+    let parsed: MealDef[] = [];
+    try {
+      if (typeof config.meals === "string") parsed = JSON.parse(config.meals as string);
+      else if (Array.isArray(config.meals)) parsed = config.meals as MealDef[];
+    } catch { /* use empty */ }
+    if (parsed.length === 0) {
+      parsed = [
+        { id: "breakfast", name: "Breakfast", sortOrder: 1, adultPrice: 18, timeslots: [{ startTime: "07:00", endTime: "09:00" }], allowCheckIn: "unselectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
+        { id: "lunch", name: "Lunch", sortOrder: 2, adultPrice: 20, timeslots: [{ startTime: "12:00", endTime: "14:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "selectable", cascadeFrom: [] },
+        { id: "supper", name: "Supper", sortOrder: 3, adultPrice: 25, timeslots: [{ startTime: "17:00", endTime: "19:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
+        { id: "night-snack", name: "Night Snack", sortOrder: 4, adultPrice: 8, timeslots: [{ startTime: "20:00", endTime: "22:00" }], allowCheckIn: "selectable", allowMiddle: "selectable", allowCheckOut: "unselectable", cascadeFrom: [] },
+      ];
+    }
+    parsed.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    return parsed;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealsConfigStr]);
 
   const currency = (config.currency as string) || "CAD";
   const singleDate = !!config.singleDate;
@@ -808,11 +811,14 @@ function MealPickerPreview({
   const kidsPricingModel = (config.kidsPricingModel as string) || "percentage";
   const kidsPercentage = (config.kidsPercentage as number) || 10;
 
-  // Get dates from inputs
+  // Get dates from inputs — MEMOIZED
   const checkIn = resolvedInputs?.checkIn as string | undefined;
   const checkOut = resolvedInputs?.checkOut as string | undefined;
   const nightCount = (resolvedInputs?.nightCount as number) || 3;
-  const dates = singleDate ? [new Date()] : generateDates(checkIn, checkOut, nightCount);
+  const dates = useMemo(
+    () => singleDate ? [new Date()] : generateDates(checkIn, checkOut, nightCount),
+    [singleDate, checkIn, checkOut, nightCount]
+  );
 
   // Selection state: Map<"mealId-dateIdx", timeslotIdx | -1 for unselected>
   const [selections, setSelections] = useState<Map<string, number>>(new Map());
@@ -909,7 +915,7 @@ function MealPickerPreview({
     });
 
     onOutput({ selectedMeals, mealTotal, kidsMealTotal });
-  }, [selections, adultCount, childCount, kidsEnabled, kidsPricingModel, kidsPercentage, meals, dates, onOutput]);
+  }, [selections, adultCount, childCount, kidsEnabled, kidsPricingModel, kidsPercentage, meals, dates]);
 
   return (
     <div className="space-y-3">
@@ -1075,7 +1081,7 @@ function ActivityPickerPreview({
       })),
       activityTotal,
     });
-  }, [selectedIds, guestCount, onOutput]);
+  }, [selectedIds, guestCount]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -1185,7 +1191,7 @@ function ContactFormPreview({
       },
       isValid,
     });
-  }, [firstName, lastName, email, phone, company, notes, gdprAccepted, config.gdprConsent, onOutput]);
+  }, [firstName, lastName, email, phone, company, notes, gdprAccepted, config.gdprConsent]);
 
   const fieldStyle = { borderRadius: `${theme.borderRadius / 2}px` };
 
@@ -1402,7 +1408,7 @@ function InvoicePreview({
 
   useEffect(() => {
     onOutput({ totalPrice: total, lineItems });
-  }, [total, onOutput]);
+  }, [total]);
 
   const fmtDate = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
@@ -1542,7 +1548,7 @@ function OptionPickerPreview({
         selectedOptions: selectedId ? [selectedId] : [],
       });
     }
-  }, [selectedId, selectedIds, isMulti, onOutput]);
+  }, [selectedId, selectedIds, isMulti]);
 
   const handleClick = (id: string) => {
     if (isMulti) {
@@ -1662,7 +1668,7 @@ function SegmentPickerPreview({
         selectedSegments: selectedId ? [selectedId] : [],
       });
     }
-  }, [selectedId, selectedIds, isMulti, onOutput]);
+  }, [selectedId, selectedIds, isMulti]);
 
   const handleClick = (id: string) => {
     if (isMulti) {
@@ -1966,7 +1972,7 @@ function CategoryPickerPreview({ config, theme, resolvedInputs, onOutput }: { co
       ...p, quantity: quantities[p.id] || 1, lineTotal: p.price * (quantities[p.id] || 1),
     }));
     onOutput({ selectedProducts, productTotal: subtotal });
-  }, [quantities, selected, subtotal, onOutput]);
+  }, [quantities, selected, subtotal]);
 
   return (
     <div className="space-y-4">
