@@ -18,7 +18,8 @@ The Hybrid Funnel Editor is a **template-driven, AI-assisted funnel builder** fo
 | Styling | Tailwind CSS + inline styles |
 | Hosting | Vercel (Hobby plan — Edge Runtime for AI streaming) |
 | Auth | Simple password gate via middleware |
-| Persistence | localStorage (no database) |
+| Persistence | Vercel KV (Redis) + localStorage fallback |
+| Image Search | Pexels API (stock photos for AI) |
 
 ## Directory Structure
 
@@ -30,7 +31,9 @@ src/
 │   ├── editor/[id]/page.tsx      # Main editor (sidebar + preview + AI)
 │   ├── api/
 │   │   ├── ai/chat/route.ts      # POST streaming AI endpoint (Edge Runtime)
-│   │   └── auth/login/route.ts   # Password verification
+│   │   ├── auth/login/route.ts   # Password verification
+│   │   ├── funnels/route.ts      # GET/POST Vercel KV funnel persistence
+│   │   └── images/route.ts       # GET Pexels image search proxy
 │   └── layout.tsx                # Root layout + viewport config
 │
 ├── stores/                       # Zustand state management
@@ -311,10 +314,23 @@ Meal products MUST include `timeslot` in syncBooking or they're silently dropped
 { sku: product.sku, startDate, endDate, quantities: { qty: 2, timeslot: 0 }, bookingUnit: 'timeslot' }
 ```
 
+### Published Funnel Navigation Features
+The generated JSX includes a rich navigation system:
+- **ProgressJourney:** Icon-based step journey map (desktop), gradient bar (mobile)
+- **StepIcon:** Emoji per step type (📅🛏️🍽️🏔️💳🎉) with completed/active/upcoming states
+- **Contextual Next Labels:** "Choose Your Rooms →", "Select Meals →" based on next step content
+- **Smart Back:** History stack for correct back navigation in branching funnels
+- **Back Tooltip:** Hover preview showing "← Back to Room Selection"
+- **MicroCelebration:** Ping animation on step completion
+- **TrustBar:** Security badges on payment step (SSL, encrypted, contact)
+- **MealTimeslotGrid:** Date × meal grid with availability bars and timeslot dropdowns
+- **hideBack:** Per-step toggle to prevent backward navigation
+
 ### Known Gaps
-1. `option-picker` JSX is a stub (produces placeholder comment)
-2. Preview uses simplified types; JSX uses Everybooking API types
-3. Some widget variants don't affect generated output
+1. Preview uses simplified data types; JSX uses Everybooking API types (architectural by design)
+2. Some widget variants don't affect generated output (segment-picker variants work, others are cosmetic)
+3. Running total needs wiring from actual price calculations to BottomNav
+4. Mobile floating action island not yet built
 
 ## Navigation System
 
@@ -376,8 +392,19 @@ Bezier curves drawn between step cards with:
 - `ai-selected-model` — Selected Claude model
 - `step-rail-width` — Step rail panel width preference
 
-### No Backend Database
-Everything is in localStorage. The "Save" button persists the current funnel to the funnels array. Funnels persist across browser refreshes but are browser-specific.
+### Vercel KV (Redis) Persistence
+Funnels are persisted to Vercel KV so they're shared across devices:
+- `/api/funnels` GET — returns all funnels from KV
+- `/api/funnels` POST — saves funnel to KV (keyed by funnel ID)
+- localStorage used as fallback when KV is unavailable
+- Auto-syncs on save with 3-second debounce
+
+### localStorage Keys (browser-local cache)
+- `everybooking-funnels` — Cached funnel array
+- `everybooking-venue-data` — VenueData object
+- `ai-account-context` — AI store account context
+- `ai-selected-model` — Selected Claude model
+- `step-rail-width` — Step rail panel width preference
 
 ## Environment Variables
 
@@ -385,8 +412,12 @@ Everything is in localStorage. The "Save" button persists the current funnel to 
 |----------|----------|---------|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI chat |
 | `EDITOR_PASSWORD` | Yes | Password for the auth gate |
+| `KV_REST_API_URL` | Yes (auto) | Vercel KV endpoint (auto-set by Vercel) |
+| `KV_REST_API_TOKEN` | Yes (auto) | Vercel KV auth token (auto-set by Vercel) |
+| `PEXELS_API_KEY` | No | Pexels API key for image search (optional) |
 
-Set both in Vercel Dashboard → Settings → Environment Variables.
+Vercel KV variables are auto-injected when you connect a KV store to the project.
+Set `ANTHROPIC_API_KEY` and `EDITOR_PASSWORD` manually in Vercel Dashboard → Settings → Environment Variables.
 
 ## Deployment
 
@@ -424,4 +455,70 @@ api.syncBooking({
   ],
   customerInfo: { first_name, last_name, email, phone }
 })
+```
+
+### Rails Integration Hooks (rails-integration.ts)
+Pre-built mapping functions for when this editor is embedded in the Heroku Rails app:
+
+```typescript
+// Convert Rails product records to editor venue data
+railsProductsToRooms(products: RailsProduct[]): RoomProduct[]
+railsProductsToActivities(products: RailsProduct[]): ActivityProduct[]
+railsMealsToWidgetConfig(mealProducts: RailsProduct[], options): MealWidgetConfig
+
+// Convert editor funnel to Rails-compatible format
+funnelToRailsSurvey(funnel: FunnelDefinition): RailsSurveyData
+```
+
+When embedded in Rails:
+1. Replace localStorage/KV persistence with Rails API calls
+2. Replace `set_venue_products` AI tool with direct database reads
+3. Products come from the venue's actual Everybooking inventory (real SKUs, stock, prices)
+4. Published JSX is saved directly to the `Funnel` model's `component_code` field
+5. No more copy-paste workflow — Publish writes to database
+
+## Testing Strategy
+
+### Unit Tests (Recommended Priority)
+
+| File | What to Test | Priority |
+|------|-------------|----------|
+| `jsx-generator.ts` | Generated JSX compiles, has correct step count, proper branching | **Critical** |
+| `ai-executor.ts` | Tool calls map correctly to store actions | **Critical** |
+| `funnel-store.ts` | CRUD operations, undo/redo, step reordering | **High** |
+| `schemas.ts` | Factory functions produce valid defaults | **High** |
+| `variable-engine.ts` | Variable binding resolution | **Medium** |
+| `ai-prompts.ts` | System prompt includes expected sections | **Medium** |
+| Widget templates | Each template has valid configFields, inputs, outputs | **Medium** |
+
+### Integration Tests
+
+| Flow | What to Test |
+|------|-------------|
+| AI → Funnel creation | Send "create a retreat funnel" → verify steps/widgets created |
+| AI → Widget config | Dock to widget, send edit → verify config updated |
+| Funnel → JSX | Create funnel → publish → verify JSX compiles without errors |
+| Branching | Create branching funnel → verify no orphan steps |
+| Meal widget | Configure meals → verify timeslot grid renders with correct dates |
+
+### Testing the Generated JSX
+The most critical test: does the published JSX actually work on Everybooking?
+
+1. Create a funnel in the editor
+2. Click Publish → copy JSX
+3. Paste into Everybooking's React Funnel editor for a test venue
+4. Verify: rooms load, meals show timeslot grid, activities display, invoice generates, payment works
+
+### Snapshot Tests
+Consider snapshot tests for `jsx-generator.ts` output — create a reference funnel definition and snapshot the generated JSX. Any change to the generator shows up as a diff.
+
+```typescript
+// Example test
+test('generates valid JSX for Wilderness Edge funnel', () => {
+  const funnel = createTestFunnel(); // 22-step branching funnel
+  const jsx = generateFunnelJSX(funnel);
+  expect(jsx).toMatchSnapshot();
+  // Verify no syntax errors
+  expect(() => new Function(jsx)).not.toThrow(); // basic syntax check
+});
 ```
