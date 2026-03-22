@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Hybrid Funnel Editor",
   description: "Visual editor for creating booking funnels with reusable widget templates",
+};
+
+export const viewport: Viewport = {
+  width: 1280,
+  initialScale: 0.5,
+  minimumScale: 0.25,
+  maximumScale: 3,
+  userScalable: true,
 };
 
 export default function RootLayout({
