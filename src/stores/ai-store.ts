@@ -505,17 +505,26 @@ export const useAiStore = create<AiStore>((set, get) => {
                     venueData.meals.length > 0 ? `${venueData.meals.length} meals` : null,
                     venueData.activities.length > 0 ? `${venueData.activities.length} activities` : null,
                   ].filter(Boolean).join(", ");
-                  // Auto-detect venue type from name for layout decisions
+                  // Auto-detect business type from name for layout and language decisions
                   const vn = (venueData.venueName || "").toLowerCase();
-                  let detectedType = "resort";
+                  let detectedType = "other";
                   if (vn.includes("retreat") || vn.includes("camp")) detectedType = "retreat-center";
                   else if (vn.includes("conference") || vn.includes("convention")) detectedType = "conference-center";
-                  else if (vn.includes("wedding") || vn.includes("banquet")) detectedType = "wedding-venue";
-                  else if (vn.includes("spa") || vn.includes("wellness")) detectedType = "spa";
+                  else if (vn.includes("wedding") || vn.includes("banquet") || vn.includes("event hall")) detectedType = "wedding-venue";
+                  else if (vn.includes("spa") || vn.includes("wellness") || vn.includes("therapy")) detectedType = "spa";
                   else if (vn.includes("hostel") || vn.includes("budget")) detectedType = "hostel";
-                  else if (vn.includes("boutique") || vn.includes("b&b") || vn.includes("inn")) detectedType = "boutique";
-                  else if (vn.includes("hotel") || vn.includes("lodge")) detectedType = "hotel";
-                  else if (vn.includes("villa") || vn.includes("cabin")) detectedType = "villa";
+                  else if (vn.includes("boutique") || vn.includes("b&b") || vn.includes("inn") || vn.includes("bed and breakfast")) detectedType = "boutique";
+                  else if (vn.includes("hotel") || vn.includes("lodge") || vn.includes("motel")) detectedType = "hotel";
+                  else if (vn.includes("villa") || vn.includes("cabin") || vn.includes("cottage")) detectedType = "villa";
+                  else if (vn.includes("resort")) detectedType = "resort";
+                  else if (vn.includes("rental") || vn.includes("equipment") || vn.includes("hire")) detectedType = "equipment-rental";
+                  else if (vn.includes("production") || vn.includes("staging") || vn.includes("av ")) detectedType = "event-production";
+                  else if (vn.includes("training") || vn.includes("academy") || vn.includes("school") || vn.includes("institute")) detectedType = "training-center";
+                  else if (vn.includes("medical") || vn.includes("clinic") || vn.includes("dental") || vn.includes("health")) detectedType = "medical";
+                  else if (vn.includes("charter") || vn.includes("yacht") || vn.includes("boat") || vn.includes("marine")) detectedType = "charter";
+                  else if (vn.includes("construct") || vn.includes("contractor") || vn.includes("building")) detectedType = "construction";
+                  else if (vn.includes("photo") || vn.includes("video") || vn.includes("studio") || vn.includes("film")) detectedType = "photography";
+                  else if (vn.includes("cater") || vn.includes("restaurant") || vn.includes("kitchen") || vn.includes("chef")) detectedType = "catering";
 
                   // Update account context with venue name and detected type
                   const currentCtx = get().accountContext;
