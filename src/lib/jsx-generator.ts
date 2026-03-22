@@ -1009,9 +1009,11 @@ function generateMainFunnel(
   lines.push(`  useEffect(() => { const id = 'funnel-rich-text-styles'; if (document.getElementById(id)) return; const s = document.createElement('style'); s.id = id; s.textContent = \`.we-rich-text{font-size:12px;line-height:1.6;color:\${THEME.outline}}.we-rich-text ul{list-style:disc;padding-left:1.2em;margin:4px 0}.we-rich-text p{margin:4px 0}.we-rich-text strong{font-weight:700;color:\${THEME.onSurface}}.we-rich-text a{color:\${THEME.primary};text-decoration:underline}\`; document.head.appendChild(s); }, []);`);
   lines.push(``);
 
-  // --- Animation helper (matches wilderness-edge-funnel.jsx) ---
+  // --- Navigation history stack for correct Back behavior in branching funnels ---
+  lines.push(`  const [stepHistory, setStepHistory] = useState([]);`);
   lines.push(`  const animRef = useRef(null);`);
-  lines.push(`  const goTo = useCallback(ns => { if (animRef.current) clearTimeout(animRef.current); setAnimating(true); animRef.current = setTimeout(() => { setStep(ns); setAnimating(false); setError(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 180); }, []);`);
+  lines.push(`  const goTo = useCallback(ns => { if (animRef.current) clearTimeout(animRef.current); setAnimating(true); setStepHistory(prev => [...prev, step]); animRef.current = setTimeout(() => { setStep(ns); setAnimating(false); setError(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 180); }, [step]);`);
+  lines.push(`  const goBack = useCallback(() => { if (stepHistory.length === 0) return; const prev = stepHistory[stepHistory.length - 1]; setStepHistory(h => h.slice(0, -1)); if (animRef.current) clearTimeout(animRef.current); setAnimating(true); animRef.current = setTimeout(() => { setStep(prev); setAnimating(false); setError(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }, 180); }, [stepHistory]);`);
   lines.push(`  useEffect(() => () => { if (animRef.current) clearTimeout(animRef.current); }, []);`);
   lines.push(``);
 
@@ -1237,7 +1239,7 @@ function generateMainFunnel(
 
       if (isContactStep && isLastBeforeInvoice) {
         lines.push(`            <BottomNav`);
-        if (prevStepId) lines.push(`              onBack={() => goTo('${prevStepId}')}`);
+        if (prevStepId) lines.push(`              onBack={goBack}`);
         lines.push(`              onNext={handleGenerateInvoice}`);
         lines.push(`              nextLabel="${escapeJsx(step.navigation.nextLabel || "Generate My Quote")}"`);
         lines.push(`              loading={submitting}`);
@@ -1245,7 +1247,7 @@ function generateMainFunnel(
         lines.push(`            />`);
       } else {
         lines.push(`            <BottomNav`);
-        if (prevStepId) lines.push(`              onBack={() => goTo('${prevStepId}')}`);
+        if (prevStepId) lines.push(`              onBack={goBack}`);
         if (nextStepId) {
           // Add validation logic before advancing
           if (widgetTemplates.includes("guest-rooms")) {
