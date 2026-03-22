@@ -225,7 +225,10 @@ export const useAiStore = create<AiStore>((set, get) => {
     const aiContext = buildAiContext(funnel, state.accountContext, state.funnelContext);
 
     // Format messages for API -- include tool results in conversation
-    const apiMessages = buildApiMessages(updatedMessages);
+    // Inject a live funnel state snapshot into the last user message so the AI
+    // always sees the real-time state (e.g., after undo/redo) rather than trusting
+    // its conversation history which may be stale.
+    const apiMessages = buildApiMessages(updatedMessages, funnel);
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -499,7 +502,7 @@ export const useAiStore = create<AiStore>((set, get) => {
         // Continue the conversation with tool results
         const updatedFunnel = useFunnelStore.getState().funnel;
         const continuationContext = buildAiContext(updatedFunnel, state.accountContext, state.funnelContext);
-        const continuationApiMessages = buildApiMessages(allMessages);
+        const continuationApiMessages = buildApiMessages(allMessages, updatedFunnel);
 
         const contResponse = await fetch("/api/ai/chat", {
           method: "POST",
@@ -523,16 +526,41 @@ export const useAiStore = create<AiStore>((set, get) => {
   },
 };});
 
+// Build a compact snapshot of the current funnel state to inject into user messages
+function buildLiveStateSnapshot(funnel: FunnelDefinition | null): string {
+  if (!funnel || funnel.steps.length === 0) {
+    return "\n\n[LIVE FUNNEL STATE: Empty — 0 steps]";
+  }
+  const stepList = funnel.steps
+    .slice(0, 60)
+    .map((s, i) => {
+      const widgets = s.widgets.map((w) => w.templateId).join(", ");
+      return `  [${i}] "${s.title}" ${widgets ? `(${widgets})` : "(no widgets)"}`;
+    })
+    .join("\n");
+  const truncNote = funnel.steps.length > 60 ? `\n  ... +${funnel.steps.length - 60} more` : "";
+  return `\n\n[LIVE FUNNEL STATE — this overrides any prior conversation about what exists:
+Name: "${funnel.name}" | ${funnel.steps.length} steps
+${stepList}${truncNote}]`;
+}
+
 // Build API message format from our internal messages
 function buildApiMessages(
-  messages: AiMessage[]
+  messages: AiMessage[],
+  currentFunnel?: FunnelDefinition | null,
 ): Array<{ role: string; content: string | Array<Record<string, unknown>> }> {
   const apiMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [];
+  const stateSnapshot = currentFunnel !== undefined ? buildLiveStateSnapshot(currentFunnel) : "";
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
 
     if (msg.role === "user") {
+      const isLastUserMsg = i === messages.length - 1 || !messages.slice(i + 1).some((m) => m.role === "user");
+      // Append live state snapshot to the last user message so the AI sees
+      // the real-time funnel state (handles undo/redo, manual edits, etc.)
+      const suffix = isLastUserMsg ? stateSnapshot : "";
+
       const hasImages = msg.images && msg.images.length > 0;
       const hasFiles = msg.files && msg.files.length > 0;
 
@@ -580,11 +608,11 @@ function buildApiMessages(
           }
         }
 
-        // Add the user's text message last
-        blocks.push({ type: "text", text: msg.content || "Please review the attached files." });
+        // Add the user's text message last (with state snapshot if last user msg)
+        blocks.push({ type: "text", text: (msg.content || "Please review the attached files.") + suffix });
         apiMessages.push({ role: "user", content: blocks });
       } else {
-        apiMessages.push({ role: "user", content: msg.content });
+        apiMessages.push({ role: "user", content: msg.content + suffix });
       }
     } else if (msg.role === "assistant") {
       // Build assistant content blocks
