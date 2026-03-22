@@ -627,7 +627,7 @@ function MealPickerPreview({
     <div className="space-y-3">
       {/* Title */}
       <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">
-        {(config.title as string) || "Meals"}
+        {String(config.title || "Meals")}
       </h3>
       {config.subtitle && (
         <p className="text-sm text-gray-500">{String(config.subtitle)}</p>
