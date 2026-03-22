@@ -131,8 +131,8 @@ function deriveConnections(funnel: FunnelDefinition): {
 }
 
 // --- Build layout rows with full path tracing ---
-// Traces ALL paths through the funnel (not just segment-picker branches)
-// to detect which steps are branch-exclusive vs shared convergence points
+// Uses topological ordering + path-exclusive analysis to detect parallel paths
+// from BOTH segment-picker branches AND conditionalNext navigation
 function buildLayoutRows(
   funnel: FunnelDefinition,
   branchMap: Map<string, { targets: string[]; labels: string[]; colors: string[] }>
@@ -142,41 +142,49 @@ function buildLayoutRows(
   const stepIdToIdx = new Map<string, number>();
   funnel.steps.forEach((s, i) => stepIdToIdx.set(s.id, i));
 
-  // 1. Build adjacency: for each step, where does it go?
-  // nextMap = primary next target (for path tracing)
-  // allNextMap = ALL targets including conditional (for reachability)
-  const nextMap = new Map<string, string>(); // stepId → primary next stepId
-  const allNextMap = new Map<string, string[]>(); // stepId → all next stepIds
+  // 1. Build full adjacency graph — ALL outgoing connections per step
+  const allOutgoing = new Map<string, string[]>(); // stepId → all target stepIds
+  const allIncoming = new Map<string, string[]>(); // stepId → all source stepIds
+
+  const addEdge = (from: string, to: string) => {
+    if (!allOutgoing.has(from)) allOutgoing.set(from, []);
+    if (!allOutgoing.get(from)!.includes(to)) allOutgoing.get(from)!.push(to);
+    if (!allIncoming.has(to)) allIncoming.set(to, []);
+    if (!allIncoming.get(to)!.includes(from)) allIncoming.get(to)!.push(from);
+  };
+
   for (let i = 0; i < funnel.steps.length; i++) {
     const step = funnel.steps[i];
-    const allTargets: string[] = [];
+    let hasExplicitNav = false;
 
-    // Conditional navigation targets
-    if (step.navigation.conditionalNext) {
+    // Segment-picker branches
+    const branch = branchMap.get(step.id);
+    if (branch) {
+      for (const t of branch.targets) addEdge(step.id, t);
+      hasExplicitNav = true;
+    }
+
+    // Conditional navigation
+    if (step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0) {
       for (const rule of step.navigation.conditionalNext) {
-        if (stepIdToIdx.has(rule.targetStepId)) {
-          allTargets.push(rule.targetStepId);
-        }
+        if (stepIdToIdx.has(rule.targetStepId)) addEdge(step.id, rule.targetStepId);
       }
+      hasExplicitNav = true;
     }
 
-    // Check navigation.next first
+    // Explicit navigation.next
     if (step.navigation.next && stepIdToIdx.has(step.navigation.next)) {
-      nextMap.set(step.id, step.navigation.next);
-      allTargets.push(step.navigation.next);
-    } else if (i < funnel.steps.length - 1) {
-      // Default: next step in list (unless this step has segment-picker branches or conditional nav)
-      const hasBranch = branchMap.has(step.id);
-      const hasConditional = step.navigation.conditionalNext && step.navigation.conditionalNext.length > 0;
-      if (!hasBranch && !hasConditional) {
-        nextMap.set(step.id, funnel.steps[i + 1].id);
-        allTargets.push(funnel.steps[i + 1].id);
-      }
+      addEdge(step.id, step.navigation.next);
+      hasExplicitNav = true;
     }
-    if (allTargets.length > 0) allNextMap.set(step.id, allTargets);
+
+    // Default: next step in list (only if no explicit nav)
+    if (!hasExplicitNav && i < funnel.steps.length - 1) {
+      addEdge(step.id, funnel.steps[i + 1].id);
+    }
   }
 
-  // 2. Find the first branching point (segment-picker with multiple targets)
+  // 2. Find the first branching point (segment-picker with 2+ targets)
   let branchStepId: string | null = null;
   let branchInfo: { targets: string[]; labels: string[]; colors: string[] } | null = null;
   for (const [stepId, info] of branchMap) {
@@ -187,18 +195,46 @@ function buildLayoutRows(
     }
   }
 
-  // 3. If no branching, just list all steps linearly
+  // 3. If no segment-picker branching, check for conditionalNext branching
+  if (!branchStepId) {
+    for (const step of funnel.steps) {
+      const cond = step.navigation.conditionalNext;
+      if (cond && cond.length > 0) {
+        const targets: string[] = [];
+        const labels: string[] = [];
+        const colors: string[] = [];
+        for (const rule of cond) {
+          if (stepIdToIdx.has(rule.targetStepId)) {
+            targets.push(rule.targetStepId);
+            labels.push(rule.label || `${rule.value}`);
+            colors.push(SEGMENT_COLORS[targets.length - 1 % SEGMENT_COLORS.length]);
+          }
+        }
+        // Add default fallback as a branch target
+        if (step.navigation.next && stepIdToIdx.has(step.navigation.next)) {
+          targets.push(step.navigation.next);
+          labels.push("default");
+          colors.push("#94a3b8");
+        }
+        if (targets.length > 1) {
+          branchStepId = step.id;
+          branchInfo = { targets, labels, colors };
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. If still no branching, linear layout
   if (!branchStepId || !branchInfo) {
     return funnel.steps.map((s) => ({ type: "single" as const, stepIds: [s.id] }));
   }
 
-  // 4. Trace each branch path to find which steps are branch-exclusive
-  // Tag each step with which branch indices can reach it
-  const stepBranches = new Map<string, Set<number>>(); // stepId → set of branch indices
+  // 5. BFS path tracing from each branch target
   const branchTargets = branchInfo.targets;
+  const stepBranches = new Map<string, Set<number>>(); // stepId → set of branch indices
 
   for (let bi = 0; bi < branchTargets.length; bi++) {
-    // BFS to trace all reachable steps from this branch (follows conditional targets too)
     const queue = [branchTargets[bi]];
     const visited = new Set<string>();
     while (queue.length > 0) {
@@ -207,30 +243,12 @@ function buildLayoutRows(
       visited.add(current);
       if (!stepBranches.has(current)) stepBranches.set(current, new Set());
       stepBranches.get(current)!.add(bi);
-      // Follow ALL targets (conditional + default)
-      const targets = allNextMap.get(current) || [];
+      const targets = allOutgoing.get(current) || [];
       for (const t of targets) queue.push(t);
-      // Also follow primary next if not in allNextMap
-      const primary = nextMap.get(current);
-      if (primary && !targets.includes(primary)) queue.push(primary);
     }
   }
 
-  // 4b. Reverse propagation for orphan steps:
-  // Build reverse map (who navigates TO each step?)
-  const incomingMap = new Map<string, string[]>();
-  for (const [from, to] of nextMap) {
-    if (!incomingMap.has(to)) incomingMap.set(to, []);
-    incomingMap.get(to)!.push(from);
-  }
-  // Also add segment picker branch targets
-  for (const target of branchTargets) {
-    if (!incomingMap.has(target)) incomingMap.set(target, []);
-    incomingMap.get(target)!.push(branchStepId);
-  }
-
-  // For steps with no branch tags, try to inherit from incoming connections
-  // Repeat until stable
+  // 5b. Reverse propagation for orphans
   let changed = true;
   let iterations = 0;
   while (changed && iterations < 10) {
@@ -239,41 +257,37 @@ function buildLayoutRows(
     for (const step of funnel.steps) {
       if (step.id === branchStepId) continue;
       const existing = stepBranches.get(step.id);
-      if (existing && existing.size > 0) continue; // already tagged
-
-      // Check incoming connections
-      const sources = incomingMap.get(step.id) || [];
+      if (existing && existing.size > 0) continue;
+      const sources = allIncoming.get(step.id) || [];
       for (const srcId of sources) {
-        const srcBranches = stepBranches.get(srcId);
-        if (srcBranches && srcBranches.size > 0) {
+        const srcTags = stepBranches.get(srcId);
+        if (srcTags && srcTags.size > 0) {
           if (!stepBranches.has(step.id)) stepBranches.set(step.id, new Set());
-          for (const b of srcBranches) stepBranches.get(step.id)!.add(b);
+          for (const b of srcTags) stepBranches.get(step.id)!.add(b);
           changed = true;
         }
       }
     }
-    // Forward propagate from newly tagged steps
-    if (changed) {
-      for (const step of funnel.steps) {
-        const tags = stepBranches.get(step.id);
-        if (!tags || tags.size === 0) continue;
-        const nextId = nextMap.get(step.id);
-        if (nextId) {
-          if (!stepBranches.has(nextId)) stepBranches.set(nextId, new Set());
-          const nextTags = stepBranches.get(nextId)!;
-          for (const b of tags) {
-            if (!nextTags.has(b)) { nextTags.add(b); changed = true; }
-          }
+    // Forward propagate
+    for (const step of funnel.steps) {
+      const tags = stepBranches.get(step.id);
+      if (!tags || tags.size === 0) continue;
+      const targets = allOutgoing.get(step.id) || [];
+      for (const t of targets) {
+        if (!stepBranches.has(t)) stepBranches.set(t, new Set());
+        const tTags = stepBranches.get(t)!;
+        for (const b of tags) {
+          if (!tTags.has(b)) { tTags.add(b); changed = true; }
         }
       }
     }
   }
 
-  // 5. Build layout rows by processing steps in order
+  // 6. Build layout rows
   const rows: LayoutRow[] = [];
   const placed = new Set<string>();
 
-  // Place steps BEFORE the branch point
+  // Place steps before the branch point
   for (const step of funnel.steps) {
     if (step.id === branchStepId) break;
     if (placed.has(step.id)) continue;
@@ -281,17 +295,13 @@ function buildLayoutRows(
     placed.add(step.id);
   }
 
-  // Place the branch point itself
+  // Place the branch point
   rows.push({ type: "single", stepIds: [branchStepId] });
   placed.add(branchStepId);
 
-  // 6. Process remaining steps, grouping by branch membership
-  // Collect steps that haven't been placed yet
+  // 7. Process remaining steps — scan ALL unplaced steps for parallel partners
   const remaining = funnel.steps.filter((s) => !placed.has(s.id));
 
-  // Group steps into parallel columns based on branch membership
-  // A step NOT reachable from ALL branches is branch-specific and should be
-  // placed side-by-side with steps from other branches at the same "level"
   let i = 0;
   while (i < remaining.length) {
     const step = remaining[i];
@@ -299,8 +309,7 @@ function buildLayoutRows(
     const branches = stepBranches.get(step.id);
 
     if (!branches || branches.size === 0) {
-      // NOT reachable from ANY branch = ORPHAN step
-      // Collect consecutive orphans into one orphan group
+      // Orphan
       const orphanGroup: string[] = [step.id];
       placed.add(step.id);
       for (let j = i + 1; j < remaining.length; j++) {
@@ -310,50 +319,44 @@ function buildLayoutRows(
         if (!nb || nb.size === 0) {
           orphanGroup.push(ns.id);
           placed.add(ns.id);
-        } else {
-          break;
-        }
+        } else break;
       }
       rows.push({ type: "orphan", stepIds: orphanGroup });
       i++;
     } else if (branches.size === branchTargets.length) {
-      // Reachable from ALL branches = convergence point → single row
+      // Convergence — reachable from ALL branches
       rows.push({ type: "single", stepIds: [step.id] });
       placed.add(step.id);
       i++;
     } else {
-      // This step is branch-specific (reachable from SOME but not ALL branches)
-      // Collect nearby unplaced steps that cover DIFFERENT branches for parallel layout
-      // Use the "primary branch" = lowest branch index in the set
+      // Branch-specific — scan ALL remaining unplaced steps for parallel partners
       const primaryBranch = Math.min(...branches);
       const parallelGroup: { stepId: string; branchSet: Set<number>; primaryBranch: number }[] = [
         { stepId: step.id, branchSet: branches, primaryBranch }
       ];
       placed.add(step.id);
 
-      // Look ahead for steps covering different branches
-      for (let j = i + 1; j < remaining.length; j++) {
-        const nextStep = remaining[j];
-        if (placed.has(nextStep.id)) continue;
-        const nb = stepBranches.get(nextStep.id);
-        if (!nb || nb.size === 0 || nb.size === branchTargets.length) {
-          break; // Hit convergence, stop collecting
-        }
-        const nextPrimary = Math.min(...nb);
-        // Check if this step covers different branches than already collected
+      // Scan ALL remaining (not just consecutive) for non-overlapping branch sets
+      for (let j = 0; j < remaining.length; j++) {
+        if (j === i) continue;
+        const candidate = remaining[j];
+        if (placed.has(candidate.id)) continue;
+        const cb = stepBranches.get(candidate.id);
+        if (!cb || cb.size === 0 || cb.size === branchTargets.length) continue;
+
+        // Check no overlap with any already-collected step
         const overlaps = parallelGroup.some((g) => {
-          for (const b of nb) { if (g.branchSet.has(b)) return true; }
+          for (const b of cb) { if (g.branchSet.has(b)) return true; }
           return false;
         });
         if (!overlaps) {
-          // Non-overlapping branch set — add to parallel group
-          parallelGroup.push({ stepId: nextStep.id, branchSet: nb, primaryBranch: nextPrimary });
-          placed.add(nextStep.id);
+          const cp = Math.min(...cb);
+          parallelGroup.push({ stepId: candidate.id, branchSet: cb, primaryBranch: cp });
+          placed.add(candidate.id);
         }
       }
 
       if (parallelGroup.length > 1) {
-        // Sort by primary branch for consistent ordering
         parallelGroup.sort((a, b) => a.primaryBranch - b.primaryBranch);
         rows.push({
           type: "parallel",
@@ -362,14 +365,13 @@ function buildLayoutRows(
           labels: parallelGroup.map((g) => branchInfo!.labels[g.primaryBranch] || ""),
         });
       } else {
-        // Only one step with this branch set — place as single with branch color
         rows.push({ type: "single", stepIds: [step.id] });
       }
       i++;
     }
   }
 
-  // 7. Add any steps that weren't placed (shouldn't happen but safety)
+  // Safety: any unplaced steps
   for (const step of funnel.steps) {
     if (!placed.has(step.id)) {
       rows.push({ type: "single", stepIds: [step.id] });
