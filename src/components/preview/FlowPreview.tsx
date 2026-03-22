@@ -455,28 +455,39 @@ function StepCard({
         {step.widgets.length === 0 ? (
           <div className="text-center py-4 text-gray-300 text-xs border border-dashed border-gray-200 rounded-lg">No widgets</div>
         ) : (
-          step.widgets.map((widget) => (
+          step.widgets.map((widget) => {
+            // In flow mode, highlight is driven by dockedWidgetId (set on double-click)
+            // Single click just selects for the editor panel, double-click docks AI
+            const isDocked = selectedWidgetId === widget.instanceId;
+            return (
             <div
               key={widget.instanceId}
               onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                // Check if user double-clicked a specific item within the widget
                 const target = e.target as HTMLElement;
                 const itemEl = target.closest("[data-item-label]") as HTMLElement | null;
                 const focusedItem = itemEl?.getAttribute("data-item-label") || undefined;
                 onWidgetDoubleClick?.(widget.instanceId, focusedItem);
               }}
+              style={isDocked ? {
+                outline: `3px solid ${theme.primaryColor}`,
+                outlineOffset: "2px",
+                borderRadius: "8px",
+                boxShadow: `0 0 12px ${theme.primaryColor}40`,
+              } : undefined}
             >
               <FlowWidgetRenderer
                 widget={widget}
                 theme={theme}
-                isSelected={selectedWidgetId === widget.instanceId}
-                onClick={() => {/* handled by wrapper div */}}
+                isSelected={isDocked}
+                onClick={() => {}}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
               />
             </div>
+            );
+          }
           ))
         )}
       </div>
