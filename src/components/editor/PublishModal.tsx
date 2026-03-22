@@ -46,21 +46,25 @@ export function PublishModal({ jsxCode, funnelName, onClose }: PublishModalProps
     }
   }, [jsxCode]);
 
-  const handleDownload = useCallback(() => {
-    const blob = new Blob([jsxCode], { type: "text/javascript" });
+  const downloadFile = useCallback((content: string, name: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = fileName;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    downloadFile(jsxCode, fileName, "text/javascript");
   }, [jsxCode, fileName]);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[60] flex items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -118,6 +122,16 @@ export function PublishModal({ jsxCode, funnelName, onClose }: PublishModalProps
                 <path d="M3 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
               Download .jsx
+            </button>
+            <button
+              onClick={() => downloadFile(jsxCode, fileName.replace(".jsx", ".txt"), "text/plain")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v8m0 0l3-3m-3 3L5 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3 12h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              Download .txt
             </button>
             <button
               onClick={onClose}
