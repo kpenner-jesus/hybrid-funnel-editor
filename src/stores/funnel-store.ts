@@ -128,6 +128,21 @@ function saveFunnelsToStorage(funnels: FunnelDefinition[]) {
   localStorage.setItem("hybrid-funnel-editor-funnels", JSON.stringify(funnels));
 }
 
+// Auto-save: debounced save to localStorage after every mutation
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleAutoSave(getFn: () => { funnel: FunnelDefinition | null; funnels: FunnelDefinition[] }) {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    const { funnel, funnels } = getFn();
+    if (!funnel) return;
+    const updated = { ...funnel, updatedAt: new Date().toISOString() };
+    const newFunnels = funnels.some((f) => f.id === updated.id)
+      ? funnels.map((f) => (f.id === updated.id ? updated : f))
+      : [...funnels, updated];
+    saveFunnelsToStorage(newFunnels);
+  }, 500); // 500ms debounce — won't thrash localStorage during rapid AI tool calls
+}
+
 // --- Undo/Redo History ---
 
 const MAX_HISTORY = 50;
@@ -271,12 +286,30 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
       set({ funnels: [example], initialized: true });
     } else {
       set({ funnels: stored, initialized: true });
+      // Auto-load last active funnel
+      try {
+        const lastId = localStorage.getItem("hybrid-funnel-editor-active-funnel");
+        if (lastId) {
+          const funnel = stored.find((f) => f.id === lastId);
+          if (funnel) {
+            set({
+              funnel,
+              previewStep: funnel.steps[0]?.id || null,
+              selectedStepId: funnel.steps[0]?.id || null,
+              isDirty: false,
+            });
+          }
+        }
+      } catch { /* ignore */ }
     }
   },
 
   loadFunnel: (id) => {
     const { funnels } = get();
     const funnel = funnels.find((f) => f.id === id) || null;
+    if (funnel) {
+      try { localStorage.setItem("hybrid-funnel-editor-active-funnel", funnel.id); } catch {}
+    }
     set({
       funnel,
       selectedStepId: funnel?.steps[0]?.id || null,
@@ -291,8 +324,11 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     const { funnel, funnels } = get();
     if (!funnel) return;
     const updated = { ...funnel, updatedAt: new Date().toISOString() };
-    const newFunnels = funnels.map((f) => (f.id === updated.id ? updated : f));
+    const newFunnels = funnels.some((f) => f.id === updated.id)
+      ? funnels.map((f) => (f.id === updated.id ? updated : f))
+      : [...funnels, updated];
     saveFunnelsToStorage(newFunnels);
+    try { localStorage.setItem("hybrid-funnel-editor-active-funnel", updated.id); } catch {}
     set({ funnel: updated, funnels: newFunnels, isDirty: false });
   },
 
@@ -510,3 +546,13 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     return resolved;
   },
 }));
+
+// --- Auto-save subscriber: persist funnel to localStorage on every mutation ---
+useFunnelStore.subscribe((state, prevState) => {
+  if (state.isDirty && state.funnel) {
+    scheduleAutoSave(() => ({
+      funnel: useFunnelStore.getState().funnel,
+      funnels: useFunnelStore.getState().funnels,
+    }));
+  }
+});
