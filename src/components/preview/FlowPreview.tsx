@@ -312,8 +312,8 @@ export function FlowPreview() {
     hasInitialized.current = true;
 
     const cw = containerRef.current.clientWidth;
-    // Zoom to fill 92% of viewport width, cap at 85%
-    const targetZoom = Math.min(0.85, (cw * 0.92) / contentWidth);
+    // Zoom to fill 80% of viewport width, cap at 65% for comfortable overview
+    const targetZoom = Math.min(0.65, (cw * 0.80) / contentWidth);
     const scaledW = contentWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
 
