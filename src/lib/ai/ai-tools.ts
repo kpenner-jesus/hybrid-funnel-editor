@@ -42,6 +42,7 @@ export const aiTools: AiToolDefinition[] = [
           items: {
             type: "object",
             properties: {
+              id: { type: "string", description: "Optional step ID for cross-referencing in branching funnels. Use short kebab-case IDs like 'retreat-type', 'group-dates', 'contact'. Other steps and segment-picker nextStep can reference these IDs." },
               title: { type: "string", description: "Step title" },
               layout: {
                 type: "string",
@@ -53,6 +54,7 @@ export const aiTools: AiToolDefinition[] = [
                 properties: {
                   nextLabel: { type: "string" },
                   backLabel: { type: "string" },
+                  next: { type: "string", description: "Step ID to navigate to when clicking Next. Use this to skip steps in branching funnels (e.g., after Retreat Type, jump to 'group-dates' instead of Conference Type)." },
                 },
               },
               widgets: {

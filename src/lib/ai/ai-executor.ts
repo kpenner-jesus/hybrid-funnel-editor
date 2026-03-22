@@ -63,6 +63,10 @@ export function executeAiToolCall(
         const newSteps: Step[] = [];
         for (const sd of stepsData) {
           const step = createEmptyStep((sd.title as string) || "Untitled Step");
+          // Allow AI to specify a custom step ID for cross-referencing in branching
+          if (sd.id && typeof sd.id === "string") {
+            step.id = sd.id;
+          }
           if (sd.layout) step.layout = sd.layout as Step["layout"];
           if (sd.navigation) {
             const nav = sd.navigation as Record<string, string>;
@@ -70,6 +74,7 @@ export function executeAiToolCall(
               ...step.navigation,
               ...(nav.nextLabel !== undefined ? { nextLabel: nav.nextLabel } : {}),
               ...(nav.backLabel !== undefined ? { backLabel: nav.backLabel } : {}),
+              ...(nav.next !== undefined ? { next: nav.next } : {}),
             };
           }
 

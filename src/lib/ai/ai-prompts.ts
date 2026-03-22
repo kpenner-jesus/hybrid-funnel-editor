@@ -141,6 +141,23 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 7. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
 8. Reference steps and widgets by their zero-based index.
 12. **CRITICAL: For option-picker widgets with static choices** (retreat types, conference types, wedding types, etc.), put the options DIRECTLY in the config \`options\` field as a JSON string. Do NOT bind them to a variable — there is no upstream widget producing those variables. Example config: \`"options": "[{\\"id\\":\\"church\\",\\"label\\":\\"Church / Faith-based\\",\\"icon\\":\\"⛪\\"},...]"\`. Only use input bindings for \`options\` when another widget dynamically generates the option list.
+13. **CRITICAL: BRANCHING FUNNEL WIRING.** When creating funnels with segment-picker branching:
+    - **Assign step IDs** to every step using the \`id\` field (e.g., "welcome", "retreat-type", "group-dates", "contact").
+    - **Set nextStep on segment-picker options** to point to the correct step ID. Each option's \`nextStep\` must be the step ID it branches to. Example: \`"nextStep": "retreat-type"\`.
+    - **Set navigation.next on branch steps** so they SKIP other branch steps and jump to the convergence point. Example: "Retreat Type" step should have \`navigation: { next: "group-dates" }\` to skip Conference Type, Family Gathering, and Wedding Type.
+    - **WITHOUT explicit wiring, all steps flow linearly** — a guest who picks "Group Retreat" would walk through Conference Type, Family Gathering, AND Wedding Type before reaching Dates. This is a CRITICAL bug.
+    - Example branching pattern:
+      \`\`\`
+      Step "welcome" (segment-picker with options):
+        - "Group Retreat" → nextStep: "retreat-type"
+        - "Conference" → nextStep: "conference-type"
+        - "Wedding" → nextStep: "wedding-type"
+        - "Individual" → nextStep: "individual-dates"
+      Step "retreat-type" (id: "retreat-type", navigation.next: "group-dates")
+      Step "conference-type" (id: "conference-type", navigation.next: "group-dates")
+      Step "wedding-type" (id: "wedding-type", navigation.next: "group-dates")
+      Step "group-dates" (id: "group-dates") ← convergence point
+      \`\`\`
 9. **BREVITY IS CRITICAL.** After creating or modifying a funnel:
    - Do NOT list every step, widget, or feature you created. The user can see the result in the preview.
    - Only mention SURPRISES: things you changed from what was requested, problems you encountered, decisions you made, or missing data.
