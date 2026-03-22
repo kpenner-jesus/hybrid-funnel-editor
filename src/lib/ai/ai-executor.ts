@@ -1,6 +1,7 @@
 import type { FunnelDefinition, Step, ThemeConfig, WidgetInstance } from "@/lib/types";
 import { createEmptyStep, createEmptyFunnel, createWidgetInstance } from "@/lib/schemas";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
+import { useVenueDataStore } from "@/stores/venue-data-store";
 
 export interface ToolCallResult {
   success: boolean;
@@ -20,6 +21,33 @@ interface StoreActions {
   updateWidgetBindings: (stepId: string, widgetId: string, bindings: WidgetInstance["bindings"]) => void;
   updateWidgetVariant: (stepId: string, widgetId: string, variant: string) => void;
   setTheme: (theme: Partial<ThemeConfig>) => void;
+}
+
+// Default timeslot windows per meal category
+function getDefaultTimeslot(category: string): { start: string; end: string } {
+  const cat = category.toLowerCase();
+  if (cat.includes("breakfast") || cat.includes("brunch")) return { start: "07:00", end: "09:00" };
+  if (cat.includes("lunch")) return { start: "12:00", end: "14:00" };
+  if (cat.includes("supper") || cat.includes("dinner")) return { start: "17:00", end: "19:00" };
+  if (cat.includes("snack") || cat.includes("night")) return { start: "20:00", end: "22:00" };
+  if (cat.includes("tea") || cat.includes("afternoon")) return { start: "14:00", end: "16:00" };
+  return { start: "12:00", end: "13:00" };
+}
+
+// Default day selectability rules per meal category
+function getDefaultDayRule(category: string, dayPosition: "checkIn" | "checkOut"): string {
+  const cat = category.toLowerCase();
+  if (dayPosition === "checkIn") {
+    // Breakfast unavailable on check-in day (guests arrive mid-day)
+    if (cat.includes("breakfast") || cat.includes("brunch")) return "unselectable";
+    return "selectable";
+  }
+  if (dayPosition === "checkOut") {
+    // Supper/snack unavailable on check-out day (guests leave)
+    if (cat.includes("supper") || cat.includes("dinner") || cat.includes("snack") || cat.includes("night")) return "unselectable";
+    return "selectable";
+  }
+  return "selectable";
 }
 
 function resolveStepByIndex(funnel: FunnelDefinition, stepIndex: number): Step | null {
@@ -106,6 +134,26 @@ export function executeAiToolCall(
                 inputs: b.inputs || {},
                 outputs: b.outputs || {},
               };
+            }
+
+            // Auto-populate meal-picker from venue data if meals config not explicitly set
+            if (templateId === "meal-picker" && !((wd.config as Record<string, unknown>)?.meals)) {
+              const venueData = useVenueDataStore.getState().venueData;
+              if (venueData?.meals && venueData.meals.length > 0) {
+                const mealDefs = venueData.meals.map((m, i) => ({
+                  id: m.id || `meal-${i}`,
+                  name: m.name,
+                  sortOrder: i + 1,
+                  adultPrice: m.pricePerPerson,
+                  timeslots: [{ startTime: getDefaultTimeslot(m.category || m.name.toLowerCase()).start, endTime: getDefaultTimeslot(m.category || m.name.toLowerCase()).end }],
+                  timeslotLocked: false,
+                  allowCheckIn: getDefaultDayRule(m.category || m.name.toLowerCase(), "checkIn"),
+                  allowMiddle: "selectable",
+                  allowCheckOut: getDefaultDayRule(m.category || m.name.toLowerCase(), "checkOut"),
+                  cascadeFrom: [] as string[],
+                }));
+                widget.config.meals = JSON.stringify(mealDefs, null, 2);
+              }
             }
 
             stepWidgets.push(widget);

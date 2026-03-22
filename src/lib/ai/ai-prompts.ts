@@ -294,6 +294,10 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 6. Always set widget bindings so data flows correctly between steps.
 7. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
 8. Reference steps and widgets by their zero-based index.
+9. **CRITICAL: Meal widgets MUST have the \`meals\` config set.** When creating a meal-picker widget, either:
+   - Include the \`meals\` JSON in the widget config inside create_complete_funnel, OR
+   - Call \`configure_meal_widget\` immediately after funnel creation to set meal prices, timeslots, and day rules.
+   If the venue data store has meal products, the system auto-populates meals config from it. But if the user provides specific meal prices, ALWAYS set them explicitly. The meals config is what drives the timeslot grid — without it, the preview falls back to a basic checkbox list.
 12. **CRITICAL: For option-picker widgets with static choices** (retreat types, conference types, wedding types, etc.), put the options DIRECTLY in the config \`options\` field as a JSON string. Do NOT bind them to a variable — there is no upstream widget producing those variables. Example config: \`"options": "[{\\"id\\":\\"church\\",\\"label\\":\\"Church / Faith-based\\",\\"icon\\":\\"⛪\\"},...]"\`. Only use input bindings for \`options\` when another widget dynamically generates the option list.
 13. **CRITICAL: BRANCHING FUNNEL WIRING.** When creating funnels with segment-picker branching:
     - **Assign step IDs** to every step using the \`id\` field (e.g., "welcome", "retreat-type", "group-dates", "contact").
