@@ -248,21 +248,35 @@ function TypeformStep({ stepNum, stepLabel, title, subtitle, image, children, fo
   );
 }
 
-function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingText, disabled, showBack = true, runningTotal, backPreview }) {
+function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingText, disabled, showBack = true, runningTotal, backPreview, variant = 'frosted' }) {
   const [showTooltip, setShowTooltip] = useState(false);
+
+  const wrapperStyles = {
+    frosted: { background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: '2rem 2rem 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.1)', padding: '12px 20px 24px' },
+    action: { background: THEME.primary, padding: '12px 20px 24px' },
+    floating: { background: 'transparent', padding: '12px 20px 24px', pointerEvents: 'none' },
+    progress: { background: 'rgba(255,255,255,0.97)', padding: '0', boxShadow: '0 -4px 20px rgba(0,0,0,0.06)' },
+  }[variant] || wrapperStyles.frosted;
+
+  const isAction = variant === 'action';
+  const isFloating = variant === 'floating';
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50" style={{
-      background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-      borderRadius: '2rem 2rem 0 0', boxShadow: '0 -8px 40px rgba(0,0,0,0.1)', padding: '12px 20px 24px',
-    }}>
-      {/* Running total */}
-      {runningTotal > 0 && (
-        <div className="max-w-2xl lg:max-w-3xl mx-auto mb-2 text-center">
-          <span className="text-xs font-medium" style={{ color: THEME.outline }}>Estimated Total: </span>
-          <span className="text-sm font-bold" style={{ color: THEME.primary }}>{fmtCurrency(runningTotal)}</span>
+    <div className="fixed bottom-0 left-0 right-0 z-50" style={wrapperStyles}>
+      {/* Progress bar footer variant */}
+      {variant === 'progress' && (
+        <div className="h-1.5 w-full" style={{ background: THEME.surfaceContainerHigh }}>
+          <div className="h-full transition-all duration-700" style={{ width: \`\${typeof pPct !== 'undefined' ? pPct : 50}%\`, background: \`linear-gradient(90deg, \${THEME.primary} 0%, \${THEME.primaryContainer || THEME.primary} 100%)\` }} />
         </div>
       )}
-      <div className="max-w-2xl lg:max-w-3xl mx-auto flex items-center gap-3">
+      {/* Running total */}
+      {runningTotal > 0 && (
+        <div className="max-w-2xl lg:max-w-3xl mx-auto mb-2 text-center" style={{ padding: variant === 'progress' ? '8px 20px 0' : '0' }}>
+          <span className="text-xs font-medium" style={{ color: isAction ? 'rgba(255,255,255,0.7)' : THEME.outline }}>Estimated Total: </span>
+          <span className="text-sm font-bold" style={{ color: isAction ? '#fff' : THEME.primary }}>{fmtCurrency(runningTotal)}</span>
+        </div>
+      )}
+      <div className="max-w-2xl lg:max-w-3xl mx-auto flex items-center gap-3" style={{ padding: variant === 'progress' ? '12px 20px 24px' : '0', pointerEvents: 'auto' }}>
         {showBack && onBack && (
           <div className="relative">
             <button
@@ -270,7 +284,7 @@ function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingTex
               onMouseEnter={() => backPreview && setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
               className="text-xs font-bold uppercase tracking-widest px-4 py-3 transition-colors hover:opacity-80"
-              style={{ color: THEME.outline }}
+              style={{ color: isAction ? 'rgba(255,255,255,0.8)' : THEME.outline }}
             >
               ← BACK
             </button>
@@ -282,16 +296,27 @@ function BottomNav({ onBack, onNext, nextLabel = 'Continue', loading, loadingTex
             )}
           </div>
         )}
-        <button
-          onClick={onNext} disabled={loading || disabled}
-          className="flex-1 py-4 text-white font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-          style={{
-            background: loading || disabled ? THEME.primary : \`linear-gradient(135deg, \${THEME.primary} 0%, \${THEME.primaryContainer} 100%)\`,
-            borderRadius: '9999px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          }}
-        >
-          {loading ? (loadingText || 'Loading...') : (nextLabel + ' →')}
-        </button>
+        {isFloating ? (
+          <div className="ml-auto flex flex-col gap-2 items-end">
+            <button onClick={onNext} disabled={loading || disabled}
+              className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl active:scale-95 transition-transform disabled:opacity-50"
+              style={{ background: \`linear-gradient(135deg, \${THEME.primary} 0%, \${THEME.primaryContainer} 100%)\` }}>
+              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onNext} disabled={loading || disabled}
+            className="flex-1 py-4 text-white font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            style={{
+              background: isAction ? 'rgba(255,255,255,0.2)' : (loading || disabled ? THEME.primary : \`linear-gradient(135deg, \${THEME.primary} 0%, \${THEME.primaryContainer} 100%)\`),
+              borderRadius: '9999px', boxShadow: isAction ? 'none' : '0 4px 20px rgba(0,0,0,0.15)',
+              border: isAction ? '2px solid rgba(255,255,255,0.3)' : 'none',
+            }}
+          >
+            {loading ? (loadingText || 'Loading...') : (nextLabel + ' →')}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1308,20 +1333,84 @@ function generateMainFunnel(
   lines.push(`  return (`);
   lines.push(`    <div className="min-h-screen" style={{ background: GRADIENT_BG, fontFamily: THEME.sans }}>`);
 
-  // Header + animated progress bar + step journey icons
-  lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
-  lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">`);
-  lines.push(`          <span className="text-lg font-bold italic" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
-  lines.push(`          {currentIdx >= 0 && <span className="text-xs font-medium hidden sm:block" style={{ color: THEME.outline }}>Step {currentIdx + 1} of {stepOrder.length} · ~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left</span>}`);
-  lines.push(`        </div>`);
-  lines.push(`        {step !== 'confirmation' && progressSteps.length > 0 && (`);
-  lines.push(`          <>`);
-  lines.push(`            <div className="hidden md:block max-w-2xl lg:max-w-4xl mx-auto px-4 pb-2"><ProgressJourney steps={progressSteps} currentIndex={currentIdx} stepIcons={stepIcons} /></div>`);
-  lines.push(`            <div className="md:hidden h-1 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700 ease-out" style={{ width: \`\${pPct}%\`, background: \`linear-gradient(90deg, \${THEME.primary} 0%, \${THEME.primaryContainer || THEME.primary} 100%)\`, borderRadius: '0 4px 4px 0' }} /></div>`);
-  lines.push(`          </>`);
-  lines.push(`        )}`);
-  lines.push(`      </div>`);
-  lines.push(`      <MicroCelebration show={showCelebration} />`);
+  // --- Header (driven by layout settings) ---
+  const layout = funnel.theme.layout || { desktopHeader: "journey-icons", mobileHeader: "progress-bar", footerStyle: "frosted-glass", showTimeEstimate: true, showStepCounter: true, showMicroCelebrations: true, showRunningTotal: false, showTrustBadges: true, useContextualNextLabels: true, tabletHeader: "auto" };
+  const dh = layout.desktopHeader || "journey-icons";
+  const mh = layout.mobileHeader || "progress-bar";
+
+  if (dh === "immersive") {
+    // Immersive: floating pill only
+    lines.push(`      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full shadow-lg" style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)' }}>`);
+    lines.push(`        <span className="text-xs font-medium" style={{ color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
+    if (layout.showStepCounter) lines.push(`        <span className="text-[10px] ml-2" style={{ color: THEME.outline }}>{currentIdx + 1}/{stepOrder.length}</span>`);
+    lines.push(`      </div>`);
+  } else if (dh === "magazine") {
+    // Magazine: large editorial venue name
+    lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.97)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
+    lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center">`);
+    lines.push(`          <div className="text-2xl lg:text-3xl font-bold" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</div>`);
+    if (layout.showStepCounter) lines.push(`          {currentIdx >= 0 && <div className="text-xs mt-1" style={{ color: THEME.outline }}>Step {currentIdx + 1} of {stepOrder.length}${layout.showTimeEstimate ? ` · ~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left` : ""}</div>}`);
+    lines.push(`        </div>`);
+    lines.push(`        {step !== 'confirmation' && <div className="h-0.5 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700" style={{ width: \`\${pPct}%\`, background: THEME.primary }} /></div>}`);
+    lines.push(`      </div>`);
+  } else if (dh === "sticky-bar") {
+    // Sticky bar: logo + dots
+    lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
+    lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between">`);
+    lines.push(`          <span className="text-base font-bold" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
+    lines.push(`          {step !== 'confirmation' && <div className="flex items-center gap-1">{stepOrder.map((s, i) => <div key={i} className="w-2 h-2 rounded-full transition-all" style={{ background: i <= currentIdx ? THEME.primary : THEME.surfaceContainerHigh, transform: i === currentIdx ? 'scale(1.3)' : 'scale(1)' }} />)}</div>}`);
+    if (layout.showStepCounter) lines.push(`          <span className="text-xs" style={{ color: THEME.outline }}>{currentIdx + 1}/{stepOrder.length}</span>`);
+    lines.push(`        </div>`);
+    lines.push(`      </div>`);
+  } else if (dh === "hero-banner") {
+    // Hero banner: full-width image with overlay
+    const logoUrl = funnel.theme.logoUrl || "";
+    lines.push(`      <div className="sticky top-0 z-40">`);
+    lines.push(`        <div className="relative h-16 overflow-hidden" style={{ background: \`linear-gradient(135deg, \${THEME.primary} 0%, \${THEME.primaryContainer || THEME.primary} 100%)\` }}>`);
+    lines.push(`          <div className="absolute inset-0 flex items-center justify-center">`);
+    if (logoUrl) {
+      lines.push(`            <img src="${escapeJsx(logoUrl)}" alt="" className="h-10 object-contain" />`);
+    } else {
+      lines.push(`            <span className="text-lg font-bold text-white" style={{ fontFamily: THEME.serif }}>${escapeJsx(funnel.name)}</span>`);
+    }
+    lines.push(`          </div>`);
+    lines.push(`        </div>`);
+    lines.push(`        {step !== 'confirmation' && <div className="h-1 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700" style={{ width: \`\${pPct}%\`, background: THEME.primary }} /></div>}`);
+    lines.push(`      </div>`);
+  } else {
+    // Default: journey-icons (also used for sidebar-nav fallback on non-wide screens)
+    lines.push(`      <div className="sticky top-0 z-40" style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: \`1px solid \${THEME.surfaceContainerHigh}\` }}>`);
+    lines.push(`        <div className="max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">`);
+    lines.push(`          <span className="text-lg font-bold italic" style={{ fontFamily: THEME.serif, color: THEME.primary }}>${escapeJsx(funnel.name)}</span>`);
+    if (layout.showStepCounter || layout.showTimeEstimate) {
+      const parts: string[] = [];
+      if (layout.showStepCounter) parts.push("Step {currentIdx + 1} of {stepOrder.length}");
+      if (layout.showTimeEstimate) parts.push("~{Math.max(1, Math.ceil((stepOrder.length - currentIdx) * 0.5))} min left");
+      lines.push(`          {currentIdx >= 0 && <span className="text-xs font-medium hidden sm:block" style={{ color: THEME.outline }}>${parts.join(" · ")}</span>}`);
+    }
+    lines.push(`        </div>`);
+    lines.push(`        {step !== 'confirmation' && progressSteps.length > 0 && (`);
+    lines.push(`          <>`);
+    lines.push(`            <div className="hidden md:block max-w-2xl lg:max-w-4xl mx-auto px-4 pb-2"><ProgressJourney steps={progressSteps} currentIndex={currentIdx} stepIcons={stepIcons} /></div>`);
+    // Mobile header variant
+    if (mh === "dots") {
+      lines.push(`            <div className="md:hidden flex items-center justify-center gap-1 py-1">{stepOrder.map((s, i) => <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: i <= currentIdx ? THEME.primary : THEME.surfaceContainerHigh }} />)}</div>`);
+    } else if (mh === "minimal") {
+      lines.push(`            <div className="md:hidden text-center py-1 text-[10px] font-medium" style={{ color: THEME.outline }}>{currentIdx + 1} of {stepOrder.length}</div>`);
+    } else if (mh === "hidden") {
+      // No mobile header
+    } else {
+      // Default: progress-bar
+      lines.push(`            <div className="md:hidden h-1 w-full" style={{ background: THEME.surfaceContainerHigh }}><div className="h-full transition-all duration-700 ease-out" style={{ width: \`\${pPct}%\`, background: \`linear-gradient(90deg, \${THEME.primary} 0%, \${THEME.primaryContainer || THEME.primary} 100%)\`, borderRadius: '0 4px 4px 0' }} /></div>`);
+    }
+    lines.push(`          </>`);
+    lines.push(`        )}`);
+    lines.push(`      </div>`);
+  }
+
+  if (layout.showMicroCelebrations) {
+    lines.push(`      <MicroCelebration show={showCelebration} />`);
+  }
 
   // Error banner
   lines.push(`      {error && <div className="max-w-2xl lg:max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-4"><div className="p-4 rounded-2xl text-sm flex items-center gap-2" style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: THEME.error }}><span>⚠</span><span className="flex-1">{error}</span><button onClick={() => setError(null)} className="ml-auto font-bold opacity-60 hover:opacity-100">✕</button></div></div>}`);
@@ -1381,6 +1470,9 @@ function generateMainFunnel(
       const isLastBeforeInvoice = nextStepId && funnel.steps.find((s) => s.id === nextStepId)?.widgets.some((w) => w.templateId === "invoice");
       const isContactStep = widgetTemplates.includes("contact-form");
 
+      // Map footer style to BottomNav variant
+      const footerVariant = { "frosted-glass": "frosted", "action-bar": "action", "floating-buttons": "floating", "progress-footer": "progress" }[layout.footerStyle] || "frosted";
+
       if (isContactStep && isLastBeforeInvoice) {
         lines.push(`            <BottomNav`);
         if (prevStepId) lines.push(`              onBack={goBack}`);
@@ -1388,6 +1480,7 @@ function generateMainFunnel(
         lines.push(`              nextLabel="${escapeJsx(step.navigation.nextLabel || "Generate My Quote")}"`);
         lines.push(`              loading={submitting}`);
         lines.push(`              loadingText="Generating Your Quote..."`);
+        lines.push(`              variant="${footerVariant}"`);
         lines.push(`            />`);
       } else {
         lines.push(`            <BottomNav`);
@@ -1430,6 +1523,7 @@ function generateMainFunnel(
           const prevStep = funnel.steps.find(s => s.id === prevStepId);
           if (prevStep) lines.push(`              backPreview="${escapeJsx(deriveStepLabel(prevStep))}"`);
         }
+        lines.push(`              variant="${footerVariant}"`);
         lines.push(`            />`);
       }
 
