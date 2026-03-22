@@ -201,7 +201,7 @@ export function railsProductsToActivities(products: RailsProduct[]): import("./t
     // Extended fields
     sku: p.sku,
     tags: p.tags.map((t) => t.name),
-    timeslots: p.timeslots || [],
+    timeslots: (p.timeslots || []).map((t) => ({ start: t.start_time, end: t.end_time })),
     images: p.images.map((img) => img.url),
   }));
 }
