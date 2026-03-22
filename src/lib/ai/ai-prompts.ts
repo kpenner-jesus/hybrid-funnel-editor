@@ -192,6 +192,46 @@ Use these widgets to create visually rich, professional funnels:
 
 **Tags:** All product widgets display tags as small chips below the product name. Tags help customers filter and understand what's included (e.g., "Kitchen", "Wi-Fi", "Two Bedrooms").
 
+## Guest Counter — Expert Configuration Guide
+
+The guest-counter has a **slider + buttons** interface for adults and **configurable youth/children categories** with age collection.
+
+**Adults section:**
+- Large number display with +/- buttons and a full-width slider for fast selection
+- Set minAdults (default 20 for groups), maxAdults (default 400), defaultAdults, sliderMax
+- showSlider: true/false to enable the slider
+
+**Youth/Children categories (youthCategories JSON array):**
+Default categories:
+\`\`\`json
+[
+  {"id":"children","name":"Children","ageLabel":"Ages 0-10","minAge":0,"maxAge":10,"min":0,"max":100,"defaultCount":0,"showSlider":true,"sliderMax":50,"enabled":true},
+  {"id":"youth","name":"Youth","ageLabel":"Ages 11-15","minAge":11,"maxAge":15,"min":0,"max":100,"defaultCount":0,"showSlider":true,"sliderMax":50,"enabled":true}
+]
+\`\`\`
+
+Each category supports:
+- **enabled**: true/false to show/hide the category
+- **showSlider**: true/false for the slider under the counter
+- **sliderMax**: maximum value for the slider
+- **min/max**: minimum and maximum count
+- **minAge/maxAge**: age range for the average age slider and individual age boxes
+- **name/ageLabel**: display labels
+
+**Age collection (collectAges config):**
+When collectAges is true and a category has count > 0:
+- **Average mode** (default): single slider to set average age for the group
+- **Individual mode** (toggle): grid of number input boxes, one per person
+- User can toggle between modes
+
+**When building funnels:**
+1. For group funnels (20+ adults): set minAdults=20, maxAdults=400, showSlider=true
+2. For individual funnels (<20): set minAdults=1, maxAdults=19, showSlider=false
+3. Always create SEPARATE guest counter steps for group vs individual paths
+4. Set youth categories based on the venue's pricing structure
+5. If the venue charges kids meals by age ($1.50 × age), enable collectAges
+6. If the venue has a flat kids rate, disable collectAges
+
 ## Meal Widget — Expert Configuration Guide
 
 The meal-picker is a **timeslot-based booking grid** (dates as rows × meals as columns). It is the most complex widget and MUST be configured correctly for invoice integration.

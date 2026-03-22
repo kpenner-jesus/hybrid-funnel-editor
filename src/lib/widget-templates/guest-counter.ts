@@ -33,8 +33,8 @@ export const guestCounterTemplate: WidgetTemplate = {
     // Youth/children categories — JSON array
     { name: "youthCategories", type: "json", label: "Youth/Children Categories",
       defaultValue: JSON.stringify([
-        { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, max: 100, defaultCount: 0 },
-        { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, max: 100, defaultCount: 0 },
+        { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
+        { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
       ]),
     },
     // Age collection

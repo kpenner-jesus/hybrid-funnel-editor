@@ -198,7 +198,7 @@ function GuestCounterPreview({
   const [adults, setAdults] = useState(defaultAdults);
 
   // Parse youth categories
-  let categories: Array<{ id: string; name: string; ageLabel: string; minAge: number; maxAge: number; max: number; defaultCount: number }> = [];
+  let categories: Array<{ id: string; name: string; ageLabel: string; minAge: number; maxAge: number; min: number; max: number; defaultCount: number; showSlider?: boolean; sliderMax?: number; enabled?: boolean }> = [];
   try {
     const raw = config.youthCategories;
     if (typeof raw === "string") categories = JSON.parse(raw);
@@ -206,8 +206,8 @@ function GuestCounterPreview({
   } catch { /* ignore */ }
   if (categories.length === 0) {
     categories = [
-      { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, max: 100, defaultCount: 0 },
-      { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, max: 100, defaultCount: 0 },
+      { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
+      { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
     ];
   }
 
@@ -301,32 +301,58 @@ function GuestCounterPreview({
       </div>
 
       {/* Youth/Children Categories */}
-      {categories.map(cat => (
+      {categories.filter(c => c.enabled !== false).map(cat => {
+        const count = catCounts[cat.id] || 0;
+        const catMin = cat.min || 0;
+        const catSliderMax = cat.sliderMax || 50;
+        return (
         <div key={cat.id} data-item-label={cat.name} className="pt-4 border-t border-gray-100">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h4 className="text-sm font-semibold">{cat.name}</h4>
               <span className="text-xs text-gray-400">{cat.ageLabel}</span>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${theme.primaryColor}08` }}>
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${pColor}08` }}>
               <button
-                onClick={(e) => { e.stopPropagation(); if ((catCounts[cat.id] || 0) > 0) updateCat(cat.id, (catCounts[cat.id] || 0) - 1); }}
-                disabled={(catCounts[cat.id] || 0) <= 0}
+                onClick={(e) => { e.stopPropagation(); if (count > catMin) updateCat(cat.id, count - 1); }}
+                disabled={count <= catMin}
                 className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold disabled:opacity-30 transition-all"
-                style={{ borderColor: theme.primaryColor + "40", color: theme.primaryColor }}
+                style={{ borderColor: pColor + "40", color: pColor }}
               >−</button>
-              <span className="text-lg font-bold w-8 text-center tabular-nums" style={{ fontFamily: theme.headlineFont }}>{catCounts[cat.id] || 0}</span>
+              <span className="text-lg font-bold w-8 text-center tabular-nums" style={{ fontFamily: hFont }}>{count}</span>
               <button
-                onClick={(e) => { e.stopPropagation(); if ((catCounts[cat.id] || 0) < cat.max) updateCat(cat.id, (catCounts[cat.id] || 0) + 1); }}
-                disabled={(catCounts[cat.id] || 0) >= cat.max}
+                onClick={(e) => { e.stopPropagation(); if (count < cat.max) updateCat(cat.id, count + 1); }}
+                disabled={count >= cat.max}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
-                style={{ backgroundColor: theme.primaryColor }}
+                style={{ backgroundColor: pColor }}
               >+</button>
             </div>
           </div>
 
+          {/* Category slider */}
+          {cat.showSlider !== false && (
+            <div className="px-1 mb-2">
+              <input
+                type="range"
+                min={catMin}
+                max={catSliderMax}
+                value={Math.min(count, catSliderMax)}
+                onChange={(e) => { e.stopPropagation(); updateCat(cat.id, parseInt(e.target.value)); }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, ${pColor} 0%, ${pColor} ${catSliderMax > catMin ? ((count - catMin) / (catSliderMax - catMin)) * 100 : 0}%, #e5e7eb ${catSliderMax > catMin ? ((count - catMin) / (catSliderMax - catMin)) * 100 : 0}%, #e5e7eb 100%)`,
+                }}
+              />
+              <div className="flex justify-between mt-0.5 text-[9px] text-gray-300">
+                <span>{catMin}</span>
+                <span>{catSliderMax}</span>
+              </div>
+            </div>
+          )}
+
           {/* Age Collection — only shows when count > 0 and collectAges is on */}
-          {collectAges && (catCounts[cat.id] || 0) > 0 && (
+          {collectAges && count > 0 && (
             <div className="ml-2 mt-2 p-3 rounded-xl" style={{ backgroundColor: `${theme.primaryColor}05`, border: `1px solid ${theme.primaryColor}15` }}>
               {/* Toggle between average and individual */}
               <div className="flex items-center justify-between mb-2">
@@ -408,7 +434,7 @@ function GuestCounterPreview({
             </div>
           )}
         </div>
-      ))}
+      ); })}
 
       {/* Total */}
       <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
