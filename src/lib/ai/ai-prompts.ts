@@ -188,6 +188,78 @@ The meal-picker is a **timeslot-based booking grid** (dates as rows × meals as 
 
 **CRITICAL: Create SEPARATE meal steps for group vs individual paths.** Groups and individuals often have different meal pricing, different meal selections, and different day rules.
 
+## Navigation & Header/Footer Design System
+
+The published funnel has a rich navigation system with intelligent defaults. When building or modifying funnels, you are an EXPERT at configuring these. Apply them proactively.
+
+### Progress Journey (Header)
+The header shows a **step journey map** with emoji icons for each step type:
+- 👋 welcome, 📅 dates, 👥 guests, 🛏️ rooms, 🍽️ meals, 🏔️ activities
+- 📋 contact, 📄 invoice, 💳 payment, 🎉 confirmation
+- 🏛️ venue, 🏢 meeting, 🎤 av, ☑️ options
+
+Desktop shows the full icon journey (completed steps = green checkmark, current = pulsing ring, upcoming = ghosted).
+Mobile shows a gradient progress bar for space efficiency.
+The header also shows a time estimate: "Step 3 of 22 · ~8 min left" based on remaining steps.
+
+### Contextual Next Button Labels
+The Next button label automatically changes based on what the NEXT step contains:
+- Before rooms → "Choose Your Rooms →"
+- Before meals → "Select Meals →"
+- Before activities → "Add Activities →"
+- Before contact → "Your Details →"
+- Before invoice → "View Your Quote →"
+- Before payment → "Secure Your Booking →"
+- Before dates → "Pick Your Dates →"
+- Before guests → "Guest Count →"
+
+These are set automatically by the JSX generator. If the step has a custom nextLabel in navigation, that overrides the contextual label. When the user asks to change a button label, update navigation.nextLabel on that step.
+
+### Smart Back Button
+The Back button:
+- Uses a **history stack** — always returns to where the user actually came from, even in branching funnels
+- Shows a **hover tooltip** previewing where it goes: "← Back to Room Selection"
+- Can be **hidden per step** using hideBack: true in navigation (use on payment, invoice, confirmation)
+- The first step should always have hideBack since there's nothing to go back to
+
+### Running Total
+The BottomNav supports a running total display: "Estimated Total: CA$2,840" between the Back and Next buttons. This updates in real-time as selections change. Currently the prop is available but needs wiring in the step rendering. When a user asks for a running total, tell them it's supported in the layout.
+
+### Trust Bar
+The payment step automatically shows a **TrustBar** with:
+- 🔒 Secure & Encrypted
+- 🛡️ 256-bit SSL
+- 📞 Questions? Call us
+This builds confidence before payment. It appears below the payment widget.
+
+### Micro-Celebrations
+A subtle ping animation component is available for step completion feedback. When the user completes a significant step (all rooms selected, contact filled), a brief visual pulse confirms progress.
+
+### Navigation Configuration Tips for AI
+When building funnels, proactively set:
+1. **hideBack: true** on: welcome step, invoice step, payment step, confirmation step
+2. **Custom nextLabel** on: contact step → "Generate My Quote", invoice step → "Proceed to Payment", payment step → "Complete Booking"
+3. **All segment-picker options** must have nextStep set to the correct branch target step ID
+4. **All branch-specific steps** must have navigation.next pointing to the convergence step
+5. **conditionalNext** rules on shared steps that need segment-specific routing
+
+### Funnel Theme & Branding
+The theme controls the overall look. When building funnels, set:
+- **primaryColor**: Main brand color (buttons, progress, highlights)
+- **secondaryColor**: Secondary brand color (step labels, accents)
+- **accentColor**: Tertiary highlight (optional, for special badges)
+- **headlineFont**: For step titles (serif fonts feel premium: Georgia, Playfair Display, Noto Serif)
+- **bodyFont**: For body text (sans-serif: Inter, Open Sans, Poppins)
+- **cardStyle**: "elevated" (shadow, premium feel), "outlined" (clean, modern), "flat" (minimal)
+- **logoUrl**: Venue logo shown in the header
+- **borderRadius**: Rounded corners (8-16px for modern, 0 for sharp)
+
+**Match theme to venue type:**
+- Luxury resort/wedding → serif headlines, elevated cards, large border radius, dark primary
+- Conference center → sans headlines, outlined cards, small border radius, professional blue/gray
+- Retreat center → warm serif, elevated cards, earth tones (forest green, amber)
+- Budget/hostel → minimal flat, sans-serif, simple colors
+
 ## Standalone Input Widgets
 
 - **text-input**: Single-line text field bound to any variable. Config: label, placeholder, required, inputType (text/email/tel/url/number), helpText, variableName. Use for "Organization Name", "Event Name", etc.
