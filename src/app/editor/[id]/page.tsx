@@ -31,6 +31,10 @@ export default function EditorPage() {
     dataMode,
     setDataMode,
     selectedWidgetId,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
   } = useFunnelStore();
 
   const { aiPanelOpen, togglePanel: toggleAiPanel } = useAiStore();
@@ -87,6 +91,26 @@ export default function EditorPage() {
       loadFunnel(id);
     }
   }, [initialized, id, loadFunnel]);
+
+  // Keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isInput = (e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA";
+      if (isInput) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
 
   const handleSave = () => {
     saveFunnel();
@@ -181,6 +205,33 @@ export default function EditorPage() {
                 <>Save{isDirty ? " *" : ""}</>
               )}
             </Button>
+
+            {/* Undo / Redo */}
+            <div className="flex items-center border border-outline-variant rounded-lg overflow-hidden">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                title="Undo (Ctrl+Z)"
+                className="px-2 py-1.5 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 7h7a3 3 0 0 1 0 6H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M7 4L4 7l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div className="w-px h-5 bg-outline-variant" />
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                title="Redo (Ctrl+Shift+Z)"
+                className="px-2 py-1.5 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M12 7H5a3 3 0 0 0 0 6h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M9 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
 
             {/* AI Assistant */}
             <Button

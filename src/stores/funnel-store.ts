@@ -128,6 +128,15 @@ function saveFunnelsToStorage(funnels: FunnelDefinition[]) {
   localStorage.setItem("hybrid-funnel-editor-funnels", JSON.stringify(funnels));
 }
 
+// --- Undo/Redo History ---
+
+const MAX_HISTORY = 50;
+
+interface HistoryState {
+  past: FunnelDefinition[];
+  future: FunnelDefinition[];
+}
+
 // --- Store Interface ---
 
 interface FunnelStore {
@@ -141,6 +150,14 @@ interface FunnelStore {
   widgetOutputs: Record<string, Record<string, unknown>>;
   isDirty: boolean;
   initialized: boolean;
+
+  // Undo/redo
+  _history: HistoryState;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+  _pushHistory: () => void;
 
   // Init
   initialize: () => void;
@@ -197,6 +214,55 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   isDirty: false,
   initialized: false,
 
+  // Undo/redo
+  _history: { past: [], future: [] },
+  canUndo: false,
+  canRedo: false,
+
+  _pushHistory: () => {
+    const { funnel, _history } = get();
+    if (!funnel) return;
+    const snapshot = JSON.parse(JSON.stringify(funnel));
+    const past = [..._history.past, snapshot].slice(-MAX_HISTORY);
+    set({ _history: { past, future: [] }, canUndo: true, canRedo: false });
+  },
+
+  undo: () => {
+    const { funnel, _history } = get();
+    if (_history.past.length === 0 || !funnel) return;
+    const past = [..._history.past];
+    const previous = past.pop()!;
+    const future = [JSON.parse(JSON.stringify(funnel)), ..._history.future];
+    set({
+      funnel: previous,
+      _history: { past, future },
+      canUndo: past.length > 0,
+      canRedo: true,
+      isDirty: true,
+      selectedStepId: previous.steps[0]?.id || null,
+      selectedWidgetId: null,
+      previewStep: previous.steps[0]?.id || null,
+    });
+  },
+
+  redo: () => {
+    const { funnel, _history } = get();
+    if (_history.future.length === 0 || !funnel) return;
+    const future = [..._history.future];
+    const next = future.shift()!;
+    const past = [..._history.past, JSON.parse(JSON.stringify(funnel))];
+    set({
+      funnel: next,
+      _history: { past, future },
+      canUndo: true,
+      canRedo: future.length > 0,
+      isDirty: true,
+      selectedStepId: next.steps[0]?.id || null,
+      selectedWidgetId: null,
+      previewStep: next.steps[0]?.id || null,
+    });
+  },
+
   initialize: () => {
     const stored = loadFunnelsFromStorage();
     if (stored.length === 0) {
@@ -252,6 +318,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   addStep: (step) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const updated = { ...funnel, steps: [...funnel.steps, step] };
     set({ funnel: updated, isDirty: true, selectedStepId: step.id });
   },
@@ -259,6 +326,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   removeStep: (stepId) => {
     const { funnel, selectedStepId } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const updated = { ...funnel, steps: funnel.steps.filter((s) => s.id !== stepId) };
     set({
       funnel: updated,
@@ -271,6 +339,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   reorderSteps: (fromIdx, toIdx) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = [...funnel.steps];
     const [moved] = steps.splice(fromIdx, 1);
     steps.splice(toIdx, 0, moved);
@@ -280,6 +349,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   updateStep: (stepId, updates) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = funnel.steps.map((s) => (s.id === stepId ? { ...s, ...updates } : s));
     set({ funnel: { ...funnel, steps }, isDirty: true });
   },
@@ -287,6 +357,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   addWidget: (stepId, templateId) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const template = widgetTemplateRegistry[templateId];
     if (!template) return;
     const widget = createWidgetInstance(templateId, template.variants[0]?.id || "default");
@@ -309,6 +380,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   removeWidget: (stepId, widgetId) => {
     const { funnel, selectedWidgetId } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = funnel.steps.map((s) =>
       s.id === stepId ? { ...s, widgets: s.widgets.filter((w) => w.instanceId !== widgetId) } : s
     );
@@ -322,6 +394,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   updateWidgetConfig: (stepId, widgetId, config) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = funnel.steps.map((s) =>
       s.id === stepId
         ? {
@@ -338,6 +411,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   updateWidgetBindings: (stepId, widgetId, bindings) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = funnel.steps.map((s) =>
       s.id === stepId
         ? {
@@ -354,6 +428,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   updateWidgetVariant: (stepId, widgetId, variant) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const steps = funnel.steps.map((s) =>
       s.id === stepId
         ? {
@@ -370,12 +445,14 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
   setTheme: (theme) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     set({ funnel: { ...funnel, theme: { ...funnel.theme, ...theme } }, isDirty: true });
   },
 
   setVariable: (name, value) => {
     const { funnel } = get();
     if (!funnel) return;
+    get()._pushHistory();
     const variables = funnel.variables.map((v) =>
       v.name === name ? { ...v, defaultValue: value } : v
     );
