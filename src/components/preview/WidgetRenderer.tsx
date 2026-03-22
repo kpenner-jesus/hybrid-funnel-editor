@@ -282,6 +282,250 @@ function GuestCounterPreview({
   );
 }
 
+// ─── Unique Inventory Picker (per room unit) ─────────────────
+
+interface RoomUnit {
+  unitId: string;
+  adults: Array<{ name: string }>;
+  children: Array<{ name: string; age: number }>;
+}
+
+function UniqueInventorySection({
+  roomId,
+  roomName,
+  qty,
+  maxAdults,
+  maxChildren,
+  stock,
+  theme,
+  units,
+  onUnitsChange,
+}: {
+  roomId: string;
+  roomName: string;
+  qty: number;
+  maxAdults: number;
+  maxChildren: number;
+  stock: number;
+  theme: ThemeConfig;
+  units: RoomUnit[];
+  onUnitsChange: (units: RoomUnit[]) => void;
+}) {
+  // Auto-grow/shrink units array to match qty
+  useEffect(() => {
+    const current = [...units];
+    while (current.length < qty) {
+      current.push({
+        unitId: "",
+        adults: [{ name: "" }],
+        children: [],
+      });
+    }
+    if (current.length > qty) {
+      current.length = qty;
+    }
+    if (current.length !== units.length) {
+      onUnitsChange(current);
+    }
+  }, [qty, units.length]);
+
+  // Generate mock room unit names (e.g., "101 - Main Floor", "201W - Upper Floor")
+  const availableUnits = Array.from({ length: stock }, (_, i) => ({
+    id: `${roomId}-unit-${i}`,
+    name: `${100 + i + 1} - ${roomName.split(" ")[0]} ${i < stock / 2 ? "Main Floor" : "Upper Floor"}`,
+  }));
+
+  const selectedUnitIds = new Set(units.map((u) => u.unitId).filter(Boolean));
+
+  const updateUnit = (unitIdx: number, updates: Partial<RoomUnit>) => {
+    const updated = [...units];
+    updated[unitIdx] = { ...updated[unitIdx], ...updates };
+    onUnitsChange(updated);
+  };
+
+  const updateAdultName = (unitIdx: number, adultIdx: number, name: string) => {
+    const updated = [...units];
+    const adults = [...updated[unitIdx].adults];
+    adults[adultIdx] = { name };
+    updated[unitIdx] = { ...updated[unitIdx], adults };
+    onUnitsChange(updated);
+  };
+
+  const addAdult = (unitIdx: number) => {
+    const updated = [...units];
+    if (updated[unitIdx].adults.length < maxAdults) {
+      updated[unitIdx] = { ...updated[unitIdx], adults: [...updated[unitIdx].adults, { name: "" }] };
+      onUnitsChange(updated);
+    }
+  };
+
+  const removeAdult = (unitIdx: number, adultIdx: number) => {
+    const updated = [...units];
+    if (updated[unitIdx].adults.length > 1) {
+      const adults = updated[unitIdx].adults.filter((_, i) => i !== adultIdx);
+      updated[unitIdx] = { ...updated[unitIdx], adults };
+      onUnitsChange(updated);
+    }
+  };
+
+  const updateChildName = (unitIdx: number, childIdx: number, name: string) => {
+    const updated = [...units];
+    const children = [...updated[unitIdx].children];
+    children[childIdx] = { ...children[childIdx], name };
+    updated[unitIdx] = { ...updated[unitIdx], children };
+    onUnitsChange(updated);
+  };
+
+  const updateChildAge = (unitIdx: number, childIdx: number, age: number) => {
+    const updated = [...units];
+    const children = [...updated[unitIdx].children];
+    children[childIdx] = { ...children[childIdx], age };
+    updated[unitIdx] = { ...updated[unitIdx], children };
+    onUnitsChange(updated);
+  };
+
+  const addChild = (unitIdx: number) => {
+    const updated = [...units];
+    if (updated[unitIdx].children.length < maxChildren) {
+      updated[unitIdx] = { ...updated[unitIdx], children: [...updated[unitIdx].children, { name: "", age: 0 }] };
+      onUnitsChange(updated);
+    }
+  };
+
+  const removeChild = (unitIdx: number, childIdx: number) => {
+    const updated = [...units];
+    const children = updated[unitIdx].children.filter((_, i) => i !== childIdx);
+    updated[unitIdx] = { ...updated[unitIdx], children };
+    onUnitsChange(updated);
+  };
+
+  if (qty === 0) return null;
+
+  const totalAdults = units.reduce((s, u) => s + u.adults.length, 0);
+  const totalChildren = units.reduce((s, u) => s + u.children.length, 0);
+
+  return (
+    <div className="mt-3 border-t border-gray-200 pt-3 space-y-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.primaryColor }}>
+        {qty}/{qty} {roomName} · {totalAdults} adult{totalAdults !== 1 ? "s" : ""}
+        {totalChildren > 0 && ` + ${totalChildren} child${totalChildren !== 1 ? "ren" : ""}`}
+        {" "}+CA$0.00
+      </div>
+
+      {units.map((unit, ui) => (
+        <div key={ui} className="p-2.5 rounded-lg border border-gray-200 bg-gray-50/50 space-y-2">
+          {/* Room unit selector */}
+          <div className="flex items-center gap-2">
+            <select
+              value={unit.unitId}
+              onChange={(e) => { e.stopPropagation(); updateUnit(ui, { unitId: e.target.value }); }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 text-[11px] border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-primary"
+              style={{ borderColor: unit.unitId ? theme.primaryColor : "#d1d5db" }}
+            >
+              <option value="">Select room unit...</option>
+              {availableUnits.map((au) => (
+                <option key={au.id} value={au.id} disabled={selectedUnitIds.has(au.id) && au.id !== unit.unitId}>
+                  {au.name}
+                </option>
+              ))}
+            </select>
+            {availableUnits.length > 1 && (
+              <div className="flex gap-0.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const curIdx = availableUnits.findIndex((au) => au.id === unit.unitId);
+                    const prevUnit = availableUnits.filter((au) => !selectedUnitIds.has(au.id) || au.id === unit.unitId);
+                    const prevIdx = prevUnit.findIndex((au) => au.id === unit.unitId);
+                    if (prevIdx > 0) updateUnit(ui, { unitId: prevUnit[prevIdx - 1].id });
+                  }}
+                  className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs"
+                >◀</button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const avail = availableUnits.filter((au) => !selectedUnitIds.has(au.id) || au.id === unit.unitId);
+                    const curIdx = avail.findIndex((au) => au.id === unit.unitId);
+                    if (curIdx < avail.length - 1) updateUnit(ui, { unitId: avail[curIdx + 1].id });
+                  }}
+                  className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs"
+                >▶</button>
+              </div>
+            )}
+          </div>
+
+          {/* Adult name inputs */}
+          <div>
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+              Adults ({unit.adults.length}/{maxAdults})
+            </div>
+            {unit.adults.map((adult, ai) => (
+              <div key={ai} className="flex items-center gap-1 mb-1">
+                <input
+                  type="text"
+                  value={adult.name}
+                  onChange={(e) => { e.stopPropagation(); updateAdultName(ui, ai, e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Enter name..."
+                  className="flex-1 text-[11px] border border-amber-300 rounded px-2 py-1 bg-amber-50 focus:outline-none focus:border-primary placeholder:text-amber-400"
+                />
+                {unit.adults.length > 1 && (
+                  <button onClick={(e) => { e.stopPropagation(); removeAdult(ui, ai); }} className="text-gray-400 hover:text-red-500 text-xs">✕</button>
+                )}
+              </div>
+            ))}
+            {unit.adults.length < maxAdults && (
+              <button onClick={(e) => { e.stopPropagation(); addAdult(ui); }}
+                className="text-[9px] font-semibold uppercase tracking-wider hover:underline" style={{ color: theme.primaryColor }}>
+                + Add Adult
+              </button>
+            )}
+          </div>
+
+          {/* Children name + age inputs */}
+          {maxChildren > 0 && (
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+                Children ({unit.children.length}/{maxChildren})
+              </div>
+              {unit.children.map((child, ci) => (
+                <div key={ci} className="flex items-center gap-1 mb-1">
+                  <input
+                    type="text"
+                    value={child.name}
+                    onChange={(e) => { e.stopPropagation(); updateChildName(ui, ci, e.target.value); }}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Child name..."
+                    className="flex-1 text-[11px] border border-amber-300 rounded px-2 py-1 bg-amber-50 focus:outline-none focus:border-primary placeholder:text-amber-400"
+                  />
+                  <input
+                    type="number"
+                    value={child.age}
+                    onChange={(e) => { e.stopPropagation(); updateChildAge(ui, ci, parseInt(e.target.value) || 0); }}
+                    onClick={(e) => e.stopPropagation()}
+                    min={0}
+                    max={17}
+                    className="w-12 text-[11px] border border-gray-200 rounded px-1 py-1 text-center focus:outline-none focus:border-primary"
+                    placeholder="Age"
+                  />
+                  <button onClick={(e) => { e.stopPropagation(); removeChild(ui, ci); }} className="text-gray-400 hover:text-red-500 text-xs">✕</button>
+                </div>
+              ))}
+              {unit.children.length < maxChildren && (
+                <button onClick={(e) => { e.stopPropagation(); addChild(ui); }}
+                  className="text-[9px] font-semibold uppercase tracking-wider hover:underline" style={{ color: theme.primaryColor }}>
+                  + Add Child
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Room Selection ───────────────────────────────────────────
 
 function RoomSelectionPreview({
@@ -300,6 +544,7 @@ function RoomSelectionPreview({
   const rooms = venueData?.rooms && venueData.rooms.length > 0 ? venueData.rooms : mockRooms.slice(0, 4);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [roomUnits, setRoomUnits] = useState<Record<string, Array<{ unitId: string; adults: Array<{ name: string }>; children: Array<{ name: string; age: number }> }>>>({});
 
   const checkIn = resolvedInputs?.checkIn as string | undefined;
   const checkOut = resolvedInputs?.checkOut as string | undefined;
@@ -446,6 +691,21 @@ function RoomSelectionPreview({
                     unavailableUntil={(room as unknown as Record<string, unknown>).unavailableUntil as string}
                   />
                 </div>
+
+                {/* Unique Inventory Picker — shows when qty > 0 */}
+                {qty > 0 && (
+                  <UniqueInventorySection
+                    roomId={room.id}
+                    roomName={room.name}
+                    qty={qty}
+                    maxAdults={room.maxAdults || 2}
+                    maxChildren={room.maxChildren || 0}
+                    stock={room.stock || 10}
+                    theme={theme}
+                    units={roomUnits[room.id] || []}
+                    onUnitsChange={(units) => setRoomUnits(prev => ({ ...prev, [room.id]: units }))}
+                  />
+                )}
               </div>
             </div>
           );
