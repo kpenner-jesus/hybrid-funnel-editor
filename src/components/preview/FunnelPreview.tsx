@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { WidgetRenderer } from "./WidgetRenderer";
+import { widgetTemplateRegistry } from "@/lib/widget-templates";
+
+// Width thresholds for step rail modes
+const RAIL_MIN = 48;
+const RAIL_THUMB = 140; // show thumbnails above this
+const RAIL_MAX = 240;
 
 export function FunnelPreview() {
   const {
@@ -15,6 +21,59 @@ export function FunnelPreview() {
     setWidgetOutput,
     resolveWidgetInputs,
   } = useFunnelStore();
+
+  // Resizable step rail width — persisted to localStorage
+  const [railWidth, setRailWidth] = useState(() => {
+    if (typeof window === "undefined") return RAIL_MIN;
+    try {
+      const saved = localStorage.getItem("step-rail-width");
+      if (saved) {
+        const n = parseInt(saved, 10);
+        if (n >= RAIL_MIN && n <= RAIL_MAX) return n;
+      }
+    } catch {}
+    return RAIL_MIN;
+  });
+
+  const isDraggingRail = useRef(false);
+
+  const handleRailDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isDraggingRail.current = true;
+      const startX = e.clientX;
+      const startWidth = railWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isDraggingRail.current) return;
+        // Dragging left edge = moving left makes it wider
+        const delta = startX - ev.clientX;
+        const newWidth = Math.min(RAIL_MAX, Math.max(RAIL_MIN, startWidth + delta));
+        setRailWidth(newWidth);
+      };
+
+      const onMouseUp = () => {
+        isDraggingRail.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        // Persist
+        setRailWidth((prev) => {
+          localStorage.setItem("step-rail-width", String(prev));
+          return prev;
+        });
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [railWidth]
+  );
+
+  const showThumbnails = railWidth >= RAIL_THUMB;
 
   if (!funnel) {
     return (
@@ -54,20 +113,6 @@ export function FunnelPreview() {
     }
   };
 
-  const stepBarRef = useRef<HTMLDivElement>(null);
-  const activeStepRef = useRef<HTMLButtonElement>(null);
-
-  // Auto-scroll the active step into view (vertical rail)
-  useEffect(() => {
-    if (activeStepRef.current && stepBarRef.current) {
-      activeStepRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-    }
-  }, [currentStepIndex]);
-
   return (
     <div className="h-full flex flex-row">
       {/* Main content area */}
@@ -78,7 +123,6 @@ export function FunnelPreview() {
           style={{ backgroundColor: funnel.theme.surfaceColor }}
         >
           <div className="max-w-xl mx-auto space-y-4">
-            {/* Step title */}
             <h2
               className="text-2xl font-bold mt-4"
               style={{
@@ -89,7 +133,6 @@ export function FunnelPreview() {
               {currentStep.title}
             </h2>
 
-            {/* Widgets */}
             {currentStep.widgets.length === 0 ? (
               <div className="text-center py-12 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
                 No widgets in this step. Add widgets from the editor panel.
@@ -142,58 +185,177 @@ export function FunnelPreview() {
         </div>
       </div>
 
-      {/* Vertical step rail — right side */}
+      {/* Drag handle — left edge of step rail */}
       <div
-        ref={stepBarRef}
-        className="w-14 border-l border-gray-200 bg-gray-50/50 overflow-y-auto flex flex-col items-center gap-1 py-3 shrink-0"
-        style={{ scrollbarWidth: "thin" }}
-      >
-        {funnel.steps.map((step, i) => {
-          const isActive = step.id === currentStep.id;
-          const isPast = i < currentStepIndex;
-          return (
-            <React.Fragment key={step.id}>
-              <button
-                ref={isActive ? activeStepRef : undefined}
-                onClick={() => {
-                  setPreviewStep(step.id);
-                  selectStep(step.id);
-                }}
-                title={step.title}
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors ${
-                  isActive
-                    ? "text-white"
-                    : isPast
-                    ? "text-white/90"
-                    : "text-gray-400 bg-gray-100 hover:bg-gray-200"
-                }`}
-                style={
-                  isActive
-                    ? { backgroundColor: funnel.theme.primaryColor, boxShadow: `0 0 0 2px white, 0 0 0 4px ${funnel.theme.primaryColor}` }
-                    : isPast
-                    ? { backgroundColor: `${funnel.theme.primaryColor}88` }
-                    : {}
-                }
-              >
-                {i + 1}
-              </button>
-              {i < funnel.steps.length - 1 && (
-                <div
-                  className="shrink-0 w-0.5 h-2 rounded"
-                  style={{
-                    backgroundColor: isPast ? funnel.theme.primaryColor : "#e5e7eb",
-                  }}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
+        onMouseDown={handleRailDragStart}
+        className="w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors shrink-0"
+        title="Drag to resize step panel"
+      />
+
+      {/* Vertical step rail — right side */}
+      <StepRail
+        steps={funnel.steps}
+        currentStep={currentStep}
+        currentStepIndex={currentStepIndex}
+        primaryColor={funnel.theme.primaryColor}
+        railWidth={railWidth}
+        showThumbnails={showThumbnails}
+        onStepClick={(step) => {
+          setPreviewStep(step.id);
+          selectStep(step.id);
+        }}
+      />
     </div>
   );
 }
 
-// Wrapper component that resolves inputs and wires output capture
+// --- Step Rail Component ---
+
+function StepRail({
+  steps,
+  currentStep,
+  currentStepIndex,
+  primaryColor,
+  railWidth,
+  showThumbnails,
+  onStepClick,
+}: {
+  steps: import("@/lib/types").Step[];
+  currentStep: import("@/lib/types").Step;
+  currentStepIndex: number;
+  primaryColor: string;
+  railWidth: number;
+  showThumbnails: boolean;
+  onStepClick: (step: import("@/lib/types").Step) => void;
+}) {
+  const stepBarRef = useRef<HTMLDivElement>(null);
+  const activeStepRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (activeStepRef.current && stepBarRef.current) {
+      activeStepRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }
+  }, [currentStepIndex]);
+
+  return (
+    <div
+      ref={stepBarRef}
+      className="border-l border-gray-200 bg-gray-50/50 overflow-y-auto flex flex-col items-center gap-1 py-3 shrink-0"
+      style={{ width: railWidth, scrollbarWidth: "thin" }}
+    >
+      {steps.map((step, i) => {
+        const isActive = step.id === currentStep.id;
+        const isPast = i < currentStepIndex;
+
+        if (showThumbnails) {
+          // Thumbnail card mode
+          const widgetIcons = step.widgets
+            .map((w) => widgetTemplateRegistry[w.templateId]?.icon || "?")
+            .slice(0, 4);
+
+          return (
+            <button
+              key={step.id}
+              ref={isActive ? activeStepRef : undefined}
+              onClick={() => onStepClick(step)}
+              title={step.title}
+              className={`w-full mx-2 px-2 py-2 rounded-lg text-left shrink-0 transition-all ${
+                isActive
+                  ? "text-white shadow-md"
+                  : isPast
+                  ? "text-white/90"
+                  : "text-gray-500 bg-white hover:bg-gray-100 border border-gray-200"
+              }`}
+              style={
+                isActive
+                  ? {
+                      backgroundColor: primaryColor,
+                      boxShadow: `0 0 0 2px white, 0 0 0 3px ${primaryColor}`,
+                    }
+                  : isPast
+                  ? { backgroundColor: `${primaryColor}88` }
+                  : {}
+              }
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <span
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                    isActive || isPast ? "bg-white/20" : "bg-gray-100"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <span className="text-[10px] font-semibold truncate leading-tight">
+                  {step.title || "Untitled"}
+                </span>
+              </div>
+              {/* Widget icons row */}
+              {widgetIcons.length > 0 && (
+                <div className="flex items-center gap-1 pl-6">
+                  {widgetIcons.map((icon, wi) => (
+                    <span key={wi} className="text-[11px]" title={step.widgets[wi]?.templateId}>
+                      {icon}
+                    </span>
+                  ))}
+                  {step.widgets.length > 4 && (
+                    <span className={`text-[9px] ${isActive || isPast ? "text-white/60" : "text-gray-400"}`}>
+                      +{step.widgets.length - 4}
+                    </span>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        }
+
+        // Compact circle mode
+        return (
+          <React.Fragment key={step.id}>
+            <button
+              ref={isActive ? activeStepRef : undefined}
+              onClick={() => onStepClick(step)}
+              title={step.title}
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors ${
+                isActive
+                  ? "text-white"
+                  : isPast
+                  ? "text-white/90"
+                  : "text-gray-400 bg-gray-100 hover:bg-gray-200"
+              }`}
+              style={
+                isActive
+                  ? {
+                      backgroundColor: primaryColor,
+                      boxShadow: `0 0 0 2px white, 0 0 0 4px ${primaryColor}`,
+                    }
+                  : isPast
+                  ? { backgroundColor: `${primaryColor}88` }
+                  : {}
+              }
+            >
+              {i + 1}
+            </button>
+            {i < steps.length - 1 && (
+              <div
+                className="shrink-0 w-0.5 h-2 rounded"
+                style={{
+                  backgroundColor: isPast ? primaryColor : "#e5e7eb",
+                }}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Widget Renderer Wrapper ---
+
 function WidgetRendererWithBindings({
   widget,
   theme,
