@@ -446,12 +446,12 @@ function generateMealTimeslotGrid(): string {
         <span className="text-sm text-gray-600"> for <strong>kids under 10</strong></span>
       </div>
 
-      <table className="w-full border-separate" style={{ borderSpacing: '0 8px', minWidth: meals.length * 180 + 120 }}>
+      <table className="w-full border-separate" style={{ borderSpacing: '0 8px', minWidth: Math.min(meals.length * 160 + 100, 640) }}>
         <thead>
           <tr>
-            <th className="text-left p-2 text-xs font-medium text-gray-500 w-28">Date</th>
+            <th className="text-left p-2 text-xs font-medium text-gray-500" style={{ width: '110px', minWidth: '90px' }}>Date</th>
             {meals.map((meal, mi) => (
-              <th key={mi} className="text-center p-2" style={{ minWidth: 160 }}>
+              <th key={mi} className="text-center p-2" style={{ width: (100 / meals.length) + '%' }}>
                 <div className="flex items-center justify-center gap-1">
                   <span className="font-bold text-sm" style={{ color: '#1f2937' }}>{meal.name}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
