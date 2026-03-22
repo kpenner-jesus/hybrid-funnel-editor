@@ -1543,13 +1543,18 @@ function generateMainFunnel(
       }
 
       // Bottom navigation
+      const isLastStep = i === funnel.steps.length - 1 || !nextStepId;
+      const isConfirmation = step.title.toLowerCase().includes("confirm") || step.title.includes("🎉") || step.title.toLowerCase().includes("all set") || step.title.toLowerCase().includes("done");
       const isLastBeforeInvoice = nextStepId && funnel.steps.find((s) => s.id === nextStepId)?.widgets.some((w) => w.templateId === "invoice");
       const isContactStep = widgetTemplates.includes("contact-form");
 
       // Map footer style to BottomNav variant
       const footerVariant = { "frosted-glass": "frosted", "action-bar": "action", "floating-buttons": "floating", "progress-footer": "progress" }[layout.footerStyle] || "frosted";
 
-      if (isContactStep && isLastBeforeInvoice) {
+      // No navigation on the last step / confirmation step
+      if (isLastStep || isConfirmation) {
+        // No BottomNav — show nothing or a "Back to Home" link
+      } else if (isContactStep && isLastBeforeInvoice) {
         lines.push(`            <BottomNav`);
         if (prevStepId) lines.push(`              onBack={goBack}`);
         lines.push(`              onNext={handleGenerateInvoice}`);
