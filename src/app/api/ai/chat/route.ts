@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
     context: AiContext;
     model?: string;
-    dockedContext?: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number } | null;
+    dockedContext?: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number; focusedItemLabel?: string } | null;
   };
 
   try {
@@ -75,6 +75,12 @@ export async function POST(request: Request) {
       }
     } catch {}
 
+    // Check if user docked to a specific item within the widget
+    const focusedItem = dc.focusedItemLabel || null;
+    const focusedItemSection = focusedItem
+      ? `\n**Focused item:** "${focusedItem}" — The user double-clicked THIS specific item. ALL commands apply to this item unless they explicitly say otherwise.\n`
+      : "";
+
     systemPrompt = `## OBJECT EDIT MODE — SCOPED TO A SINGLE WIDGET
 
 You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and expects ALL commands to apply ONLY to this widget.
@@ -82,7 +88,7 @@ You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and
 **Docked widget:** ${dc.label}
 **Step index:** ${dc.stepIndex} (use this for tool calls)
 **Widget index:** ${dc.widgetIndex} (use this for tool calls)
-
+${focusedItemSection}
 **Current widget config (this is what the widget currently contains):**
 \`\`\`json
 ${widgetConfigDump}
@@ -94,9 +100,8 @@ RULES:
 3. Do NOT use create_complete_funnel, add_step, remove_step, or add_widget
 4. Focus exclusively on modifying THIS widget's config
 5. Be conversational — the user is talking TO this widget, not about the whole funnel
-6. **BE DECISIVE — DO NOT ASK FOR CLARIFICATION when you can figure it out.** When the user says "change the $500 to $600", FIND the product with price $500 in the config and change it. Only ask if there are genuinely multiple matches at the same price. The user can SEE the widget — they know what they're pointing at.
+6. ${focusedItem ? `The user is focused on "${focusedItem}". When they say "change the price", "update the description", etc., apply it to "${focusedItem}" specifically. Find it in the config JSON and modify only that item.` : "When the user refers to a specific product, option, or item, find it in the config above and modify it."}
 7. When modifying options/categories JSON, preserve the existing structure and only change the specific field requested. Output the COMPLETE updated JSON string, not just the changed field.
-8. **ACT IMMEDIATELY.** When the user gives a clear edit instruction, execute the tool call. Do not list the current state back to them — they can already see it.
 
 ---
 

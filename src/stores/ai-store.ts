@@ -69,11 +69,12 @@ interface AiStore {
   undockedPosition: { x: number; y: number };
   undockedSize: { width: number; height: number };
 
-  // Object-docked mode: AI scoped to a specific widget
+  // Object-docked mode: AI scoped to a specific widget (and optionally a specific item within it)
   dockedStepId: string | null;
   dockedWidgetId: string | null;
   dockedWidgetLabel: string | null; // e.g. "Option Picker — What Type of Retreat?"
-  dockToWidget: (stepId: string, widgetId: string, label: string) => void;
+  dockedFocusedItem: string | null; // e.g. "Manitoba Room" — specific item the user clicked
+  dockToWidget: (stepId: string, widgetId: string, label: string, focusedItem?: string) => void;
   undockWidget: () => void;
 
   togglePanel: () => void;
@@ -181,36 +182,33 @@ export const useAiStore = create<AiStore>((set, get) => {
   dockedStepId: null,
   dockedWidgetId: null,
   dockedWidgetLabel: null,
+  dockedFocusedItem: null,
 
-  dockToWidget: (stepId, widgetId, label) => {
+  dockToWidget: (stepId, widgetId, label, focusedItem?) => {
     // Find the widget's current config for the greeting
     const funnel = useFunnelStore.getState().funnel;
     const step = funnel?.steps.find((s) => s.id === stepId);
     const widget = step?.widgets.find((w) => w.instanceId === widgetId);
 
-    // Build a greeting message describing what the AI sees
-    let greeting = `🎯 **Docked to: ${label}**\n\nI'm focused on this widget. Tell me what to change — I'll only modify this widget.`;
+    // Build greeting — if a specific item was clicked, mention it
+    let greeting: string;
+    if (focusedItem) {
+      greeting = `**Editing: ${focusedItem}**\n\nI'm focused on "${focusedItem}" in this widget. All changes apply to this item. What would you like to change?`;
+    } else {
+      greeting = `**Docked to: ${label}**\n\nI'm focused on this widget. Tell me what to change.`;
+    }
 
-    if (widget) {
+    if (widget && !focusedItem) {
       const templateId = widget.templateId;
-      const config = widget.config;
-
       if (templateId === "segment-picker" || templateId === "option-picker") {
         greeting += `\n\nTry: *"add a Yoga option"*, *"rename Church to Faith-based"*, *"remove the last one"*`;
-      } else if (templateId === "date-picker") {
-        greeting += `\n\nTry: *"set minimum stay to 3 nights"*, *"change the title"*`;
-      } else if (templateId === "guest-counter") {
-        greeting += `\n\nTry: *"set max adults to 50"*, *"hide infants counter"*, *"change the title"*`;
-      } else if (templateId === "guest-rooms" || templateId === "meal-picker" || templateId === "activity-picker") {
-        greeting += `\n\nTry: *"change the title"*, *"change category ID"*, *"show images"*`;
-      } else if (templateId === "contact-form") {
-        greeting += `\n\nTry: *"hide the company field"*, *"make phone optional"*, *"change GDPR text"*`;
+      } else if (templateId === "category-picker") {
+        greeting += `\n\nTry: *"change the price"*, *"update the description"*, *"add a product"*`;
       } else {
         greeting += `\n\nTry: *"change the title"*, *"update the config"*`;
       }
     }
 
-    // Add greeting as an assistant message
     const greetingMessage: AiMessage = {
       role: "assistant",
       content: greeting,
@@ -220,6 +218,7 @@ export const useAiStore = create<AiStore>((set, get) => {
       dockedStepId: stepId,
       dockedWidgetId: widgetId,
       dockedWidgetLabel: label,
+      dockedFocusedItem: focusedItem || null,
       aiPanelOpen: true,
       messages: [...s.messages, greetingMessage],
     }));
@@ -235,6 +234,7 @@ export const useAiStore = create<AiStore>((set, get) => {
       dockedStepId: null,
       dockedWidgetId: null,
       dockedWidgetLabel: null,
+      dockedFocusedItem: null,
       messages: [...s.messages, undockMessage],
     }));
   },
@@ -295,8 +295,8 @@ export const useAiStore = create<AiStore>((set, get) => {
     const aiContext = buildAiContext(funnel, state.accountContext, state.funnelContext);
 
     // If docked to a widget, add scoped context
-    const { dockedStepId, dockedWidgetId, dockedWidgetLabel } = state;
-    let dockedContext: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number } | null = null;
+    const { dockedStepId, dockedWidgetId, dockedWidgetLabel, dockedFocusedItem } = state;
+    let dockedContext: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number; focusedItemLabel?: string } | null = null;
     if (dockedStepId && dockedWidgetId && funnel) {
       const stepIdx = funnel.steps.findIndex((s) => s.id === dockedStepId);
       const step = stepIdx >= 0 ? funnel.steps[stepIdx] : null;
@@ -308,6 +308,7 @@ export const useAiStore = create<AiStore>((set, get) => {
           label: dockedWidgetLabel || "widget",
           stepIndex: stepIdx,
           widgetIndex: widgetIdx,
+          focusedItemLabel: dockedFocusedItem || undefined,
         };
       }
     }

@@ -114,7 +114,7 @@ export function FunnelPreview() {
       <div className="h-full flex flex-col">
         {modeToggle}
         <div className="flex-1 overflow-hidden">
-          <FlowPreview onEditWidget={(stepId, widgetId) => {
+          <FlowPreview onEditWidget={(stepId, widgetId, focusedItemLabel?) => {
             // Find step and widget for the label
             const step = funnel?.steps.find((s) => s.id === stepId);
             const widget = step?.widgets.find((w) => w.instanceId === widgetId);
@@ -126,8 +126,8 @@ export function FunnelPreview() {
             selectStep(stepId);
             selectWidget(widgetId);
 
-            // Dock AI to this widget
-            useAiStore.getState().dockToWidget(stepId, widgetId, label);
+            // Dock AI to this widget, with optional focused item
+            useAiStore.getState().dockToWidget(stepId, widgetId, label, focusedItemLabel);
           }} />
         </div>
       </div>

@@ -404,7 +404,7 @@ function StepCard({
   borderColor?: string;
   onStepClick: () => void;
   onWidgetClick: (widgetId: string) => void;
-  onWidgetDoubleClick?: (widgetId: string) => void;
+  onWidgetDoubleClick?: (widgetId: string, focusedItemLabel?: string) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
   stepRef: (el: HTMLDivElement | null) => void;
@@ -459,7 +459,11 @@ function StepCard({
               key={widget.instanceId}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                onWidgetDoubleClick?.(widget.instanceId);
+                // Check if user double-clicked a specific item within the widget
+                const target = e.target as HTMLElement;
+                const itemEl = target.closest("[data-item-label]") as HTMLElement | null;
+                const focusedItem = itemEl?.getAttribute("data-item-label") || undefined;
+                onWidgetDoubleClick?.(widget.instanceId, focusedItem);
               }}
             >
               <FlowWidgetRenderer
@@ -490,7 +494,7 @@ function StepCard({
 }
 
 // --- Main Flow Preview ---
-export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, widgetId: string) => void } = {}) {
+export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, widgetId: string, focusedItemLabel?: string) => void } = {}) {
   const {
     funnel, previewStep, setPreviewStep, selectedWidgetId,
     selectWidget, selectStep, setWidgetOutput, resolveWidgetInputs,
@@ -728,7 +732,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 selectedWidgetId={selectedWidgetId}
                 onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
-                onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
+                onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -767,7 +771,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         borderColor="#dc2626"
                         onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
-                        onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
+                        onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                         resolveWidgetInputs={resolveWidgetInputs}
                         setWidgetOutput={setWidgetOutput}
                         stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -809,7 +813,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       borderColor={color}
                       onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
-                      onWidgetDoubleClick={(wid) => { onEditWidget?.(stepId, wid); }}
+                      onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
                       stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}

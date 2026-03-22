@@ -1269,6 +1269,7 @@ function SegmentPickerPreview({
             <div
               key={opt.id}
               data-segment-option={opt.id}
+              data-item-label={opt.label}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClick(opt.id);
@@ -1478,7 +1479,7 @@ function CategoryPickerPreview({ config, theme, resolvedInputs, onOutput }: { co
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#6b7280", marginBottom: 8, borderBottom: "1px solid #e5e7eb", paddingBottom: 4 }}>{cat.name}</div>
           <div className="space-y-2">
             {cat.products.map((p) => (
-              <div key={p.id} onClick={() => toggle(p.id)} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              <div key={p.id} data-item-label={p.name} onClick={() => toggle(p.id)} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
                 style={{ borderColor: selected.has(p.id) ? theme.primaryColor : "#e5e7eb", backgroundColor: selected.has(p.id) ? `${theme.primaryColor}08` : "#fff" }}>
                 {showImages && p.imageUrl && <img src={p.imageUrl} alt={p.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />}
                 <div className="flex-1 min-w-0">
