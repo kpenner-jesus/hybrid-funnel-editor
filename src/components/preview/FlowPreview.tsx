@@ -264,36 +264,32 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load — measure content after it renders, then center
+  // Center on initial load — calculate from layout data, no DOM measurement needed
   useEffect(() => {
-    if (hasInitialized.current || !funnel?.steps.length) return;
+    if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
+    hasInitialized.current = true;
 
-    // Use multiple timeouts to catch when content is ready
-    const checkAndCenter = () => {
-      if (!containerRef.current || !contentRef.current) return false;
-      const contentW = contentRef.current.scrollWidth;
-      if (contentW < 200) return false; // not rendered yet
+    const CARD_W = 380;
+    const PARALLEL_GAP = 30;
 
-      hasInitialized.current = true;
-      const cw = containerRef.current.clientWidth;
-      const targetZoom = 0.28;
-      const scaledContentW = contentW * targetZoom;
-      const centerX = (cw - scaledContentW) / 2;
+    // Find the widest row from layout data
+    let maxRowWidth = CARD_W; // at minimum, single card
+    for (const row of layoutRows) {
+      if (row.type === "parallel") {
+        const rowW = row.stepIds.length * CARD_W + (row.stepIds.length - 1) * PARALLEL_GAP;
+        if (rowW > maxRowWidth) maxRowWidth = rowW;
+      }
+    }
 
-      setZoom(targetZoom);
-      setPan({ x: Math.max(10, centerX), y: 20 });
-      return true;
-    };
+    const cw = containerRef.current.clientWidth;
+    // Zoom so the widest row fits in 90% of viewport width
+    const targetZoom = Math.min(0.35, (cw * 0.9) / maxRowWidth);
+    const scaledW = maxRowWidth * targetZoom;
+    const centerX = (cw - scaledW) / 2;
 
-    // Try at 200ms, 500ms, 1000ms
-    const t1 = setTimeout(() => { if (!checkAndCenter()) {
-      const t2 = setTimeout(() => { if (!checkAndCenter()) {
-        setTimeout(checkAndCenter, 500);
-      }}, 300);
-    }}, 200);
-
-    return () => clearTimeout(t1);
-  }, [funnel?.steps.length]);
+    setZoom(targetZoom);
+    setPan({ x: Math.max(10, centerX), y: 20 });
+  }, [funnel?.steps.length, layoutRows]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
