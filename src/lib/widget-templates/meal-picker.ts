@@ -33,9 +33,7 @@ export const mealPickerTemplate: WidgetTemplate = {
     { name: "allowCustomQuantity", type: "boolean", label: "Allow Custom Quantity per Meal", defaultValue: false },
   ],
   variants: [
-    { id: "default", name: "Grouped List", description: "Meals grouped by category (breakfast, lunch, dinner)" },
-    { id: "cards", name: "Meal Cards", description: "Visual cards with meal images" },
-    { id: "checklist", name: "Checklist", description: "Simple checkbox-based meal selection" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "per-person-calc", description: "Calculate total based on guest count and nights", condition: "always", action: "calculate_total" },

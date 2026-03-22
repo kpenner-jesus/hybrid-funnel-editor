@@ -34,9 +34,7 @@ export const datePickerTemplate: WidgetTemplate = {
     ]},
   ],
   variants: [
-    { id: "default", name: "Inline Calendar", description: "Full inline calendar with range selection" },
-    { id: "compact", name: "Compact Input", description: "Date input fields with popup calendar on focus" },
-    { id: "dual-month", name: "Dual Month", description: "Side-by-side two-month calendar view" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "min-stay", description: "Enforce minimum stay duration", condition: "nightCount < config.minStay", action: "error" },

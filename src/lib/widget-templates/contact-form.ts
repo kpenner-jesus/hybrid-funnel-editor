@@ -30,9 +30,7 @@ export const contactFormTemplate: WidgetTemplate = {
     { name: "gdprText", type: "textarea", label: "GDPR Consent Text", defaultValue: "I agree to the processing of my personal data in accordance with the privacy policy." },
   ],
   variants: [
-    { id: "default", name: "Standard Form", description: "Vertical stacked form fields" },
-    { id: "two-column", name: "Two Column", description: "Name/email on left, phone/company on right" },
-    { id: "minimal", name: "Minimal", description: "Only name and email in a compact layout" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "email-required", description: "Validate email format", condition: "!isValidEmail(contactInfo.email)", action: "error" },

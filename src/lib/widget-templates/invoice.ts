@@ -37,9 +37,7 @@ export const invoiceTemplate: WidgetTemplate = {
     { name: "showDateSummary", type: "boolean", label: "Show Date Summary", defaultValue: true },
   ],
   variants: [
-    { id: "default", name: "Standard Invoice", description: "Clean line-item invoice with subtotals" },
-    { id: "compact", name: "Compact Summary", description: "Condensed summary with key totals only" },
-    { id: "detailed", name: "Detailed Breakdown", description: "Full breakdown with per-night and per-person calculations" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "calc-total", description: "Calculate grand total from all line items", condition: "always", action: "calculate_total" },

@@ -34,9 +34,7 @@ export const guestRoomsTemplate: WidgetTemplate = {
     ]},
   ],
   variants: [
-    { id: "default", name: "Card Grid", description: "Rooms displayed as image cards in a responsive grid" },
-    { id: "compact", name: "Compact List", description: "Rooms displayed as compact list items without images" },
-    { id: "detailed", name: "Detailed Cards", description: "Large cards with full description and amenity icons" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "stock-check", description: "Disable selection when stock is 0", condition: "product.stock === 0", action: "disable" },

@@ -35,9 +35,7 @@ export const activityPickerTemplate: WidgetTemplate = {
     ]},
   ],
   variants: [
-    { id: "default", name: "Image Cards", description: "Activity cards with large images and descriptions" },
-    { id: "compact", name: "Compact List", description: "Condensed list view for many activities" },
-    { id: "carousel", name: "Carousel", description: "Horizontally scrolling activity carousel" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "capacity-check", description: "Check activity has capacity for group size", condition: "product.maxParticipants < totalGuests", action: "warn" },

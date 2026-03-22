@@ -28,9 +28,7 @@ export const guestCounterTemplate: WidgetTemplate = {
     { name: "childAgeLabel", type: "text", label: "Children Age Label", defaultValue: "Ages 2-12" },
   ],
   variants: [
-    { id: "default", name: "Vertical Counters", description: "Stacked counter rows with +/- buttons" },
-    { id: "horizontal", name: "Horizontal Counters", description: "Side-by-side counter groups" },
-    { id: "dropdown", name: "Dropdown", description: "Compact dropdown selector for guest counts" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "min-adults", description: "Require at least one adult", condition: "guests.adults < config.minAdults", action: "error" },

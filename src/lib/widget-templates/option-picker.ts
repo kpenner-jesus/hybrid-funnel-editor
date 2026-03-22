@@ -42,9 +42,7 @@ export const optionPickerTemplate: WidgetTemplate = {
     { name: "required", type: "boolean", label: "Selection Required", defaultValue: true },
   ],
   variants: [
-    { id: "default", name: "Card Grid", description: "Options as selectable cards in a grid layout" },
-    { id: "chips", name: "Pill Chips", description: "Compact horizontal pill-shaped selectors" },
-    { id: "segmented", name: "Segmented Control", description: "iOS-style segmented button bar" },
+    { id: "default", name: "Default", description: "Standard layout" },
   ],
   rules: [
     { id: "required-check", description: "Require at least one selection when required", condition: "config.required && !selectedOption", action: "error" },
