@@ -107,10 +107,11 @@ export function FlowPreview() {
   } = useFunnelStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.5);
-  const [pan, setPan] = useState({ x: 20, y: 20 });
+  const [zoom, setZoom] = useState(0.35);
+  const [pan, setPan] = useState({ x: 0, y: 20 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const hasInitialized = useRef(false);
 
   // Step element refs for drawing connections
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -122,11 +123,23 @@ export function FlowPreview() {
     return () => clearTimeout(timer);
   }, [funnel?.steps.length, zoom]);
 
+  // Center content on initial load
+  useEffect(() => {
+    if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
+    hasInitialized.current = true;
+    const container = containerRef.current;
+    const containerWidth = container.clientWidth;
+    const STEP_W = 420;
+    const contentWidth = STEP_W * zoom;
+    const centerX = (containerWidth - contentWidth) / 2;
+    setPan({ x: Math.max(0, centerX), y: 20 });
+  }, [funnel?.steps.length, zoom]);
+
   // Zoom with scroll
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setZoom((prev) => Math.max(0.15, Math.min(1.5, prev + delta)));
+    setZoom((prev) => Math.max(0.05, Math.min(1.5, prev + delta)));
   }, []);
 
   // Pan with mouse drag on background
@@ -188,27 +201,27 @@ export function FlowPreview() {
           d={`M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`}
           fill="none"
           stroke={conn.color}
-          strokeWidth={2 / zoom}
-          strokeDasharray={conn.label ? `${6 / zoom},${4 / zoom}` : "none"}
+          strokeWidth={2}
+          strokeDasharray={conn.label ? "6,4" : "none"}
           markerEnd={`url(#arrow-${ci})`}
         />
         {conn.label && (
           <>
             <rect
-              x={(fromX + toX) / 2 - (conn.label.length * 3.5) / zoom}
-              y={midY - 8 / zoom}
-              width={(conn.label.length * 7) / zoom}
-              height={16 / zoom}
-              rx={4 / zoom}
+              x={(fromX + toX) / 2 - conn.label.length * 3.5}
+              y={midY - 8}
+              width={conn.label.length * 7}
+              height={16}
+              rx={4}
               fill="white"
               stroke={conn.color}
-              strokeWidth={1 / zoom}
+              strokeWidth={1}
             />
             <text
               x={(fromX + toX) / 2}
-              y={midY + 3 / zoom}
+              y={midY + 3}
               textAnchor="middle"
-              fontSize={9 / zoom}
+              fontSize={9}
               fontWeight={600}
               fill={conn.color}
             >
@@ -222,8 +235,8 @@ export function FlowPreview() {
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
-            markerWidth={8 / zoom}
-            markerHeight={8 / zoom}
+            markerWidth={8}
+            markerHeight={8}
             orient="auto-start-reverse"
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill={conn.color} />
@@ -247,7 +260,7 @@ export function FlowPreview() {
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-1 py-0.5">
         <button
-          onClick={() => setZoom((z) => Math.max(0.15, z - 0.1))}
+          onClick={() => setZoom((z) => Math.max(0.05, z - 0.1))}
           className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold"
         >
           −
@@ -263,7 +276,21 @@ export function FlowPreview() {
         </button>
         <div className="w-px h-5 bg-gray-200" />
         <button
-          onClick={() => { setZoom(0.5); setPan({ x: 20, y: 20 }); }}
+          onClick={() => {
+            // Fit: auto-calculate zoom to fit all steps in view, then center
+            if (!containerRef.current || !funnel) return;
+            const container = containerRef.current;
+            const containerH = container.clientHeight;
+            const containerW = container.clientWidth;
+            const STEP_W = 420;
+            const totalStepHeight = funnel.steps.length * 200; // rough estimate per step
+            const fitZoomH = containerH / totalStepHeight;
+            const fitZoomW = containerW / (STEP_W + 40);
+            const fitZoom = Math.max(0.05, Math.min(0.8, Math.min(fitZoomH, fitZoomW) * 0.9));
+            const centerX = (containerW - STEP_W * fitZoom) / 2;
+            setZoom(fitZoom);
+            setPan({ x: Math.max(0, centerX), y: 10 });
+          }}
           className="px-2 h-7 flex items-center justify-center text-[10px] text-gray-500 hover:text-gray-800"
         >
           Fit
