@@ -466,6 +466,7 @@ function StepCard({
             return (
             <div
               key={widget.instanceId}
+              data-widget-scope={widget.instanceId}
               onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -481,10 +482,10 @@ function StepCard({
                 transition: "background-color 0.2s ease",
               }}
             >
-              {/* Item-level highlighting: inject CSS that targets the specific data-item-label */}
+              {/* Item-level highlighting: scoped to THIS widget via data-widget-scope */}
               {hasItemFocus && (
                 <style>{`
-                  [data-item-label="${dockedFocusedItem}"] {
+                  [data-widget-scope="${widget.instanceId}"] [data-item-label="${(dockedFocusedItem || "").replace(/"/g, '\\"')}"] {
                     background-color: ${theme.primaryColor}20 !important;
                     box-shadow: inset 0 0 0 2px ${theme.primaryColor}60 !important;
                     border-radius: 8px !important;
