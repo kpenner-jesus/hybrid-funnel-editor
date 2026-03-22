@@ -389,6 +389,7 @@ function StepCard({
   isActive,
   theme,
   selectedWidgetId,
+  dockedFocusedItem,
   borderColor,
   onStepClick,
   onWidgetClick,
@@ -402,6 +403,7 @@ function StepCard({
   isActive: boolean;
   theme: ThemeConfig;
   selectedWidgetId: string | null;
+  dockedFocusedItem?: string | null;
   borderColor?: string;
   onStepClick: () => void;
   onWidgetClick: (widgetId: string) => void;
@@ -456,9 +458,11 @@ function StepCard({
           <div className="text-center py-4 text-gray-300 text-xs border border-dashed border-gray-200 rounded-lg">No widgets</div>
         ) : (
           step.widgets.map((widget) => {
-            // In flow mode, highlight is driven by dockedWidgetId (set on double-click)
-            // Single click just selects for the editor panel, double-click docks AI
             const isDocked = selectedWidgetId === widget.instanceId;
+            const hasItemFocus = isDocked && !!dockedFocusedItem;
+            // Widget-level bg highlight: when docked to widget (no specific item)
+            const widgetBgHighlight = isDocked && !hasItemFocus;
+
             return (
             <div
               key={widget.instanceId}
@@ -470,13 +474,24 @@ function StepCard({
                 const focusedItem = itemEl?.getAttribute("data-item-label") || undefined;
                 onWidgetDoubleClick?.(widget.instanceId, focusedItem);
               }}
-              style={isDocked ? {
-                outline: `3px solid ${theme.primaryColor}`,
-                outlineOffset: "2px",
-                borderRadius: "8px",
-                boxShadow: `0 0 12px ${theme.primaryColor}40`,
-              } : undefined}
+              className="relative"
+              style={{
+                backgroundColor: widgetBgHighlight ? `${theme.primaryColor}15` : undefined,
+                borderRadius: widgetBgHighlight ? "8px" : undefined,
+                transition: "background-color 0.2s ease",
+              }}
             >
+              {/* Item-level highlighting: inject CSS that targets the specific data-item-label */}
+              {hasItemFocus && (
+                <style>{`
+                  [data-item-label="${dockedFocusedItem}"] {
+                    background-color: ${theme.primaryColor}20 !important;
+                    box-shadow: inset 0 0 0 2px ${theme.primaryColor}60 !important;
+                    border-radius: 8px !important;
+                    transition: background-color 0.2s ease, box-shadow 0.2s ease !important;
+                  }
+                `}</style>
+              )}
               <FlowWidgetRenderer
                 widget={widget}
                 theme={theme}
@@ -514,6 +529,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
 
   // Use docked widget ID for highlight persistence — this stays set even when clicks clear selectedWidgetId
   const dockedWidgetId = useAiStore((s) => s.dockedWidgetId);
+  const dockedFocusedItem = useAiStore((s) => s.dockedFocusedItem);
   const effectiveSelectedWidgetId = dockedWidgetId || selectedWidgetId;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -746,6 +762,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 isActive={previewStep === stepId}
                 theme={funnel.theme}
                 selectedWidgetId={effectiveSelectedWidgetId}
+                dockedFocusedItem={dockedFocusedItem}
                 onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
@@ -784,6 +801,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         isActive={previewStep === stepId}
                         theme={funnel.theme}
                         selectedWidgetId={effectiveSelectedWidgetId}
+                dockedFocusedItem={dockedFocusedItem}
                         borderColor="#dc2626"
                         onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
@@ -826,6 +844,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       isActive={previewStep === stepId}
                       theme={funnel.theme}
                       selectedWidgetId={effectiveSelectedWidgetId}
+                dockedFocusedItem={dockedFocusedItem}
                       borderColor={color}
                       onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
