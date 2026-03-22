@@ -5,6 +5,7 @@ import { useFunnelStore } from "@/stores/funnel-store";
 import { WidgetRenderer } from "./WidgetRenderer";
 import { FlowPreview } from "./FlowPreview";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
+import { useAiStore } from "@/stores/ai-store";
 
 // Width thresholds for step rail modes
 const RAIL_MIN = 48;
@@ -114,10 +115,19 @@ export function FunnelPreview() {
         {modeToggle}
         <div className="flex-1 overflow-hidden">
           <FlowPreview onEditWidget={(stepId, widgetId) => {
+            // Find step and widget for the label
+            const step = funnel?.steps.find((s) => s.id === stepId);
+            const widget = step?.widgets.find((w) => w.instanceId === widgetId);
+            const templateName = widget ? (widgetTemplateRegistry[widget.templateId]?.name || widget.templateId) : "Widget";
+            const label = `${templateName} — ${step?.title || "Step"}`;
+
+            // Select the widget in the editor
             setPreviewStep(stepId);
             selectStep(stepId);
             selectWidget(widgetId);
-            setPreviewMode("step");
+
+            // Dock AI to this widget
+            useAiStore.getState().dockToWidget(stepId, widgetId, label);
           }} />
         </div>
       </div>

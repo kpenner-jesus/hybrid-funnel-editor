@@ -13,6 +13,13 @@ const QUICK_SUGGESTIONS = [
   "What am I missing?",
 ];
 
+const DOCKED_SUGGESTIONS = [
+  "Change the title",
+  "Add an option",
+  "Remove the last option",
+  "Make this multi-select",
+];
+
 const MIN_WIDTH = 320;
 const MIN_HEIGHT = 400;
 
@@ -34,6 +41,9 @@ export function AiChatPanel() {
     toggleDock,
     setUndockedPosition,
     setUndockedSize,
+    dockedWidgetId,
+    dockedWidgetLabel,
+    undockWidget,
   } = useAiStore();
 
   const funnel = useFunnelStore((s) => s.funnel);
@@ -432,24 +442,40 @@ export function AiChatPanel() {
 
   // --- Shared sub-components ---
 
+  const isObjectDocked = !!dockedWidgetId;
+
   const headerContent = (
     <>
-      <div className="flex items-center gap-2">
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 20 20"
-          fill="none"
-          className="text-primary"
-        >
-          <path
-            d="M10 2l2.09 4.26L17 7.27l-3.5 3.41.82 4.82L10 13.27l-4.32 2.23.82-4.82L3 7.27l4.91-1.01L10 2z"
-            fill="currentColor"
-          />
-        </svg>
-        <span className="text-sm font-semibold text-on-surface">
-          AI Assistant
-        </span>
+      <div className="flex items-center gap-2 min-w-0">
+        {isObjectDocked ? (
+          <>
+            <span className="text-base">🎯</span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                Editing Widget
+              </div>
+              <div className="text-xs font-semibold text-on-surface truncate max-w-[180px]" title={dockedWidgetLabel || ""}>
+                {dockedWidgetLabel || "Widget"}
+              </div>
+            </div>
+            <button
+              onClick={undockWidget}
+              className="ml-1 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition-colors"
+              title="Exit object edit mode"
+            >
+              ✕ Exit
+            </button>
+          </>
+        ) : (
+          <>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-primary shrink-0">
+              <path d="M10 2l2.09 4.26L17 7.27l-3.5 3.41.82 4.82L10 13.27l-4.32 2.23.82-4.82L3 7.27l4.91-1.01L10 2z" fill="currentColor" />
+            </svg>
+            <span className="text-sm font-semibold text-on-surface">
+              AI Assistant
+            </span>
+          </>
+        )}
       </div>
       <div className="flex items-center gap-1">
         {messages.length > 0 && (
@@ -655,9 +681,10 @@ export function AiChatPanel() {
     </div>
   );
 
+  const activeSuggestions = isObjectDocked ? DOCKED_SUGGESTIONS : QUICK_SUGGESTIONS;
   const suggestions = messages.length === 0 && (
     <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-      {QUICK_SUGGESTIONS.map((suggestion) => (
+      {activeSuggestions.map((suggestion) => (
         <button
           key={suggestion}
           onClick={() => handleSuggestionClick(suggestion)}
@@ -863,9 +890,11 @@ export function AiChatPanel() {
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`fixed right-0 bg-white border-l border-outline-variant z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out ${
+        className={`fixed right-0 z-50 flex flex-col shadow-xl transition-all duration-300 ease-in-out ${
           aiPanelOpen ? "translate-x-0" : "translate-x-full"
-        } ${isMinimized ? "bottom-0 rounded-tl-xl" : "top-0 h-full"}`}
+        } ${isMinimized ? "bottom-0 rounded-tl-xl" : "top-0 h-full"} ${
+          isObjectDocked ? "bg-amber-50 border-l-2 border-amber-400" : "bg-white border-l border-outline-variant"
+        }`}
         style={{ width: isMinimized ? 280 : 360 }}
       >
         {/* Header */}

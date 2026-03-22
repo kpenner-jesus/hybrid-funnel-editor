@@ -69,6 +69,13 @@ interface AiStore {
   undockedPosition: { x: number; y: number };
   undockedSize: { width: number; height: number };
 
+  // Object-docked mode: AI scoped to a specific widget
+  dockedStepId: string | null;
+  dockedWidgetId: string | null;
+  dockedWidgetLabel: string | null; // e.g. "Option Picker — What Type of Retreat?"
+  dockToWidget: (stepId: string, widgetId: string, label: string) => void;
+  undockWidget: () => void;
+
   togglePanel: () => void;
   toggleDock: () => void;
   setUndockedPosition: (pos: { x: number; y: number }) => void;
@@ -169,6 +176,28 @@ export const useAiStore = create<AiStore>((set, get) => {
   undockedPosition: undockedInit.undockedPosition,
   undockedSize: undockedInit.undockedSize,
 
+  // Object-docked mode
+  dockedStepId: null,
+  dockedWidgetId: null,
+  dockedWidgetLabel: null,
+
+  dockToWidget: (stepId, widgetId, label) => {
+    set({
+      dockedStepId: stepId,
+      dockedWidgetId: widgetId,
+      dockedWidgetLabel: label,
+      aiPanelOpen: true,
+    });
+  },
+
+  undockWidget: () => {
+    set({
+      dockedStepId: null,
+      dockedWidgetId: null,
+      dockedWidgetLabel: null,
+    });
+  },
+
   togglePanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
 
   toggleDock: () => {
@@ -224,6 +253,24 @@ export const useAiStore = create<AiStore>((set, get) => {
     // Build context
     const aiContext = buildAiContext(funnel, state.accountContext, state.funnelContext);
 
+    // If docked to a widget, add scoped context
+    const { dockedStepId, dockedWidgetId, dockedWidgetLabel } = state;
+    let dockedContext: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number } | null = null;
+    if (dockedStepId && dockedWidgetId && funnel) {
+      const stepIdx = funnel.steps.findIndex((s) => s.id === dockedStepId);
+      const step = stepIdx >= 0 ? funnel.steps[stepIdx] : null;
+      const widgetIdx = step?.widgets.findIndex((w) => w.instanceId === dockedWidgetId) ?? -1;
+      if (stepIdx >= 0 && widgetIdx >= 0) {
+        dockedContext = {
+          stepId: dockedStepId,
+          widgetId: dockedWidgetId,
+          label: dockedWidgetLabel || "widget",
+          stepIndex: stepIdx,
+          widgetIndex: widgetIdx,
+        };
+      }
+    }
+
     // Format messages for API -- include tool results in conversation
     // Inject a live funnel state snapshot into the last user message so the AI
     // always sees the real-time state (e.g., after undo/redo) rather than trusting
@@ -238,6 +285,7 @@ export const useAiStore = create<AiStore>((set, get) => {
           messages: apiMessages,
           context: aiContext,
           model: get().selectedModel,
+          dockedContext,
         }),
       });
 

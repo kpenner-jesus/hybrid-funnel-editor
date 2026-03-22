@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
     context: AiContext;
     model?: string;
+    dockedContext?: { stepId: string; widgetId: string; label: string; stepIndex: number; widgetIndex: number } | null;
   };
 
   try {
@@ -52,7 +53,36 @@ export async function POST(request: Request) {
     currency: "USD",
   });
 
-  const systemPrompt = buildSystemPrompt(context);
+  let systemPrompt = buildSystemPrompt(context);
+
+  // If docked to a widget, prepend a scoped instruction
+  if (body.dockedContext) {
+    const dc = body.dockedContext;
+    systemPrompt = `## OBJECT EDIT MODE — SCOPED TO A SINGLE WIDGET
+
+You are in OBJECT EDIT MODE. The user has docked the AI to a specific widget and expects ALL commands to apply ONLY to this widget.
+
+**Docked widget:** ${dc.label}
+**Step index:** ${dc.stepIndex} (use this for tool calls)
+**Widget index:** ${dc.widgetIndex} (use this for tool calls)
+
+RULES:
+1. ONLY use update_widget_config with stepIndex=${dc.stepIndex} and widgetIndex=${dc.widgetIndex}
+2. Do NOT create, remove, or modify other steps or widgets
+3. Do NOT use create_complete_funnel, add_step, remove_step, or add_widget
+4. Focus exclusively on modifying THIS widget's config (options, title, style, etc.)
+5. Be conversational — the user is talking TO this widget, not about the whole funnel
+
+Example user commands in this mode:
+- "Add a Yoga Retreat option" → update options config to add it
+- "Change the title" → update title config
+- "Make this multi-select" → update multiSelect config
+- "Remove the last option" → update options config
+
+---
+
+${systemPrompt}`;
+  }
 
   // Format messages for Anthropic API
   const anthropicMessages = body.messages.map((m) => ({
