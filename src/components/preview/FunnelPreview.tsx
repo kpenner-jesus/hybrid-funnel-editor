@@ -79,10 +79,54 @@ export function FunnelPreview() {
   // Preview mode: "step" (single step) or "flow" (all steps with connections)
   const [previewMode, setPreviewMode] = useState<"step" | "flow">("step");
 
+  // --- Preview mode toggle bar (always visible) ---
+  const modeToggle = (
+    <div className="flex items-center justify-center gap-1 py-1.5 px-3 bg-white border-b border-gray-200 shrink-0">
+      <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+        <button
+          onClick={() => setPreviewMode("step")}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            previewMode === "step"
+              ? "bg-white text-gray-800 shadow-sm"
+              : "text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Step
+        </button>
+        <button
+          onClick={() => setPreviewMode("flow")}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            previewMode === "flow"
+              ? "bg-white text-gray-800 shadow-sm"
+              : "text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Flow
+        </button>
+      </div>
+    </div>
+  );
+
+  // --- Flow mode (works even with no steps — FlowPreview handles empty state) ---
+  if (previewMode === "flow") {
+    return (
+      <div className="h-full flex flex-col">
+        {modeToggle}
+        <div className="flex-1 overflow-hidden">
+          <FlowPreview />
+        </div>
+      </div>
+    );
+  }
+
+  // --- Step mode early returns ---
   if (!funnel) {
     return (
-      <div className="flex items-center justify-center h-full text-on-surface-variant text-sm">
-        No funnel loaded.
+      <div className="h-full flex flex-col">
+        {modeToggle}
+        <div className="flex-1 flex items-center justify-center text-on-surface-variant text-sm">
+          No funnel loaded.
+        </div>
       </div>
     );
   }
@@ -92,8 +136,11 @@ export function FunnelPreview() {
 
   if (!currentStep) {
     return (
-      <div className="flex items-center justify-center h-full text-on-surface-variant text-sm">
-        No steps in this funnel. Add a step to start building.
+      <div className="h-full flex flex-col">
+        {modeToggle}
+        <div className="flex-1 flex items-center justify-center text-on-surface-variant text-sm">
+          No steps in this funnel. Add a step to start building.
+        </div>
       </div>
     );
   }
@@ -116,47 +163,6 @@ export function FunnelPreview() {
       selectStep(prevStep.id);
     }
   };
-
-  // --- Preview mode toggle bar ---
-  const modeToggle = (
-    <div className="flex items-center justify-center gap-1 py-1.5 px-3 bg-white border-b border-gray-200 shrink-0">
-      <span className="text-[10px] text-gray-400 mr-2 select-none">Preview</span>
-      <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-        <button
-          onClick={() => setPreviewMode("step")}
-          className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
-            previewMode === "step"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          Step
-        </button>
-        <button
-          onClick={() => setPreviewMode("flow")}
-          className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
-            previewMode === "flow"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          Flow
-        </button>
-      </div>
-    </div>
-  );
-
-  // --- Flow mode ---
-  if (previewMode === "flow") {
-    return (
-      <div className="h-full flex flex-col">
-        {modeToggle}
-        <div className="flex-1 overflow-hidden">
-          <FlowPreview />
-        </div>
-      </div>
-    );
-  }
 
   // --- Step mode (default) ---
   return (
