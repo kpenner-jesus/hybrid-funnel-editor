@@ -1435,7 +1435,7 @@ function ImageBlockPreview({ config, theme, variant }: { config: Record<string, 
 
   if (!imageUrl) {
     return (
-      <div style={{ width: typeof width === "number" ? width : "100%", height: 200, backgroundColor: "#f3f4f6", borderRadius, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 14 }}>
+      <div data-item-label="Image" style={{ width: typeof width === "number" ? width : "100%", height: 200, backgroundColor: "#f3f4f6", borderRadius, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 14 }}>
         🏞️ No image URL set
       </div>
     );
