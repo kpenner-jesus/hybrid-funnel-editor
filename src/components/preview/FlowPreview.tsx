@@ -303,7 +303,9 @@ export function FlowPreview() {
         if (rowW > maxW) maxW = rowW;
       }
     }
-    return maxW;
+    // Add 15% buffer — rendered content is wider than card math due to
+    // segment labels, borders, badge overflows, and flex gap rounding
+    return Math.round(maxW * 1.15);
   }, [layoutRows]);
 
   // Center on initial load
@@ -312,15 +314,14 @@ export function FlowPreview() {
     hasInitialized.current = true;
 
     const cw = containerRef.current.clientWidth;
-    // Zoom to fill 80% of viewport width, cap at 65% for comfortable overview
-    const targetZoom = Math.min(0.65, (cw * 0.80) / contentWidth);
+    // Zoom to fill 85% of viewport width, cap at 65%
+    const targetZoom = Math.min(0.65, (cw * 0.85) / contentWidth);
     const scaledW = contentWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
 
     setZoom(targetZoom);
     setPan({ x: Math.max(10, centerX), y: 15 });
-    // Debug: log to help diagnose centering
-    console.log("[FlowPreview center]", { cw, contentWidth, targetZoom, scaledW: contentWidth * targetZoom, centerX, layoutRowCount: layoutRows.length });
+    console.log("[FlowPreview center]", { cw, contentWidth, targetZoom, scaledW: contentWidth * targetZoom, centerX });
   }, [funnel?.steps.length, contentWidth, layoutRows.length]);
 
   if (!funnel || funnel.steps.length === 0) {
