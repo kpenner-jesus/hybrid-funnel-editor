@@ -933,8 +933,9 @@ function MealPickerPreview({
         </p>
       )}
 
-      {/* Grid: dates as rows, meals as columns */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden" style={{ borderRadius: theme.borderRadius }}>
+      {/* Grid: dates as rows, meals as columns — horizontally scrollable when narrow */}
+      <div className="border border-gray-200 rounded-xl overflow-x-auto" style={{ borderRadius: theme.borderRadius, WebkitOverflowScrolling: "touch" }}>
+      <div style={{ minWidth: Math.max(400, 100 + meals.length * 120) }}>
         {/* Header row — meal names + prices */}
         <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: `100px repeat(${meals.length}, 1fr)` }}>
           <div className="p-2 text-[10px] text-gray-400 font-medium">Date</div>
@@ -1034,7 +1035,8 @@ function MealPickerPreview({
             </div>
           );
         })}
-      </div>
+      </div>{/* end min-width inner */}
+      </div>{/* end overflow-x-auto outer */}
 
       {/* Summary */}
       <div className="text-xs text-gray-500 text-right">
