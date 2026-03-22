@@ -1352,7 +1352,7 @@ function generateWidgetInStep(
           if (p.tags && p.tags.length > 0) catLines.push(`                      <div className="flex gap-1 mt-1 flex-wrap">${p.tags.map(t => `<span className="px-1.5 py-0.5 rounded text-[9px]" style={{ background: THEME.surfaceContainerHigh, color: THEME.outline }}>${escapeJsx(t)}</span>`).join("")}</div>`);
           catLines.push(`                    </div>`);
           catLines.push(`                    <div className="text-right">`);
-          catLines.push(`                      <div className="font-bold text-sm" style={{ color: THEME.primary }}>${fmtCat}.format(${p.price})</div>`);
+          catLines.push(`                      <div className="font-bold text-sm" style={{ color: THEME.primary }}>{${fmtCat}.format(${p.price})}</div>`);
           if (p.unit) catLines.push(`                      <div className="text-[10px]" style={{ color: THEME.outline }}>per ${escapeJsx(p.unit)}</div>`);
           catLines.push(`                    </div>`);
           if (cfg.multiSelect !== false) {
