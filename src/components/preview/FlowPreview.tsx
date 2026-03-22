@@ -264,42 +264,25 @@ export function FlowPreview() {
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
-  // Center on initial load — uses multiple attempts to ensure content is measured
+  // Center on initial load — find the first step card and center it
   useEffect(() => {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
 
-    let attempts = 0;
-    const tryCenter = () => {
-      attempts++;
-      if (!containerRef.current || !contentRef.current) {
-        if (attempts < 10) requestAnimationFrame(tryCenter);
-        return;
-      }
-
-      const contentW = contentRef.current.scrollWidth;
-      const contentH = contentRef.current.scrollHeight;
-      // Wait until content has actually rendered (non-zero dimensions)
-      if ((contentW < 100 || contentH < 100) && attempts < 10) {
-        requestAnimationFrame(tryCenter);
-        return;
-      }
-
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return;
       hasInitialized.current = true;
-      const cw = containerRef.current.clientWidth;
-      const ch = containerRef.current.clientHeight;
 
-      // Target zoom: fit the content width with padding, cap at 28%
-      const targetZoom = Math.max(0.1, Math.min(0.28, (cw * 0.8) / contentW));
-      const scaledW = contentW * targetZoom;
-      // Center horizontally: place content in the middle of viewport
-      const centerX = (cw - scaledW) / 2;
+      const cw = containerRef.current.clientWidth;
+      // The first step card is 380px wide. Center it in the viewport.
+      const CARD_W = 380;
+      const targetZoom = 0.28;
+      const scaledCardW = CARD_W * targetZoom;
+      // Center the card horizontally in the available space
+      const centerX = (cw - scaledCardW) / 2;
 
       setZoom(targetZoom);
-      setPan({ x: Math.max(10, centerX), y: 20 });
-    };
-
-    // Start after a short delay to let React render
-    const timer = setTimeout(tryCenter, 300);
+      setPan({ x: centerX, y: 20 });
+    }, 100);
     return () => clearTimeout(timer);
   }, [funnel?.steps.length]);
 
