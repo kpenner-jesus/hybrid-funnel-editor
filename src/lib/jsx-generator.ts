@@ -76,6 +76,7 @@ export function generateFunnelJSX(funnel: FunnelDefinition): string {
 interface CategoryInfo {
   roomCatIds: number[];
   mealCatIds: number[];
+  meetingMealCatIds: number[];
   activityCatIds: number[];
 }
 
@@ -108,7 +109,7 @@ function collectCategoryInfo(funnel: FunnelDefinition): CategoryInfo {
   }
 
   // No fallbacks — each venue has its own category IDs set via widget config
-  return { roomCatIds, mealCatIds, activityCatIds };
+  return { roomCatIds, mealCatIds, meetingMealCatIds, activityCatIds };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -709,11 +710,27 @@ function generateMainFunnel(
     lines.push(`  const [childAges, setChildAges] = useState([]);`);
   }
   if (hasContactForm) {
-    lines.push(`  const [contact, setContact] = useState({ first_name: '', last_name: '', email: '', phone: '', notes: '' });`);
+    lines.push(`  const [contact, setContact] = useState({ first_name: '', last_name: '', email: '', phone: '', company: '', notes: '', gdprAccepted: false });`);
   }
   if (usedTemplates.has("segment-picker")) {
     lines.push(`  const [selectedSegment, setSelectedSegment] = useState(null);`);
     lines.push(`  const [selectedSegments, setSelectedSegments] = useState([]);`);
+  }
+  // Option-picker state — one state variable per option-picker widget instance
+  if (usedTemplates.has("option-picker")) {
+    for (const step of funnel.steps) {
+      for (const widget of step.widgets) {
+        if (widget.templateId === "option-picker") {
+          const stateKey = `optPick_${widget.instanceId.slice(-6)}`;
+          const capitalized = stateKey.charAt(0).toUpperCase() + stateKey.slice(1);
+          if (widget.config.multiSelect) {
+            lines.push(`  const [${stateKey}, set${capitalized}] = useState([]);`);
+          } else {
+            lines.push(`  const [${stateKey}, set${capitalized}] = useState(null);`);
+          }
+        }
+      }
+    }
   }
   lines.push(``);
 
@@ -755,8 +772,9 @@ function generateMainFunnel(
       lines.push(`      setMealProducts([]);`);
     }
   }
-  // Meeting meal products (category 39 — always include for conference support)
-  lines.push(`      setMealMeetingProducts(cats.find(c => c.id === 39)?.products || []);`);
+  // Meeting meal products — use configured category ID, fallback to 39 for legacy support
+  const meetingMealCatId = catInfo.meetingMealCatIds[0] || 39;
+  lines.push(`      setMealMeetingProducts(cats.find(c => c.id === ${meetingMealCatId})?.products || []);`);
 
   if (hasActivities) {
     if (catInfo.activityCatIds.length === 1) {
@@ -1062,29 +1080,97 @@ function generateWidgetInStep(
         `            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5 mb-6">{activityProducts.map(a => { const q = selectedActivities[a.id] || 0, sel = q > 0, pr = Object.values(a.price || {})?.[0]?.base_price, free = !pr || pr === 0, img = (a.images || [])[0]?.url; return <div key={a.id} className="overflow-hidden transition-all duration-200" style={{ background: THEME.surfaceContainerLowest, borderRadius: '2rem', border: \`2px solid \${sel ? THEME.primary : THEME.surfaceContainerHigh + '4D'}\`, boxShadow: sel ? '0 8px 32px rgba(0,0,0,0.12)' : '0 24px 40px rgba(0,0,0,0.04)' }}><div className="relative overflow-hidden" style={{ height: '140px', background: THEME.surfaceContainerLow }}>{img ? <img src={img} alt={a.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><span className="text-5xl opacity-20">🌲</span></div>}<div className="absolute top-3 right-3 px-3 py-1.5 rounded-xl font-bold text-sm text-white" style={{ background: free ? 'rgba(0,128,0,0.85)' : 'rgba(0,0,0,0.7)' }}>{free ? 'Free' : fmtCurrency(pr)}</div>{sel && <div className="absolute top-3 left-3 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: THEME.primary }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>}</div><div className="p-4" style={{ background: sel ? \`\${THEME.primary}08\` : 'transparent' }}><div className="font-bold text-sm leading-tight mb-1" style={{ color: THEME.onSurface, fontFamily: THEME.serif }}>{a.name}</div>{a.details && <SafeHtml html={a.details} className="mb-3" />}<div className="pt-3" style={{ borderTop: \`1px solid \${THEME.outlineVariant}40\` }}><p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-3 text-center" style={{ color: THEME.outline }}>{free ? 'Add to Itinerary' : 'Quantity'}</p><CompactQtyPicker value={q} onChange={v => setSelectedActivities(p => ({ ...p, [a.id]: v }))} min={0} /></div></div></div>; })}</div>`,
       ].join("\n");
 
-    case "contact-form":
-      return [
-        `            <div className="space-y-3.5 mb-5" style={{ paddingBottom: '80px' }}>`,
-        `              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">`,
-        `                <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>First Name <span style={{ color: THEME.error }}>*</span></label><input type="text" value={contact.first_name} onChange={e => setContact(p => ({ ...p, first_name: e.target.value }))} placeholder="Jane" className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }} /></div>`,
-        `                <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>Last Name <span style={{ color: THEME.error }}>*</span></label><input type="text" value={contact.last_name} onChange={e => setContact(p => ({ ...p, last_name: e.target.value }))} placeholder="Smith" className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }} /></div>`,
-        `              </div>`,
-        `              <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>Email <span style={{ color: THEME.error }}>*</span></label><input type="email" value={contact.email} onChange={e => setContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@example.com" className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }} /></div>`,
-        `              <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>Phone <span style={{ color: THEME.error }}>*</span></label><input type="tel" value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} placeholder="+1 (555) 000-0000" className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }} /></div>`,
-        `              <div><label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}>Notes <span style={{ color: THEME.outlineVariant }}>(optional)</span></label><textarea rows={2} value={contact.notes || ''} onChange={e => setContact(p => ({ ...p, notes: e.target.value }))} placeholder="Anything else..." className={inputCls + ' resize-none'} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }} /></div>`,
-        `            </div>`,
-      ].join("\n");
+    case "contact-form": {
+      const showPhone = cfg.showPhone !== false; // default true
+      const showCompany = !!cfg.showCompany;
+      const showNotes = cfg.showNotes !== false; // default true
+      const requireEmail = cfg.requireEmail !== false;
+      const requirePhone = !!cfg.requirePhone;
+      const gdprConsent = !!cfg.gdprConsent;
+      const gdprText = (cfg.gdprText as string) || "I agree to the processing of my personal data.";
+
+      const labelStyle = `className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-1.5" style={{ color: THEME.outline }}`;
+      const reqStar = `<span style={{ color: THEME.error }}>*</span>`;
+      const optTag = `<span style={{ color: THEME.outlineVariant }}>(optional)</span>`;
+      const inputStyle = `className={inputCls} style={{ background: THEME.surfaceContainerHigh, color: THEME.onSurface, '--tw-ring-color': THEME.primary }}`;
+
+      const formLines: string[] = [];
+      formLines.push(`            <div className="space-y-3.5 mb-5" style={{ paddingBottom: '80px' }}>`);
+      // Name row — always shown
+      formLines.push(`              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">`);
+      formLines.push(`                <div><label ${labelStyle}>First Name ${reqStar}</label><input type="text" value={contact.first_name} onChange={e => setContact(p => ({ ...p, first_name: e.target.value }))} placeholder="Jane" ${inputStyle} /></div>`);
+      formLines.push(`                <div><label ${labelStyle}>Last Name ${reqStar}</label><input type="text" value={contact.last_name} onChange={e => setContact(p => ({ ...p, last_name: e.target.value }))} placeholder="Smith" ${inputStyle} /></div>`);
+      formLines.push(`              </div>`);
+      // Email — always shown
+      formLines.push(`              <div><label ${labelStyle}>Email ${requireEmail ? reqStar : optTag}</label><input type="email" value={contact.email} onChange={e => setContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@example.com" ${inputStyle} /></div>`);
+      // Phone — conditional
+      if (showPhone) {
+        formLines.push(`              <div><label ${labelStyle}>Phone ${requirePhone ? reqStar : optTag}</label><input type="tel" value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} placeholder="+1 (555) 000-0000" ${inputStyle} /></div>`);
+      }
+      // Company — conditional
+      if (showCompany) {
+        formLines.push(`              <div><label ${labelStyle}>Company / Organization ${optTag}</label><input type="text" value={contact.company || ''} onChange={e => setContact(p => ({ ...p, company: e.target.value }))} placeholder="Organization name" ${inputStyle} /></div>`);
+      }
+      // Notes — conditional
+      if (showNotes) {
+        formLines.push(`              <div><label ${labelStyle}>Notes ${optTag}</label><textarea rows={2} value={contact.notes || ''} onChange={e => setContact(p => ({ ...p, notes: e.target.value }))} placeholder="Anything else..." ${inputStyle.replace('inputCls', "inputCls + ' resize-none'")} /></div>`);
+      }
+      // GDPR consent — conditional
+      if (gdprConsent) {
+        formLines.push(`              <label className="flex items-start gap-2 mt-2 cursor-pointer">`);
+        formLines.push(`                <input type="checkbox" checked={contact.gdprAccepted || false} onChange={e => setContact(p => ({ ...p, gdprAccepted: e.target.checked }))} className="mt-0.5" />`);
+        formLines.push(`                <span className="text-xs" style={{ color: THEME.outline }}>${escapeJsx(gdprText)}</span>`);
+        formLines.push(`              </label>`);
+      }
+      formLines.push(`            </div>`);
+      return formLines.join("\n");
+    }
 
     case "option-picker": {
       const title = (cfg.title as string) || "";
-      return [
-        title
-          ? `            <h3 className="font-semibold text-lg mb-3" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(title)}</h3>`
-          : "",
-        `            {/* Option picker — implement per-funnel options here */}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      // Parse options from config (same pattern as segment-picker)
+      let parsedOpts: Array<{ id: string; label: string; description?: string; icon?: string }> = [];
+      try {
+        const raw = cfg.options;
+        if (typeof raw === "string") parsedOpts = JSON.parse(raw as string);
+        else if (Array.isArray(raw)) parsedOpts = raw as typeof parsedOpts;
+      } catch {
+        parsedOpts = [];
+      }
+      const isMulti = !!cfg.multiSelect;
+      const columns = (cfg.columns as number) || 2;
+      const optsJson = JSON.stringify(parsedOpts);
+
+      // Generate an OptionPicker using the same SegmentPicker component
+      // (it handles both single and multi select with the same card UI)
+      const optLines: string[] = [];
+      if (title) {
+        optLines.push(`            <h3 className="font-semibold text-lg mb-3" style={{ fontFamily: THEME.serif, color: THEME.onSurface }}>${escapeJsx(title)}</h3>`);
+      }
+      if (isMulti) {
+        // Multi-select: use SegmentPicker with allowMultiple
+        const stateKey = `optPick_${widget.instanceId.slice(-6)}`;
+        optLines.push(`            <SegmentPicker`);
+        optLines.push(`              options={${optsJson}}`);
+        optLines.push(`              allowMultiple`);
+        optLines.push(`              selectedMulti={${stateKey} || []}`);
+        optLines.push(`              onSelectMulti={ids => set${stateKey.charAt(0).toUpperCase() + stateKey.slice(1)}(ids)}`);
+        optLines.push(`            />`);
+      } else {
+        // Single-select with auto-advance
+        const defaultNext = _nextStepId ? `'${_nextStepId}'` : "null";
+        const stateKey = `optPick_${widget.instanceId.slice(-6)}`;
+        optLines.push(`            <SegmentPicker`);
+        optLines.push(`              options={${optsJson}}`);
+        optLines.push(`              selected={${stateKey}}`);
+        optLines.push(`              onSelect={opt => {`);
+        optLines.push(`                set${stateKey.charAt(0).toUpperCase() + stateKey.slice(1)}(opt.id);`);
+        optLines.push(`                const target = ${defaultNext};`);
+        optLines.push(`                if (target) setTimeout(() => goTo(target), 250);`);
+        optLines.push(`              }}`);
+        optLines.push(`            />`);
+      }
+      return optLines.join("\n");
     }
 
     case "segment-picker": {
