@@ -182,20 +182,71 @@ export const useAiStore = create<AiStore>((set, get) => {
   dockedWidgetLabel: null,
 
   dockToWidget: (stepId, widgetId, label) => {
-    set({
+    // Find the widget's current config for the greeting
+    const funnel = useFunnelStore.getState().funnel;
+    const step = funnel?.steps.find((s) => s.id === stepId);
+    const widget = step?.widgets.find((w) => w.instanceId === widgetId);
+
+    // Build a greeting message describing what the AI sees
+    let greeting = `🎯 **Docked to: ${label}**\n\nI'm focused on this widget. Tell me what to change — I'll only modify this widget.`;
+
+    if (widget) {
+      const templateId = widget.templateId;
+      const config = widget.config;
+
+      if (templateId === "segment-picker" || templateId === "option-picker") {
+        // Show current options
+        let options: Array<{ label?: string; id?: string }> = [];
+        try {
+          const raw = config.options;
+          if (typeof raw === "string") options = JSON.parse(raw);
+          else if (Array.isArray(raw)) options = raw;
+        } catch {}
+        if (options.length > 0) {
+          const optList = options.map((o) => `• ${o.label || o.id}`).join("\n");
+          greeting += `\n\n**Current options (${options.length}):**\n${optList}`;
+        }
+        greeting += `\n\nTry: *"add a Yoga option"*, *"rename Church to Faith-based"*, *"remove the last one"*`;
+      } else if (templateId === "date-picker") {
+        greeting += `\n\nTry: *"set minimum stay to 3 nights"*, *"change the title"*`;
+      } else if (templateId === "guest-counter") {
+        greeting += `\n\nTry: *"set max adults to 50"*, *"hide infants counter"*, *"change the title"*`;
+      } else if (templateId === "guest-rooms" || templateId === "meal-picker" || templateId === "activity-picker") {
+        greeting += `\n\nTry: *"change the title"*, *"change category ID"*, *"show images"*`;
+      } else if (templateId === "contact-form") {
+        greeting += `\n\nTry: *"hide the company field"*, *"make phone optional"*, *"change GDPR text"*`;
+      } else {
+        greeting += `\n\nTry: *"change the title"*, *"update the config"*`;
+      }
+    }
+
+    // Add greeting as an assistant message
+    const greetingMessage: AiMessage = {
+      role: "assistant",
+      content: greeting,
+    };
+
+    set((s) => ({
       dockedStepId: stepId,
       dockedWidgetId: widgetId,
       dockedWidgetLabel: label,
       aiPanelOpen: true,
-    });
+      messages: [...s.messages, greetingMessage],
+    }));
   },
 
   undockWidget: () => {
-    set({
+    // Add an undock message
+    const undockMessage: AiMessage = {
+      role: "assistant",
+      content: "🔓 Back to full funnel mode. I can now help with any part of your funnel.",
+    };
+    set((s) => ({
       dockedStepId: null,
       dockedWidgetId: null,
       dockedWidgetLabel: null,
-    });
+      messages: [...s.messages, undockMessage],
+    }));
   },
 
   togglePanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
