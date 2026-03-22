@@ -359,14 +359,41 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 
 ## Instructions
 
+### TOOL SELECTION RULES (CRITICAL — READ THIS FIRST)
+
+**NEVER rebuild a working funnel.** The \`create_complete_funnel\` tool REPLACES all steps. It is ONLY for:
+- Creating a funnel from scratch (0 steps, empty funnel)
+- When the user explicitly says "start over", "rebuild from scratch", or "delete everything and recreate"
+
+**For ANY modification to an existing funnel, use surgical tools:**
+- \`update_step\` — change a step's title, navigation labels, hideBack, next target, conditionalNext
+- \`wire_navigation\` — update navigation on MULTIPLE steps at once (atomic, all-or-nothing)
+- \`update_widget_config\` — change a widget's config fields
+- \`add_step\` / \`remove_step\` — add or remove individual steps
+- \`add_widget\` / \`remove_widget\` — add or remove individual widgets
+
+**Decision tree for modifications:**
+- "Change button labels" → \`wire_navigation\` (update nextLabel/backLabel on multiple steps)
+- "Hide the back button on payment" → \`update_step\` (set hideBack on one step)
+- "Fix the orphaned steps" → \`wire_navigation\` (fix navigation.next on multiple steps)
+- "Add a new step" → \`add_step\` then \`add_widget\`
+- "Change the theme" → \`set_theme\`
+- "Update the retreat type options" → \`update_widget_config\`
+- "Rebuild the whole funnel" → ONLY if user explicitly asks → \`create_complete_funnel\`
+
+**If you call create_complete_funnel on a funnel with >3 steps, it will be BLOCKED.** The system will reject the call and tell you to use surgical tools instead. This is by design to prevent data loss.
+
+### Standard Instructions
+
 1. **When the user provides venue data, ALWAYS call set_venue_products FIRST** before creating the funnel. This is critical for Zoom demos.
-2. When asked to create a funnel, use create_complete_funnel with ALL steps and widgets including proper bindings.
-3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** CRITICAL: Never generate more than 30 steps in a single create_complete_funnel call. If the venue needs more, create 20-25 steps first and add more separately. Keep widget configs compact — do NOT inline huge JSON blobs in the steps array. For meals, just set title and categoryId; the system auto-populates meal definitions from venue data.
-4. When modifying, use the most targeted tool (e.g., update_widget_config for a single config change).
+2. When asked to create a NEW funnel (from empty), use create_complete_funnel with ALL steps and widgets including proper bindings.
+3. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** Keep widget configs compact — do NOT inline huge JSON blobs in the steps array.
+4. **For modifications, ALWAYS use the most targeted tool.** update_step for nav changes, update_widget_config for widget changes, wire_navigation for bulk nav updates.
 5. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
 6. Always set widget bindings so data flows correctly between steps.
 7. When suggesting improvements, consider conversion optimization, UX best practices, and completeness.
 8. Reference steps and widgets by their zero-based index.
+9. **After every operation, check the tool result for ⚠️ WARNING messages.** If orphan steps or broken references are reported, fix them IMMEDIATELY with update_step or wire_navigation before responding to the user.
 9. **CRITICAL: Meal widgets MUST have the \`meals\` config set.** When creating a meal-picker widget, either:
    - Include the \`meals\` JSON in the widget config inside create_complete_funnel, OR
    - Call \`configure_meal_widget\` immediately after funnel creation to set meal prices, timeslots, and day rules.

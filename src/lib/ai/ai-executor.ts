@@ -82,6 +82,17 @@ export function executeAiToolCall(
           };
         }
 
+        // Guard: prevent nuclear rebuild on existing funnels with content
+        if (funnel && funnel.steps.length > 3) {
+          const hasWidgets = funnel.steps.some(s => s.widgets.length > 0);
+          if (hasWidgets) {
+            return {
+              success: false,
+              message: `BLOCKED: This funnel already has ${funnel.steps.length} steps with widgets. Do NOT rebuild — use update_step or wire_navigation for modifications. Use create_complete_funnel ONLY when starting from empty (0-3 steps). To force a rebuild, the user must first clear all steps.`,
+            };
+          }
+        }
+
         // Build the new funnel based on the existing one (preserving id, accountId, etc.)
         const baseFunnel = funnel ? { ...funnel } : createEmptyFunnel(name);
         baseFunnel.name = name;
@@ -168,7 +179,7 @@ export function executeAiToolCall(
 
         return {
           success: true,
-          message: `Created funnel "${name}" with ${newSteps.length} steps and ${newSteps.reduce((a, s) => a + s.widgets.length, 0)} widgets.`,
+          message: `Created funnel "${name}" with ${newSteps.length} steps and ${newSteps.reduce((a, s) => a + s.widgets.length, 0)} widgets.${validateFunnelIntegrity(store.getFunnel()!)}`,
         };
       }
 
@@ -207,7 +218,8 @@ export function executeAiToolCall(
           };
         }
         store.removeStep(step.id);
-        return { success: true, message: `Removed step "${step.title}" (index ${stepIndex}).` };
+        const rmWarnings = validateFunnelIntegrity(store.getFunnel()!);
+        return { success: true, message: `Removed step "${step.title}" (index ${stepIndex}).${rmWarnings}` };
       }
 
       case "reorder_steps": {
@@ -221,7 +233,8 @@ export function executeAiToolCall(
           return { success: false, message: `toIndex ${toIndex} is out of range.` };
         }
         store.reorderSteps(fromIndex, toIndex);
-        return { success: true, message: `Moved step from position ${fromIndex} to ${toIndex}.` };
+        const reorderWarnings = validateFunnelIntegrity(store.getFunnel()!);
+        return { success: true, message: `Moved step from position ${fromIndex} to ${toIndex}.${reorderWarnings}` };
       }
 
       case "add_widget": {
@@ -398,6 +411,85 @@ export function executeAiToolCall(
         return { success: true, message: "Searching for images..." };
       }
 
+      case "update_step": {
+        if (!funnel) return { success: false, message: "No funnel loaded." };
+        const stepIdx = args.stepIndex as number;
+        const step = resolveStepByIndex(funnel, stepIdx);
+        if (!step) return { success: false, message: `Invalid step index: ${stepIdx}. Funnel has ${funnel.steps.length} steps.` };
+
+        const updates: Partial<Step> = {};
+        if (args.title && typeof args.title === "string") updates.title = args.title;
+        if (args.navigation) {
+          const navInput = args.navigation as Record<string, unknown>;
+          const currentNav = { ...step.navigation };
+          if (navInput.next !== undefined) currentNav.next = navInput.next as string | null;
+          if (navInput.nextLabel !== undefined) currentNav.nextLabel = navInput.nextLabel as string;
+          if (navInput.backLabel !== undefined) currentNav.backLabel = navInput.backLabel as string;
+          if (navInput.hideBack !== undefined) currentNav.hideBack = navInput.hideBack as boolean;
+          if (navInput.conditionalNext !== undefined) {
+            currentNav.conditionalNext = (navInput.conditionalNext as Array<Record<string, unknown>>)?.map(r => ({
+              variable: r.variable as string,
+              operator: r.operator as "equals" | "not_equals" | "contains",
+              value: r.value as string,
+              targetStepId: r.targetStepId as string,
+              label: r.label as string | undefined,
+            })) || undefined;
+          }
+          updates.navigation = currentNav;
+        }
+
+        store.updateStep(step.id, updates);
+
+        // Post-operation validation
+        const warnings = validateFunnelIntegrity(store.getFunnel()!);
+        const msg = `Updated step "${step.title}" (index ${stepIdx}).${warnings}`;
+        return { success: true, message: msg };
+      }
+
+      case "wire_navigation": {
+        if (!funnel) return { success: false, message: "No funnel loaded." };
+        const updates = (args.updates as Array<Record<string, unknown>>) || [];
+        if (updates.length === 0) return { success: false, message: "No updates provided." };
+
+        const results: string[] = [];
+        for (const upd of updates) {
+          const idx = upd.stepIndex as number;
+          const step = resolveStepByIndex(funnel, idx);
+          if (!step) {
+            results.push(`[${idx}] SKIP: invalid index`);
+            continue;
+          }
+
+          const stepUpdates: Partial<Step> = {};
+          if (upd.title && typeof upd.title === "string") stepUpdates.title = upd.title;
+          if (upd.navigation) {
+            const navInput = upd.navigation as Record<string, unknown>;
+            const currentNav = { ...step.navigation };
+            if (navInput.next !== undefined) currentNav.next = navInput.next as string | null;
+            if (navInput.nextLabel !== undefined) currentNav.nextLabel = navInput.nextLabel as string;
+            if (navInput.backLabel !== undefined) currentNav.backLabel = navInput.backLabel as string;
+            if (navInput.hideBack !== undefined) currentNav.hideBack = navInput.hideBack as boolean;
+            if (navInput.conditionalNext !== undefined) {
+              currentNav.conditionalNext = (navInput.conditionalNext as Array<Record<string, unknown>>)?.map(r => ({
+                variable: r.variable as string,
+                operator: r.operator as "equals" | "not_equals" | "contains",
+                value: r.value as string,
+                targetStepId: r.targetStepId as string,
+                label: r.label as string | undefined,
+              })) || undefined;
+            }
+            stepUpdates.navigation = currentNav;
+          }
+
+          store.updateStep(step.id, stepUpdates);
+          results.push(`[${idx}] "${step.title}" updated`);
+        }
+
+        // Post-operation validation
+        const warnings = validateFunnelIntegrity(store.getFunnel()!);
+        return { success: true, message: `Updated ${results.length} steps:\n${results.join("\n")}${warnings}` };
+      }
+
       case "suggest_improvements": {
         // This tool doesn't modify the funnel - the AI just returns text
         return {
@@ -413,4 +505,85 @@ export function executeAiToolCall(
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return { success: false, message: `Error executing ${toolName}: ${errorMessage}` };
   }
+}
+
+// --- Post-operation validation ---
+// Checks funnel integrity after any modification and returns warning strings
+function validateFunnelIntegrity(funnel: FunnelDefinition): string {
+  const warnings: string[] = [];
+  const stepIds = new Set(funnel.steps.map(s => s.id));
+
+  // Check for orphan steps (not reachable from step 0)
+  const reachable = new Set<string>();
+  const queue = [funnel.steps[0]?.id].filter(Boolean);
+  const stepMap = new Map(funnel.steps.map((s, i) => [s.id, { step: s, index: i }]));
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    const entry = stepMap.get(id);
+    if (!entry) continue;
+    const { step: s, index: idx } = entry;
+
+    // Segment picker branches
+    const segW = s.widgets.find(w => w.templateId === "segment-picker");
+    if (segW) {
+      try {
+        const raw = (segW.config as Record<string, unknown>).options;
+        const opts = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : [];
+        for (const opt of opts) {
+          if (opt.nextStep && stepIds.has(opt.nextStep)) queue.push(opt.nextStep);
+        }
+      } catch {}
+    }
+
+    // conditionalNext
+    if (s.navigation.conditionalNext) {
+      for (const rule of s.navigation.conditionalNext) {
+        if (stepIds.has(rule.targetStepId)) queue.push(rule.targetStepId);
+      }
+    }
+
+    // navigation.next
+    if (s.navigation.next && stepIds.has(s.navigation.next)) {
+      queue.push(s.navigation.next);
+    } else if (idx < funnel.steps.length - 1) {
+      queue.push(funnel.steps[idx + 1].id);
+    }
+  }
+
+  const orphans = funnel.steps.filter(s => !reachable.has(s.id));
+  if (orphans.length > 0) {
+    warnings.push(`\n⚠️ WARNING: ${orphans.length} DISCONNECTED steps found: ${orphans.map(s => `"${s.title}"`).join(", ")}. These steps are not reachable. Fix with update_step or wire_navigation.`);
+  }
+
+  // Check for broken navigation references
+  for (const s of funnel.steps) {
+    if (s.navigation.next && !stepIds.has(s.navigation.next)) {
+      warnings.push(`\n⚠️ WARNING: Step "${s.title}" has navigation.next pointing to non-existent step ID "${s.navigation.next}".`);
+    }
+    if (s.navigation.conditionalNext) {
+      for (const rule of s.navigation.conditionalNext) {
+        if (!stepIds.has(rule.targetStepId)) {
+          warnings.push(`\n⚠️ WARNING: Step "${s.title}" has conditionalNext pointing to non-existent step ID "${rule.targetStepId}".`);
+        }
+      }
+    }
+    // Check segment picker nextStep references
+    const segW = s.widgets.find(w => w.templateId === "segment-picker");
+    if (segW) {
+      try {
+        const raw = (segW.config as Record<string, unknown>).options;
+        const opts = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : [];
+        for (const opt of opts) {
+          if (opt.nextStep && !stepIds.has(opt.nextStep)) {
+            warnings.push(`\n⚠️ WARNING: Segment option "${opt.label || opt.id}" has nextStep pointing to non-existent step ID "${opt.nextStep}".`);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return warnings.join("");
 }

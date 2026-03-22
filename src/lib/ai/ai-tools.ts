@@ -173,6 +173,90 @@ export const aiTools: AiToolDefinition[] = [
     },
   },
   {
+    name: "update_step",
+    description:
+      "Updates a step's title and/or navigation WITHOUT touching its widgets. Use this for changing button labels, hideBack, next targets, or conditionalNext rules. This is the PREFERRED tool for navigation changes — never rebuild a funnel just to change navigation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        stepIndex: { type: "number", description: "Zero-based index of the step to update" },
+        title: { type: "string", description: "New step title (optional — omit to keep current)" },
+        navigation: {
+          type: "object",
+          description: "Navigation overrides. Only include fields you want to change.",
+          properties: {
+            next: { type: "string", description: "Step ID to navigate to" },
+            nextLabel: { type: "string", description: "Text for the Next button" },
+            backLabel: { type: "string", description: "Text for the Back button" },
+            hideBack: { type: "boolean", description: "If true, hides the Back button on this step" },
+            conditionalNext: {
+              type: "array",
+              description: "Conditional navigation rules",
+              items: {
+                type: "object",
+                properties: {
+                  variable: { type: "string" },
+                  operator: { type: "string", enum: ["equals", "not_equals", "contains"] },
+                  value: { type: "string" },
+                  targetStepId: { type: "string" },
+                  label: { type: "string" },
+                },
+                required: ["variable", "operator", "value", "targetStepId"],
+              },
+            },
+          },
+        },
+      },
+      required: ["stepIndex"],
+    },
+  },
+  {
+    name: "wire_navigation",
+    description:
+      "Atomically updates navigation on MULTIPLE steps at once. Use this when you need to update button labels, hideBack, or navigation targets across many steps. Much safer than making individual update_step calls because it applies all changes together — no partial updates.",
+    input_schema: {
+      type: "object",
+      properties: {
+        updates: {
+          type: "array",
+          description: "Array of step navigation updates to apply atomically",
+          items: {
+            type: "object",
+            properties: {
+              stepIndex: { type: "number", description: "Zero-based index of the step" },
+              title: { type: "string", description: "New title (optional)" },
+              navigation: {
+                type: "object",
+                properties: {
+                  next: { type: "string" },
+                  nextLabel: { type: "string" },
+                  backLabel: { type: "string" },
+                  hideBack: { type: "boolean" },
+                  conditionalNext: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        variable: { type: "string" },
+                        operator: { type: "string", enum: ["equals", "not_equals", "contains"] },
+                        value: { type: "string" },
+                        targetStepId: { type: "string" },
+                        label: { type: "string" },
+                      },
+                      required: ["variable", "operator", "value", "targetStepId"],
+                    },
+                  },
+                },
+              },
+            },
+            required: ["stepIndex"],
+          },
+        },
+      },
+      required: ["updates"],
+    },
+  },
+  {
     name: "add_widget",
     description:
       "Adds a widget to a specific step. Specify the step by index, then the widget template ID, optional config, bindings, and variant.",
