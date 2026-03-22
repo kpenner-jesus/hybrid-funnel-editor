@@ -74,11 +74,11 @@ export function executeAiToolCall(
         const themeOverrides = (args.theme as Partial<ThemeConfig>) || {};
         const stepsData = (args.steps as Array<Record<string, unknown>>) || [];
 
-        // Guard: cap at 35 steps max to prevent runaway funnel creation
-        if (stepsData.length > 35) {
+        // Guard: cap at 60 steps max to prevent runaway funnel creation
+        if (stepsData.length > 60) {
           return {
             success: false,
-            message: `Too many steps (${stepsData.length}). Maximum is 35 per call. Create 20-25 steps first, then add more with add_step. Do NOT put huge JSON configs inline — keep widget configs minimal.`,
+            message: `Too many steps (${stepsData.length}). Maximum is 60. Most funnels have 20-30 steps. Keep widget configs compact — do NOT inline huge JSON blobs.`,
           };
         }
 
