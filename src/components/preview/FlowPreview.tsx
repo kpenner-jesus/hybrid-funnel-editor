@@ -292,7 +292,7 @@ export function FlowPreview() {
     return { layoutRows: rows, connections: conns, stepIndexMap: idxMap };
   }, [funnel]);
 
-  // Center on initial load — calculate from layout data, no DOM measurement needed
+  // Center on initial load — calculate from layout data
   useEffect(() => {
     if (hasInitialized.current || !containerRef.current || !funnel?.steps.length) return;
     hasInitialized.current = true;
@@ -300,7 +300,7 @@ export function FlowPreview() {
     const CARD_W = 380;
     const PARALLEL_GAP = 30;
 
-    // Find the widest row from layout data
+    // Find the widest row
     let maxRowWidth = CARD_W;
     for (const row of layoutRows) {
       if (row.type === "parallel") {
@@ -310,12 +310,16 @@ export function FlowPreview() {
     }
 
     const cw = containerRef.current.clientWidth;
-    const targetZoom = Math.min(0.35, (cw * 0.9) / maxRowWidth);
+    // Zoom: fit the widest row in 95% of viewport, allow up to 50%
+    const targetZoom = Math.min(0.5, (cw * 0.95) / maxRowWidth);
+    // The content div centers items via alignItems:center, so the
+    // first card is at (maxRowWidth - CARD_W) / 2 within the content.
+    // Center the CONTENT in the viewport:
     const scaledW = maxRowWidth * targetZoom;
     const centerX = (cw - scaledW) / 2;
 
     setZoom(targetZoom);
-    setPan({ x: Math.max(10, centerX), y: 20 });
+    setPan({ x: Math.max(10, centerX), y: 15 });
   }, [funnel?.steps.length, layoutRows]);
 
   if (!funnel || funnel.steps.length === 0) {
