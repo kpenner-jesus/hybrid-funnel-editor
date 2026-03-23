@@ -18,8 +18,12 @@ export function buildSystemPrompt(context: AiContext): string {
       const variantsSummary = t.variants
         .map((v) => `    - ${v.id}: ${v.name} - ${v.description}`)
         .join("\n");
+      // Rich metadata for better widget selection
+      const aiDesc = (t as Record<string, unknown>).aiDescription ? `\n    AI GUIDE: ${(t as Record<string, unknown>).aiDescription}` : "";
+      const confusion = (t as Record<string, unknown>).aiConfusionNotes ? `\n    ⚠️ ${(t as Record<string, unknown>).aiConfusionNotes}` : "";
+      const bestFor = (t as Record<string, unknown>).bestFor ? `\n    Best for: ${((t as Record<string, unknown>).bestFor as string[]).join(", ")}` : "";
       return `  ${t.id} (${t.category}) - ${t.name}
-    ${t.description}
+    ${t.description}${aiDesc}${confusion}${bestFor}
     Config fields:
 ${configSummary}
     Inputs:
