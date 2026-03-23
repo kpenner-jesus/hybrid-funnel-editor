@@ -224,13 +224,29 @@ When collectAges is true and a category has count > 0:
 - **Individual mode** (toggle): grid of number input boxes, one per person
 - User can toggle between modes
 
-**When building funnels:**
-1. For group funnels (20+ adults): set minAdults=20, maxAdults=400, showSlider=true
-2. For individual funnels (<20): set minAdults=1, maxAdults=19, showSlider=false
+**When building funnels, ALWAYS configure the guest counter properly:**
+1. For group funnels (20+ adults): set minAdults=20, maxAdults=400, showSlider=true, sliderMax=200, defaultAdults=20
+2. For individual funnels (<20): set minAdults=1, maxAdults=19, showSlider=false, defaultAdults=2
 3. Always create SEPARATE guest counter steps for group vs individual paths
 4. Set youth categories based on the venue's pricing structure
-5. If the venue charges kids meals by age ($1.50 × age), enable collectAges
-6. If the venue has a flat kids rate, disable collectAges
+5. If the venue charges kids meals by age ($1.50 × age), enable collectAges=true
+6. If the venue has a flat kids rate, disable collectAges=false
+7. **ALWAYS include youthCategories in the widget config.** Example config for a group guest counter:
+   \`\`\`json
+   {
+     "title": "How Many Guests in Your Group?",
+     "minAdults": 20,
+     "maxAdults": 400,
+     "defaultAdults": 20,
+     "showSlider": true,
+     "sliderMax": 200,
+     "collectAges": true,
+     "ageCollectionMode": "average",
+     "youthCategories": "[{\\"id\\":\\"children\\",\\"name\\":\\"Children\\",\\"ageLabel\\":\\"Ages 0-10\\",\\"minAge\\":0,\\"maxAge\\":10,\\"min\\":0,\\"max\\":100,\\"defaultCount\\":0,\\"showSlider\\":true,\\"sliderMax\\":50,\\"enabled\\":true},{\\"id\\":\\"youth\\",\\"name\\":\\"Youth\\",\\"ageLabel\\":\\"Ages 11-15\\",\\"minAge\\":11,\\"maxAge\\":15,\\"min\\":0,\\"max\\":100,\\"defaultCount\\":0,\\"showSlider\\":true,\\"sliderMax\\":50,\\"enabled\\":true}]"
+   }
+   \`\`\`
+8. For individual guest counters, use simpler config: showSlider=false, smaller maxAdults, disable categories that aren't needed
+9. **Adapt categories to the business type.** A daycare might have "Toddlers (0-3)", "Preschool (4-5)", "School Age (6-12)". A retreat center uses "Children (0-10)", "Youth (11-15)". An equipment rental wouldn't have youth categories at all — set youthCategories to "[]".
 
 ## Meal Widget — Expert Configuration Guide
 
