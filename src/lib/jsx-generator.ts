@@ -2056,6 +2056,11 @@ function generateWidgetInStep(
     }
 
     case "category-picker": {
+      // Category picker uses config-embedded product data (preview/standalone mode).
+      // In production (Rails integration), this should be replaced with API-driven
+      // product loading from getCategories(). The config data serves as fallback.
+      // TODO: When embedding in Rails, add categoryId config field and load products
+      // from api.getCategories().find(c => c.id === categoryId)?.products
       const catTitle = (cfg.title as string) || "Select Products";
       const catCurrency = (cfg.currency as string) || "CAD";
       const catStateKey = `catPick_${widget.instanceId.slice(-6)}`;

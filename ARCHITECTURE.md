@@ -326,11 +326,28 @@ The generated JSX includes a rich navigation system:
 - **MealTimeslotGrid:** Date × meal grid with availability bars and timeslot dropdowns
 - **hideBack:** Per-step toggle to prevent backward navigation
 
+### API-First Widget Pattern
+
+All product-based widgets follow a two-layer pattern:
+
+| Widget | API Source (production) | Config Fallback (preview) |
+|--------|----------------------|--------------------------|
+| Guest Rooms | `roomProducts` from `getCategories()` | venue data store rooms |
+| Meal Picker | `mealProducts` from `getCategories()` | widget config `meals` JSON |
+| Activity Picker | `activityProducts` from `getCategories()` | venue data store activities |
+| Category Picker | TODO: `getCategories()` by categoryId | widget config `categories` JSON |
+| Guest Counter | TODO: product parameters from API | widget config `youthCategories` JSON |
+
+**The rule:** Published JSX should ALWAYS prefer API data when available. Widget config data is the fallback for preview/standalone mode. The API returns real SKUs, real pricing, real parameters — the config is an approximation.
+
+**For CTO integrating with Rails:** The `MealTimeslotGrid` component already accepts both `mealProducts` (API) and `meals` (config). When `mealProducts` is populated from `getCategories()`, it overrides the config meals. Same pattern should be applied to Category Picker when wiring to real Everybooking categories.
+
 ### Known Gaps
 1. Preview uses simplified data types; JSX uses Everybooking API types (architectural by design)
 2. Some widget variants don't affect generated output (segment-picker variants work, others are cosmetic)
 3. Running total needs wiring from actual price calculations to BottomNav
 4. Mobile floating action island not yet built
+5. Category picker not yet wired to API — uses config data only (works, but no real SKUs for syncBooking)
 
 ## Navigation System
 
