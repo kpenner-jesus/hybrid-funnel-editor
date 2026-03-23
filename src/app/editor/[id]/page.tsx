@@ -396,7 +396,7 @@ function EditorPageInner() {
 
           {/* Preview content */}
           <div className="flex-1 overflow-hidden min-h-[500px]">
-            <FunnelPreview />
+            <FunnelPreview onSwitchToSteps={() => setActiveTab("steps")} />
           </div>
         </div>
       </div>

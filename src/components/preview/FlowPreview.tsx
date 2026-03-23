@@ -397,6 +397,7 @@ function StepCard({
   onWidgetClick,
   onWidgetDoubleClick,
   onWidgetRightClick,
+  onWidgetGearClick,
   onDropWidget,
   resolveWidgetInputs,
   setWidgetOutput,
@@ -413,6 +414,7 @@ function StepCard({
   onWidgetClick: (widgetId: string) => void;
   onWidgetDoubleClick?: (widgetId: string, focusedItemLabel?: string) => void;
   onWidgetRightClick?: (e: React.MouseEvent, stepId: string, widgetId: string, templateId: string) => void;
+  onWidgetGearClick?: (stepId: string, widgetId: string) => void;
   onDropWidget?: (stepId: string, templateId: string, position?: number) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
@@ -613,7 +615,22 @@ function StepCard({
               className="relative group/widget"
               style={{ borderRadius: "8px" }}
             >
-              {/* Hover delete button */}
+              {/* Hover gear button — top-left */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWidgetGearClick?.(step.id, widget.instanceId);
+                }}
+                className="absolute -top-2 -left-2 z-20 w-5 h-5 rounded-full bg-gray-600 text-white flex items-center justify-center opacity-0 group-hover/widget:opacity-100 transition-opacity shadow-sm hover:bg-gray-800 hover:scale-110"
+                title="Open widget settings"
+              >
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 10a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M13.5 8a5.5 5.5 0 01-.3 1.8l1.3.8-.8 1.4-1.3-.8a5.5 5.5 0 01-1.5 1l.1 1.5H9.3l.1-1.5a5.5 5.5 0 01-1.5-1l-1.3.8-.8-1.4 1.3-.8A5.5 5.5 0 016.5 8c0-.6.1-1.2.3-1.8l-1.3-.8.8-1.4 1.3.8a5.5 5.5 0 011.5-1L9 2.3h1.6l-.1 1.5a5.5 5.5 0 011.5 1l1.3-.8.8 1.4-1.3.8c.2.6.3 1.2.3 1.8z" stroke="currentColor" strokeWidth="1"/>
+                </svg>
+              </button>
+
+              {/* Hover delete button — top-right */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -698,7 +715,7 @@ function StepCard({
 }
 
 // --- Main Flow Preview ---
-export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, widgetId: string, focusedItemLabel?: string) => void } = {}) {
+export function FlowPreview({ onEditWidget, onGearClick }: { onEditWidget?: (stepId: string, widgetId: string, focusedItemLabel?: string) => void; onGearClick?: (stepId: string, widgetId: string) => void } = {}) {
   const {
     funnel, previewStep, setPreviewStep, selectedWidgetId,
     selectWidget, selectStep, setWidgetOutput, resolveWidgetInputs,
@@ -946,6 +963,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onWidgetGearClick={(sId, wId) => onGearClick?.(sId, wId)}
                 onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
@@ -990,6 +1008,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                         onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onWidgetGearClick={(sId, wId) => onGearClick?.(sId, wId)}
                 onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                         resolveWidgetInputs={resolveWidgetInputs}
                         setWidgetOutput={setWidgetOutput}
@@ -1035,6 +1054,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                       onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onWidgetGearClick={(sId, wId) => onGearClick?.(sId, wId)}
                 onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
