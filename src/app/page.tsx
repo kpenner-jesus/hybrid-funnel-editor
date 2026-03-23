@@ -353,7 +353,7 @@ export default function HomePage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Create your first funnel</h2>
             <p className="text-sm text-gray-500 mb-8 text-center max-w-md">
-              Build AI-assisted booking funnels for hospitality venues. Start from scratch or use the AI assistant to generate a complete funnel in seconds.
+              Build AI-assisted quotation and booking funnels for any service business. Start from scratch or use the AI to generate a complete funnel in seconds.
             </p>
             <button
               onClick={() => setShowCreate(true)}

@@ -8,7 +8,7 @@ import { useFunnelStore } from "@/stores/funnel-store";
 import { AiChatMessage } from "./AiChatMessage";
 
 const QUICK_SUGGESTIONS = [
-  "Create a retreat funnel",
+  "Create a quotation funnel",
   "Change theme colors",
   "Add a step",
   "What am I missing?",
@@ -592,7 +592,7 @@ export function AiChatPanel() {
           </span>
         ) : (
           <span className="italic">
-            No venue set &mdash; tell the AI about your venue to get started
+            No business set &mdash; tell the AI about your business to get started
           </span>
         )}
       </div>

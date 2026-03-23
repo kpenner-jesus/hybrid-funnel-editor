@@ -947,7 +947,7 @@ function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("
       {/* Conditional Navigation (Multi-Jump) */}
       <div className="pt-2 border-t border-gray-100">
         <div className="flex items-center justify-between mb-2">
-          <label className="flex items-center text-xs font-medium text-on-surface-variant">Conditional Routing<HelpTip text="Send customers to different pages based on their earlier choices (e.g., wedding guests go to venue space, corporate guests skip it)" /></label>
+          <label className="flex items-center text-xs font-medium text-on-surface-variant">Conditional Routing<HelpTip text="Send customers to different pages based on their earlier choices (e.g., one customer type sees extra options, another skips them)" /></label>
           {condRules.length > 0 && (
             <button onClick={() => setShowAdvancedNav(!showAdvancedNav)}
               className="text-[9px] text-gray-400 hover:text-gray-600">

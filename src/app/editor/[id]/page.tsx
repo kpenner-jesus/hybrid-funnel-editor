@@ -225,7 +225,7 @@ function EditorPageInner() {
         actions={
           <div className="flex items-center gap-3">
             {/* Data mode toggle */}
-            <Tooltip text={dataMode === "mock" ? "Using sample data for preview" : "Using real venue data from your store"} position="bottom">
+            <Tooltip text={dataMode === "mock" ? "Using sample data for preview" : "Using real business data from your store"} position="bottom">
               <div className="flex items-center gap-1.5 bg-surface-dim rounded-lg p-0.5">
                 <button
                   onClick={() => setDataMode("mock")}
@@ -251,7 +251,7 @@ function EditorPageInner() {
             </Tooltip>
 
             {/* Save */}
-            <Tooltip text={isDirty ? "Save your changes (they're shared with your team)" : "All changes saved"} position="bottom">
+            <Tooltip text={isDirty ? "Save your changes — shared with your team" : "All changes saved"} position="bottom">
               <Button
                 size="sm"
                 variant={saveFlash ? "secondary" : "outline"}

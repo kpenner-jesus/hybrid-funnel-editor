@@ -810,7 +810,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                   display: "flex", alignItems: "center", justifyContent: "center",
                   minHeight: 80,
                 }}>
-                  <Tooltip text="These pages can't be reached by customers. Connect them using navigation settings or ask AI to fix the wiring." position="right">
+                  <Tooltip text="These pages aren't connected to the flow. Use navigation settings or ask AI to fix the wiring." position="right">
                     <span>⚠️ DISCONNECTED</span>
                   </Tooltip>
                 </div>

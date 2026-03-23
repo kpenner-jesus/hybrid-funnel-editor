@@ -386,7 +386,7 @@ function NavigationLayoutEditor() {
   return (
     <div className="space-y-4">
       <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center">
-        Navigation Layout<HelpTip text="Controls how the header, footer, and progress indicators look in the published funnel" />
+        Navigation Layout<HelpTip text="Controls header, footer, and progress indicators in the published output" />
       </div>
 
       {/* Desktop Header */}
