@@ -2307,6 +2307,232 @@ function BookingWidgetPreview({ config, theme }: { config: Record<string, unknow
 
 // ─── Payment Widget ──────────────────────────────────────────
 
+// ─── Beverage Package Picker ─────────────────────────────
+function BeveragePackagePreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const [selectedPkg, setSelectedPkg] = useState<string>("");
+  const [hours, setHours] = useState((config.defaultHours as number) || 4);
+  const [selectedAddOns, setSelectedAddOns] = useState<Set<string>>(new Set());
+  const guestCount = 100; // preview approximation
+
+  let packages: Array<{ id: string; name: string; description: string; pricePerPerson: number; icon: string; includes: string[] }> = [];
+  try { const raw = config.packages; packages = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw as typeof packages : []; } catch {}
+
+  let addOns: Array<{ id: string; name: string; price: number; priceType: string; icon: string }> = [];
+  try { const raw = config.addOns; addOns = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw as typeof addOns : []; } catch {}
+
+  const includedHours = (config.includedHours as number) || 4;
+  const overtimeRate = (config.overtimeRate as number) || 8;
+  const pkg = packages.find(p => p.id === selectedPkg);
+  const baseTotal = pkg ? pkg.pricePerPerson * guestCount : 0;
+  const overtimeHours = Math.max(0, hours - includedHours);
+  const overtimeTotal = overtimeHours * overtimeRate * guestCount;
+  const addOnTotal = addOns.filter(a => selectedAddOns.has(a.id)).reduce((s, a) => s + (a.priceType === "per-person" ? a.price * guestCount : a.price), 0);
+  const total = baseTotal + overtimeTotal + addOnTotal;
+
+  return (
+    <div data-item-label="Beverage Package" className="space-y-4">
+      <h3 className="text-lg font-semibold" style={{ fontFamily: `${theme.headlineFont}`, color: `${theme.primaryColor}` }}>
+        {`${config.title || "Choose Your Bar Package"}`}
+      </h3>
+      {config.subtitle ? <p className="text-sm text-gray-500">{`${config.subtitle}`}</p> : null}
+
+      {/* Package cards */}
+      <div className="grid grid-cols-1 gap-3" style={{ gridTemplateColumns: packages.length <= 3 ? `repeat(${packages.length}, 1fr)` : "repeat(2, 1fr)" }}>
+        {packages.map(p => (
+          <button key={p.id} data-item-label={p.name} onClick={(e) => { e.stopPropagation(); setSelectedPkg(p.id); }}
+            className={`text-left p-3 rounded-xl border-2 transition-all ${selectedPkg === p.id ? "shadow-md" : "hover:shadow-sm"}`}
+            style={{ borderColor: selectedPkg === p.id ? theme.primaryColor : "#e5e7eb", backgroundColor: selectedPkg === p.id ? `${theme.primaryColor}08` : "#fff" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">{p.icon}</span>
+              <span className="font-semibold text-sm">{p.name}</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">{p.description}</p>
+            <div className="text-sm font-bold" style={{ color: theme.primaryColor }}>${p.pricePerPerson}/person</div>
+            {p.includes && <div className="mt-2 space-y-0.5">{p.includes.map((inc, i) => (
+              <div key={i} className="text-[10px] text-gray-400 flex items-center gap-1">
+                <span style={{ color: theme.primaryColor }}>✓</span> {inc}
+              </div>
+            ))}</div>}
+          </button>
+        ))}
+      </div>
+
+      {/* Hours slider */}
+      <div className="pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500">Service Duration</span>
+          <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>{hours} hours</span>
+        </div>
+        <input type="range" min={(config.minHours as number) || 2} max={(config.maxHours as number) || 8} value={hours}
+          onChange={(e) => { e.stopPropagation(); setHours(parseInt(e.target.value)); }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+          style={{ background: `linear-gradient(to right, ${theme.primaryColor} 0%, ${theme.primaryColor} ${((hours - 2) / 6) * 100}%, #e5e7eb ${((hours - 2) / 6) * 100}%, #e5e7eb 100%)` }} />
+        {overtimeHours > 0 && <p className="text-[10px] text-amber-600 mt-1">+{overtimeHours} overtime hour{overtimeHours > 1 ? "s" : ""} at ${overtimeRate}/person/hour</p>}
+      </div>
+
+      {/* Add-ons */}
+      {addOns.length > 0 && (
+        <div className="pt-3 border-t border-gray-100">
+          <div className="text-xs font-medium text-gray-500 mb-2">Beverage Add-Ons</div>
+          <div className="space-y-1.5">
+            {addOns.map(a => (
+              <label key={a.id} data-item-label={a.name} className="flex items-center gap-2 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" checked={selectedAddOns.has(a.id)}
+                  onChange={() => setSelectedAddOns(prev => { const next = new Set(prev); if (next.has(a.id)) next.delete(a.id); else next.add(a.id); return next; })}
+                  className="rounded border-gray-300" style={{ accentColor: theme.primaryColor }} />
+                <span className="text-xs">{a.icon} {a.name}</span>
+                <span className="text-xs font-medium ml-auto" style={{ color: theme.primaryColor }}>
+                  ${a.price}{a.priceType === "per-person" ? "/pp" : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Total */}
+      {selectedPkg && (
+        <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
+          <span className="text-xs text-gray-400">Estimated beverage total ({guestCount} guests)</span>
+          <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>${total.toLocaleString()}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Package Tier Picker ─────────────────────────────────
+function PackageTierPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const [selectedTier, setSelectedTier] = useState<string>("");
+  const guestCount = 100;
+  const pricingType = (config.pricingType as string) || "per-person";
+
+  let tiers: Array<{ id: string; name: string; icon: string; pricePerPerson: number; flatPrice: number; color: string; popular: boolean; includes: string[]; excludes: string[] }> = [];
+  try { const raw = config.tiers; tiers = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw as typeof tiers : []; } catch {}
+
+  const selected = tiers.find(t => t.id === selectedTier);
+  const total = selected ? (pricingType === "per-person" ? selected.pricePerPerson * guestCount : selected.flatPrice) : 0;
+
+  return (
+    <div data-item-label="Package Tier" className="space-y-4">
+      <h3 className="text-lg font-semibold" style={{ fontFamily: `${theme.headlineFont}`, color: `${theme.primaryColor}` }}>
+        {`${config.title || "Choose Your Package"}`}
+      </h3>
+      {config.subtitle ? <p className="text-sm text-gray-500">{`${config.subtitle}`}</p> : null}
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: tiers.length <= 3 ? `repeat(${tiers.length}, 1fr)` : "repeat(2, 1fr)" }}>
+        {tiers.map(tier => (
+          <button key={tier.id} data-item-label={tier.name} onClick={(e) => { e.stopPropagation(); setSelectedTier(tier.id); }}
+            className={`text-left p-4 rounded-xl border-2 transition-all relative ${selectedTier === tier.id ? "shadow-lg" : "hover:shadow-sm"}`}
+            style={{ borderColor: selectedTier === tier.id ? (tier.color || theme.primaryColor) : "#e5e7eb", backgroundColor: selectedTier === tier.id ? `${tier.color || theme.primaryColor}08` : "#fff" }}>
+            {tier.popular && (
+              <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold text-white"
+                style={{ backgroundColor: tier.color || theme.primaryColor }}>POPULAR</div>
+            )}
+            <div className="text-center mb-3">
+              <span className="text-2xl">{tier.icon}</span>
+              <div className="font-bold text-sm mt-1">{tier.name}</div>
+              <div className="text-lg font-bold mt-1" style={{ color: tier.color || theme.primaryColor }}>
+                ${pricingType === "per-person" ? tier.pricePerPerson : tier.flatPrice.toLocaleString()}
+                {pricingType === "per-person" && <span className="text-xs font-normal text-gray-400">/person</span>}
+              </div>
+            </div>
+            <div className="space-y-1">
+              {tier.includes.map((item, i) => (
+                <div key={i} className="text-[10px] flex items-start gap-1">
+                  <span className="text-green-500 mt-0.5">✓</span>
+                  <span className="text-gray-600">{item}</span>
+                </div>
+              ))}
+              {tier.excludes.map((item, i) => (
+                <div key={`ex-${i}`} className="text-[10px] flex items-start gap-1">
+                  <span className="text-gray-300 mt-0.5">✕</span>
+                  <span className="text-gray-300 line-through">{item}</span>
+                </div>
+              ))}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selected && (
+        <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
+          <span className="text-xs text-gray-400">{selected.name} × {guestCount} guests</span>
+          <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>${total.toLocaleString()}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Add-On Picker ───────────────────────────────────────
+function AddOnPickerPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const guestCount = 100;
+  const groupByCategory = config.groupByCategory !== false;
+
+  let addOns: Array<{ id: string; name: string; description: string; price: number; priceType: string; icon: string; imageUrl?: string; category: string }> = [];
+  try { const raw = config.addOns; addOns = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw as typeof addOns : []; } catch {}
+
+  const toggle = (id: string) => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const total = addOns.filter(a => selected.has(a.id)).reduce((s, a) => s + (a.priceType === "per-person" ? a.price * guestCount : a.price), 0);
+
+  // Group by category
+  const categories = groupByCategory
+    ? Array.from(new Set(addOns.map(a => a.category || "General")))
+    : [""];
+
+  return (
+    <div data-item-label="Add-Ons" className="space-y-4">
+      <h3 className="text-lg font-semibold" style={{ fontFamily: `${theme.headlineFont}`, color: `${theme.primaryColor}` }}>
+        {`${config.title || "Enhance Your Event"}`}
+      </h3>
+      {config.subtitle ? <p className="text-sm text-gray-500">{`${config.subtitle}`}</p> : null}
+
+      {categories.map(cat => (
+        <div key={cat}>
+          {groupByCategory && cat && (
+            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2 pb-1 border-b border-gray-100">{cat}</div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {addOns.filter(a => !groupByCategory || (a.category || "General") === cat).map(addon => {
+              const isOn = selected.has(addon.id);
+              return (
+                <button key={addon.id} data-item-label={addon.name}
+                  onClick={(e) => { e.stopPropagation(); toggle(addon.id); }}
+                  className={`text-left p-3 rounded-xl border-2 transition-all ${isOn ? "shadow-sm" : ""}`}
+                  style={{ borderColor: isOn ? theme.primaryColor : "#f3f4f6", backgroundColor: isOn ? `${theme.primaryColor}08` : "#fafafa" }}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">{addon.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold flex items-center gap-1">
+                        {addon.name}
+                        {isOn && <span className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px]" style={{ backgroundColor: theme.primaryColor }}>✓</span>}
+                      </div>
+                      <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5">{addon.description}</p>
+                      <div className="text-xs font-bold mt-1" style={{ color: theme.primaryColor }}>
+                        ${addon.price}{addon.priceType === "per-person" ? "/person" : ""}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {selected.size > 0 && (
+        <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
+          <span className="text-xs text-gray-400">{selected.size} add-on{selected.size !== 1 ? "s" : ""} selected</span>
+          <span className="text-sm font-bold" style={{ color: theme.primaryColor }}>+${total.toLocaleString()}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PaymentWidgetPreview({ config, theme }: { config: Record<string, unknown>; theme: ThemeConfig }) {
   const title = (config.title as string) || "Secure Your Booking";
   const amount = typeof config.amount === "number" ? config.amount : 10;
@@ -2519,6 +2745,15 @@ export function WidgetRenderer({
       break;
     case "payment-widget":
       content = <PaymentWidgetPreview config={widget.config} theme={theme} />;
+      break;
+    case "beverage-package-picker":
+      content = <BeveragePackagePreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "package-tier-picker":
+      content = <PackageTierPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "add-on-picker":
+      content = <AddOnPickerPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
       break;
     default:
       content = template ? (

@@ -16,6 +16,9 @@ import { categoryPickerTemplate } from "./category-picker";
 import { textInputTemplate, textareaInputTemplate } from "./text-input";
 import { bookingWidgetTemplate } from "./booking-widget";
 import { paymentWidgetTemplate } from "./payment-widget";
+import { beveragePackagePickerTemplate } from "./beverage-package-picker";
+import { packageTierPickerTemplate } from "./package-tier-picker";
+import { addOnPickerTemplate } from "./add-on-picker";
 
 // --- Rich metadata for AI selection, search, and catalog ---
 const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
@@ -273,6 +276,10 @@ export const widgetTemplateRegistry: Record<string, WidgetTemplate> = {
   "payment-widget": enrichTemplate(paymentWidgetTemplate, registryMetadata["payment-widget"]),
   // --- Display ---
   "invoice": enrichTemplate(invoiceTemplate, registryMetadata["invoice"]),
+  // --- Pricing ---
+  "beverage-package-picker": beveragePackagePickerTemplate,
+  "package-tier-picker": packageTierPickerTemplate,
+  "add-on-picker": addOnPickerTemplate,
 };
 
 export const widgetTemplateList: WidgetTemplate[] = Object.values(widgetTemplateRegistry);
