@@ -457,6 +457,79 @@ api.syncBooking({
 })
 ```
 
+### CRITICAL ARCHITECTURE PRINCIPLE: Thin Client
+
+**The editor is a THIN CLIENT. Everybooking is the single source of truth.**
+
+The editor does NOT maintain its own:
+- Parameter registry (age categories, pricing tiers)
+- Inventory system (stock counts, availability)
+- Pricing engine (base prices, group pricing, age multipliers)
+- Product catalog (beyond preview approximations)
+
+All of these live in the Everybooking database and are exposed via the API. The editor's job is:
+1. **COLLECT** — user selections (dates, quantities, room choices)
+2. **DISPLAY** — preview approximations using venue data store
+3. **PASS** — selections to `syncBooking()` with correct `{ sku, quantities: { [report_id]: value } }`
+4. **LET EVERYBOOKING CALCULATE** — pricing, taxes, invoices, inventory
+
+### Everybooking Parameter System (DO NOT REBUILD)
+
+Parameters are per-account records with:
+- `report_id` — machine identifier (e.g., "adults", "kids_age", "qty")
+- `pricing: boolean` — if true, parameter value multiplies with base_price
+- `controls_inventory: boolean` — if true, decrements stock
+- `min/max` — stored in `resource.rules["param"][report_id]`
+- Parent/child hierarchy via `parent_id` on ParameterAssignment
+
+Products return their parameters via `getCategories()`:
+```javascript
+product.parameters = [
+  { report_id: "adults", name: "Adults", controls_inventory: true, min: 1, max: 400 },
+  { report_id: "kids_age", name: "Kids Age", pricing: true, min: 0, max: 17 }
+]
+product.price = {
+  "adults": { "base_price": "50.00", "group_price": {...} },
+  "kids_age": { "base_price": "1.50" }  // $1.50 × age — server calculates
+}
+```
+
+The editor never needs to know the pricing formula. It collects `kids_age: 8` from the user and passes it to `syncBooking()`. The server calculates `$1.50 × 8 = $12.00`.
+
+### Preview vs Production Data Flow
+
+**Preview (standalone editor on Vercel):**
+```
+Venue data store (manual/AI populated)
+  → Widget preview renderers use simplified types
+  → Approximate display for Zoom demos
+  → No real pricing, no real inventory
+```
+
+**Production (embedded in Rails/Heroku):**
+```
+Everybooking API (getCategories, getProducts)
+  → Published JSX reads real products with parameters
+  → Real pricing from product.price JSONB
+  → Real inventory from stock counts
+  → Real timeslots from product timeslot records
+  → syncBooking sends { sku, quantities: { [report_id]: value } }
+  → Server calculates totals, generates invoice
+```
+
+### Guest Counter: Two Modes
+
+**Preview mode (venue data store):**
+- Uses `youthCategories` config for visual display
+- Approximate — shows adults + children/youth counters
+- Age collection is preview-only (average slider / individual boxes)
+
+**Production mode (API-driven):**
+- Reads product parameters from `getCategories()`
+- Dynamically builds counters based on which `report_id` values exist
+- Passes collected values directly to `syncBooking()`
+- No local pricing — server handles everything
+
 ### Rails Integration Hooks (rails-integration.ts)
 Pre-built mapping functions for when this editor is embedded in the Heroku Rails app:
 
@@ -472,10 +545,12 @@ funnelToRailsSurvey(funnel: FunnelDefinition): RailsSurveyData
 
 When embedded in Rails:
 1. Replace localStorage/KV persistence with Rails API calls
-2. Replace `set_venue_products` AI tool with direct database reads
-3. Products come from the venue's actual Everybooking inventory (real SKUs, stock, prices)
-4. Published JSX is saved directly to the `Funnel` model's `component_code` field
-5. No more copy-paste workflow — Publish writes to database
+2. Replace `set_venue_products` AI tool with direct database reads via `getCategories()`
+3. Products come from the venue's actual Everybooking inventory (real SKUs, stock, prices, parameters)
+4. Guest counter reads parameters from products — no local age category registry needed
+5. Published JSX is saved directly to the `Funnel` model's `component_code` field
+6. No more copy-paste workflow — Publish writes to database
+7. Parameters are NOT created by the editor — they're managed in Everybooking's admin or created during product setup
 
 ## Testing Strategy
 

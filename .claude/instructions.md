@@ -8,14 +8,16 @@ This is a **template-driven, AI-assisted funnel builder** for the Everybooking S
 
 ## Critical Rules
 
-1. **Never add `import { useState } from 'react'`** to generated JSX. The Everybooking bundler auto-injects React hooks.
-2. **Never hardcode Everybooking category IDs** (like 39 for meeting meals). Always read from widget config.
-3. **Meal products MUST include `timeslot` in syncBooking** or they're silently dropped from the invoice.
-4. **The preview is an approximation** — the JSX generator output is what actually runs. When in doubt, match the gold standard at `../guest-rooms-widget/examples/wilderness-edge-funnel.jsx`.
-5. **Vercel KV is the primary persistence** for funnels (shared across devices). localStorage is a fallback cache.
-6. **Edge Runtime required** for `/api/ai/chat/route.ts` — Vercel Hobby has 10s timeout for serverless but unlimited for Edge streaming.
-7. **Function names in generated JSX** must not start with numbers. The generator sanitizes funnel names to valid JS identifiers.
-8. **Single quotes in step titles** break generated JSX strings. The `escapeJsString` function handles this — always use it for user-provided text in generated code.
+1. **THIN CLIENT PRINCIPLE:** The editor does NOT maintain its own parameter registry, pricing engine, or inventory system. Everybooking is the single source of truth. The editor collects user selections, displays preview approximations, and passes data to `syncBooking()`. All pricing/inventory/parameter logic lives in Everybooking. Do NOT build features that duplicate Everybooking's Parameter model, pricing JSONB, or inventory system.
+2. **Never add `import { useState } from 'react'`** to generated JSX. The Everybooking bundler auto-injects React hooks.
+3. **Never hardcode Everybooking category IDs** (like 39 for meeting meals). Always read from widget config.
+4. **Meal products MUST include `timeslot` in syncBooking** or they're silently dropped from the invoice.
+5. **The preview is an approximation** — the JSX generator output is what actually runs. When in doubt, match the gold standard at `../guest-rooms-widget/examples/wilderness-edge-funnel.jsx`.
+6. **Vercel KV is the primary persistence** for funnels (shared across devices). localStorage is a fallback cache.
+7. **Edge Runtime required** for `/api/ai/chat/route.ts` — Vercel Hobby has 10s timeout for serverless but unlimited for Edge streaming.
+8. **Function names in generated JSX** must not start with numbers. The generator sanitizes funnel names to valid JS identifiers.
+9. **Single quotes in step titles** break generated JSX strings. The `escapeJsString` function handles this — always use it for user-provided text in generated code.
+10. **Parameters are Everybooking's domain.** Products return their parameters via `getCategories()` with `report_id`, `pricing`, `controls_inventory`, `min`, `max`. The editor reads these — never creates or manages parameters. The guest counter's `youthCategories` config is a preview-only approximation; in production, parameters come from the API.
 
 ## Key Files to Know
 
