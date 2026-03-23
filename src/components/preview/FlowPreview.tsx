@@ -6,6 +6,7 @@ import { useAiStore } from "@/stores/ai-store";
 import { Tooltip } from "@/components/shared/Tooltip";
 import { WidgetRenderer } from "./WidgetRenderer";
 import type { WidgetInstance, ThemeConfig, Step, FunnelDefinition } from "@/lib/types";
+import { getSwappableWidgets, widgetTemplateRegistry } from "@/lib/widget-templates";
 
 // --- Connection data ---
 interface Connection {
@@ -395,6 +396,7 @@ function StepCard({
   onStepClick,
   onWidgetClick,
   onWidgetDoubleClick,
+  onWidgetRightClick,
   resolveWidgetInputs,
   setWidgetOutput,
   stepRef,
@@ -409,6 +411,7 @@ function StepCard({
   onStepClick: () => void;
   onWidgetClick: (widgetId: string) => void;
   onWidgetDoubleClick?: (widgetId: string, focusedItemLabel?: string) => void;
+  onWidgetRightClick?: (e: React.MouseEvent, stepId: string, widgetId: string, templateId: string) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
   stepRef: (el: HTMLDivElement | null) => void;
@@ -469,6 +472,11 @@ function StepCard({
               key={widget.instanceId}
               data-widget-scope={widget.instanceId}
               onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onWidgetRightClick?.(e, step.id, widget.instanceId, widget.templateId);
+              }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 const target = e.target as HTMLElement;
@@ -565,6 +573,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
   const stepRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [renderKey, setRenderKey] = useState(0);
   const [wiredMode, setWiredMode] = useState(false); // Lines from segment option buttons
+  const [swapMenu, setSwapMenu] = useState<{ x: number; y: number; stepId: string; widgetId: string; templateId: string } | null>(null);
 
   // Re-render for SVG after layout settles
   useEffect(() => {
@@ -790,6 +799,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
+                onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -832,6 +842,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                         onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
+                onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
                         resolveWidgetInputs={resolveWidgetInputs}
                         setWidgetOutput={setWidgetOutput}
                         stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -875,6 +886,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       onStepClick={() => { setPreviewStep(stepId); selectStep(stepId); }}
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                       onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
+                onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
                       stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -888,6 +900,70 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
       </div>
 
       {/* SVG z-order note: kept before content so lines go behind cards */}
+
+      {/* Widget swap context menu */}
+      {swapMenu && (() => {
+        const alternatives = getSwappableWidgets(swapMenu.templateId);
+        const currentTemplate = widgetTemplateRegistry[swapMenu.templateId];
+        return (
+          <>
+            {/* Backdrop to close menu */}
+            <div className="fixed inset-0 z-[80]" onClick={() => setSwapMenu(null)} />
+            <div
+              className="fixed z-[81] bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[240px] max-w-[320px]"
+              style={{ left: swapMenu.x, top: swapMenu.y, maxHeight: 400, overflowY: "auto" }}
+            >
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 mb-1">
+                {currentTemplate?.name || "Widget"} · Swap with
+              </div>
+              {alternatives.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-gray-400 text-center">No alternatives available</div>
+              ) : (
+                alternatives.map(alt => (
+                  <button
+                    key={alt.id}
+                    onClick={() => {
+                      // Swap the widget: remove old, add new at same position
+                      const step = funnel.steps.find(s => s.id === swapMenu.stepId);
+                      if (step) {
+                        const widgetIdx = step.widgets.findIndex(w => w.instanceId === swapMenu.widgetId);
+                        if (widgetIdx >= 0) {
+                          const { removeWidget, addWidget } = useFunnelStore.getState();
+                          removeWidget(swapMenu.stepId, swapMenu.widgetId);
+                          addWidget(swapMenu.stepId, alt.id);
+                        }
+                      }
+                      setSwapMenu(null);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-start gap-2.5 transition-colors"
+                  >
+                    <span className="text-lg mt-0.5">{alt.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-gray-800">{alt.name}</div>
+                      <div className="text-[10px] text-gray-400 line-clamp-2">{alt.aiDescription || alt.description}</div>
+                      {alt.bestFor && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {alt.bestFor.slice(0, 2).map(b => (
+                            <span key={b} className="px-1 py-0.5 rounded text-[8px] bg-gray-50 text-gray-400 border border-gray-100">{b}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+              <div className="border-t border-gray-100 mt-1 pt-1">
+                <button
+                  onClick={() => setSwapMenu(null)}
+                  className="w-full text-left px-3 py-1.5 text-[10px] text-gray-400 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
