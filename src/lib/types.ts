@@ -114,7 +114,7 @@ export interface ConfigField {
 export interface WidgetTemplate {
   id: string;
   name: string;
-  category: "input" | "display" | "selection" | "form" | "layout" | "pricing" | "transaction" | "content";
+  category: "input" | "display" | "selection" | "form" | "layout" | "pricing" | "transaction" | "content" | "data-collection";
   description: string;
   icon: string; // emoji or icon identifier
   inputs: TemplateInput[];

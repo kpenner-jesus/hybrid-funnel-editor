@@ -2561,6 +2561,327 @@ function PaymentWidgetPreview({ config, theme }: { config: Record<string, unknow
 
 // ─── Generic Fallback ─────────────────────────────────────────
 
+// ─── Fee Calculator ─────────────────────────────────────
+function FeeCalculatorPreview({ config, theme, resolvedInputs, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; resolvedInputs: Record<string, unknown>; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Fees & Service Charges");
+  const currency = String(config.currency || "CAD");
+  const subtotal = (resolvedInputs.subtotal as number) || 2500; // demo value
+  let fees: Array<{ id: string; name: string; type: string; value: number; enabled: boolean; optional: boolean; presets?: number[] }> = [];
+  try { const raw = config.fees; fees = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch { fees = []; }
+  if (fees.length === 0) fees = [
+    { id: "service", name: "Service Charge", type: "percentage", value: 20, enabled: true, optional: false },
+    { id: "gratuity", name: "Gratuity", type: "percentage", value: 18, enabled: true, optional: true, presets: [15, 18, 20, 25] },
+    { id: "admin", name: "Admin Fee", type: "flat", value: 150, enabled: true, optional: false },
+  ];
+  const [gratuityPct, setGratuityPct] = useState(18);
+  const feeLines = fees.filter(f => f.enabled).map(f => {
+    const pct = f.id === "gratuity" ? gratuityPct : f.value;
+    const amt = f.type === "percentage" ? subtotal * pct / 100 : f.value;
+    return { ...f, calculatedAmount: amt, displayPct: f.type === "percentage" ? pct : null };
+  });
+  const totalFees = feeLines.reduce((s, f) => s + f.calculatedAmount, 0);
+  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(n);
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <div style={{ background: "#f8fafc", borderRadius: theme.borderRadius, border: "1px solid #e2e8f0", padding: 16 }}>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>Subtotal: <strong>{fmt(subtotal)}</strong></div>
+        {feeLines.map(f => (
+          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }} data-item-label={f.name}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{f.name}{f.optional && <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 6 }}>optional</span>}</div>
+              {f.displayPct !== null && <div style={{ fontSize: 11, color: "#6b7280" }}>{f.displayPct}%</div>}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: theme.primaryColor }}>{fmt(f.calculatedAmount)}</div>
+          </div>
+        ))}
+        {fees.some(f => f.id === "gratuity" && f.optional) && (
+          <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+            {(fees.find(f => f.id === "gratuity")?.presets || [15, 18, 20, 25]).map(p => (
+              <button key={p} onClick={() => setGratuityPct(p)} style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, border: `1px solid ${gratuityPct === p ? theme.primaryColor : "#d1d5db"}`, background: gratuityPct === p ? `${theme.primaryColor}15` : "white", color: gratuityPct === p ? theme.primaryColor : "#6b7280", cursor: "pointer" }}>{p}%</button>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "2px solid #e2e8f0" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1f2937" }}>Total with Fees</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: theme.primaryColor }}>{fmt(subtotal + totalFees)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Time Block Picker ──────────────────────────────────
+function TimeBlockPickerPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Event Schedule");
+  const mode = String(config.mode || "start-end");
+  const minHours = Number(config.minHours || 4);
+  const hourlyRate = Number(config.hourlyRate || 0);
+  const overtimeRate = Number(config.overtimeRate || 0);
+  const overtimeAfter = Number(config.overtimeAfterHours || 5);
+  let blocks: Array<{ id: string; label: string; startTime: string; endTime: string; description: string }> = [];
+  try { const raw = config.timeBlocks; blocks = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (blocks.length === 0) blocks = [
+    { id: "morning", label: "Morning", startTime: "08:00", endTime: "12:00", description: "8 AM - 12 PM" },
+    { id: "afternoon", label: "Afternoon", startTime: "12:00", endTime: "17:00", description: "12 PM - 5 PM" },
+    { id: "evening", label: "Evening", startTime: "17:00", endTime: "23:00", description: "5 PM - 11 PM" },
+    { id: "full-day", label: "Full Day", startTime: "08:00", endTime: "23:00", description: "8 AM - 11 PM" },
+  ];
+  const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      {minHours > 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>Minimum {minHours} hours required</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        {blocks.map(b => {
+          const sel = selectedBlock === b.id;
+          return (
+            <button key={b.id} onClick={() => { setSelectedBlock(b.id); onOutput({ startTime: b.startTime, endTime: b.endTime, totalHours: 0 }); }}
+              data-item-label={b.label}
+              style={{ padding: 14, borderRadius: theme.borderRadius, border: `2px solid ${sel ? theme.primaryColor : "#e2e8f0"}`, background: sel ? `${theme.primaryColor}08` : "white", textAlign: "left", cursor: "pointer" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: sel ? theme.primaryColor : "#1f2937" }}>{b.label}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{b.description}</div>
+            </button>
+          );
+        })}
+      </div>
+      {hourlyRate > 0 && <div style={{ fontSize: 12, color: theme.secondaryColor, fontWeight: 500 }}>${hourlyRate}/hour{overtimeRate > 0 && ` · $${overtimeRate}/hour after ${overtimeAfter}hrs`}</div>}
+    </div>
+  );
+}
+
+// ─── Floor Plan Picker ──────────────────────────────────
+function FloorPlanPickerPreview({ config, theme, resolvedInputs, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; resolvedInputs: Record<string, unknown>; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Choose Your Room Layout");
+  const guestCount = (resolvedInputs.guestCount as number) || 0;
+  const showCapacity = config.showCapacity !== false;
+  const validateCapacity = config.validateCapacity !== false;
+  let layouts: Array<{ id: string; name: string; capacity: number; description: string; imageUrl?: string; priceAdjustment?: number }> = [];
+  try { const raw = config.layouts; layouts = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (layouts.length === 0) layouts = [
+    { id: "theater", name: "Theater Style", capacity: 300, description: "Rows of chairs facing stage" },
+    { id: "rounds", name: "Rounds of 8-10", capacity: 200, description: "Round tables for dinner service" },
+    { id: "cocktail", name: "Cocktail / Standing", capacity: 400, description: "Open floor with high-tops" },
+    { id: "classroom", name: "Classroom", capacity: 150, description: "Tables and chairs facing front" },
+  ];
+  const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        {layouts.map(l => {
+          const sel = selectedLayout === l.id;
+          const overCapacity = validateCapacity && guestCount > 0 && guestCount > l.capacity;
+          return (
+            <button key={l.id} onClick={() => { setSelectedLayout(l.id); onOutput({ selectedLayout: l }); }}
+              data-item-label={l.name}
+              style={{ padding: 14, borderRadius: theme.borderRadius, border: `2px solid ${overCapacity ? "#ef4444" : sel ? theme.primaryColor : "#e2e8f0"}`, background: sel ? `${theme.primaryColor}08` : "white", textAlign: "left", cursor: "pointer", opacity: overCapacity ? 0.6 : 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: sel ? theme.primaryColor : "#1f2937" }}>📐 {l.name}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{l.description}</div>
+              {showCapacity && <div style={{ fontSize: 11, color: overCapacity ? "#ef4444" : "#9ca3af", marginTop: 4, fontWeight: 600 }}>Capacity: {l.capacity}{overCapacity && " ⚠️ Over capacity!"}</div>}
+              {(l.priceAdjustment || 0) > 0 && <div style={{ fontSize: 11, color: theme.secondaryColor, marginTop: 2 }}>+${l.priceAdjustment}</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Linen & Decor Picker ───────────────────────────────
+function LinenDecorPickerPreview({ config, theme, resolvedInputs, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; resolvedInputs: Record<string, unknown>; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Table Linens & Decor");
+  const currency = String(config.currency || "CAD");
+  let categories: Array<{ id: string; name: string; items: Array<{ id: string; name: string; pricePerUnit: number; unit: string; colors: string[]; description: string }> }> = [];
+  try { const raw = config.categories; categories = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (categories.length === 0) categories = [
+    { id: "linens", name: "Table Linens", items: [
+      { id: "tablecloth", name: "Tablecloth", pricePerUnit: 15, unit: "per table", colors: ["White", "Ivory", "Black", "Navy"], description: "Floor-length tablecloth" },
+      { id: "napkins", name: "Cloth Napkins", pricePerUnit: 2, unit: "per person", colors: ["White", "Ivory", "Black"], description: "Pressed cloth napkins" },
+    ]},
+    { id: "centerpieces", name: "Centerpieces", items: [
+      { id: "floral", name: "Floral Arrangement", pricePerUnit: 35, unit: "per table", colors: [], description: "Seasonal flowers in glass vase" },
+      { id: "candle", name: "Candle Cluster", pricePerUnit: 20, unit: "per table", colors: ["White", "Gold"], description: "Pillar and votive candles" },
+    ]},
+  ];
+  const colorMap: Record<string, string> = { White: "#fff", Ivory: "#FFFFF0", Black: "#1a1a1a", Navy: "#000080", Burgundy: "#800020", Gold: "#FFD700", "Sage Green": "#9DC183", "Blush Pink": "#FFB6C1" };
+  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(n);
+  return (
+    <div className="space-y-4" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      {categories.map(cat => (
+        <div key={cat.id}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 8 }}>{cat.name}</div>
+          <div className="space-y-2">
+            {cat.items.map(item => (
+              <div key={item.id} data-item-label={item.name} style={{ padding: 12, borderRadius: theme.borderRadius, border: "1px solid #e2e8f0", background: "white" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{item.name}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{item.description}</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: theme.primaryColor }}>{fmt(item.pricePerUnit)} <span style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af" }}>{item.unit}</span></div>
+                </div>
+                {item.colors.length > 0 && (
+                  <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                    {item.colors.slice(0, 6).map(c => (
+                      <div key={c} title={c} style={{ width: 20, height: 20, borderRadius: "50%", background: colorMap[c] || "#ddd", border: "1px solid #d1d5db", cursor: "pointer" }} />
+                    ))}
+                    {item.colors.length > 6 && <span style={{ fontSize: 10, color: "#9ca3af", alignSelf: "center" }}>+{item.colors.length - 6}</span>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Ceremony Details Picker ────────────────────────────
+function CeremonyDetailsPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Ceremony Details");
+  const subtitle = String(config.subtitle || "Tell us about your ceremony preferences");
+  let sections: Array<{ id: string; name: string; enabled: boolean; type: string; options?: Array<{ value: string; label: string }>; placeholder?: string; items?: Array<{ id: string; label: string; type: string; placeholder: string }> }> = [];
+  try { const raw = config.sections; sections = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (sections.length === 0) sections = [
+    { id: "officiant", name: "Officiant", enabled: true, type: "select", options: [{ value: "provided", label: "We have our own officiant" }, { value: "in-house", label: "Venue provides officiant" }, { value: "undecided", label: "Haven't decided yet" }] },
+    { id: "vows", name: "Vow Style", enabled: true, type: "select", options: [{ value: "traditional", label: "Traditional vows" }, { value: "custom", label: "Writing our own" }, { value: "mix", label: "Mix of both" }] },
+    { id: "music", name: "Music", enabled: true, type: "multi", items: [{ id: "processional", label: "Processional Song", type: "text", placeholder: "Walking down the aisle" }, { id: "recessional", label: "Recessional Song", type: "text", placeholder: "Exit song" }] },
+    { id: "special", name: "Special Requests", enabled: true, type: "textarea", placeholder: "Any other ceremony details..." },
+  ];
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(sections.map(s => s.id)));
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <p style={{ fontSize: 13, color: "#6b7280" }}>{subtitle}</p>
+      {sections.filter(s => s.enabled).map(section => (
+        <div key={section.id} data-item-label={section.name} style={{ border: "1px solid #e2e8f0", borderRadius: theme.borderRadius, overflow: "hidden" }}>
+          <button onClick={() => setExpanded(p => { const n = new Set(p); n.has(section.id) ? n.delete(section.id) : n.add(section.id); return n; })}
+            style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", border: "none", cursor: "pointer" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>💍 {section.name}</span>
+            <span style={{ fontSize: 10, color: "#9ca3af" }}>{expanded.has(section.id) ? "▼" : "▶"}</span>
+          </button>
+          {expanded.has(section.id) && (
+            <div style={{ padding: 14 }}>
+              {section.type === "select" && section.options && (
+                <div className="space-y-2">{section.options.map(o => (
+                  <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#374151", cursor: "pointer" }}>
+                    <input type="radio" name={section.id} style={{ accentColor: theme.primaryColor }} />{o.label}
+                  </label>
+                ))}</div>
+              )}
+              {section.type === "multi" && section.items && (
+                <div className="space-y-2">{section.items.map(item => (
+                  <div key={item.id}><label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>{item.label}</label>
+                  <input type="text" placeholder={item.placeholder} style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }} /></div>
+                ))}</div>
+              )}
+              {section.type === "textarea" && (
+                <textarea placeholder={section.placeholder} rows={3} style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13, resize: "vertical" }} />
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Site Visit Scheduler ───────────────────────────────
+function SiteVisitSchedulerPreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Schedule a Venue Tour");
+  const subtitle = String(config.subtitle || "See the space in person — tours are complimentary");
+  const optional = config.optional !== false;
+  let timeSlots: Array<{ id: string; label: string; startTime: string; endTime: string }> = [];
+  try { const raw = config.timeSlots; timeSlots = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (timeSlots.length === 0) timeSlots = [
+    { id: "morning", label: "Morning Tour", startTime: "10:00", endTime: "10:45" },
+    { id: "midday", label: "Midday Tour", startTime: "12:00", endTime: "12:45" },
+    { id: "afternoon", label: "Afternoon Tour", startTime: "14:00", endTime: "14:45" },
+  ];
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const today = new Date();
+  const demoDate = new Date(today.getTime() + 7 * 86400000);
+  const dateStr = demoDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <p style={{ fontSize: 13, color: "#6b7280" }}>{subtitle}</p>
+      <div style={{ padding: 14, background: "#f8fafc", borderRadius: theme.borderRadius, border: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 10 }}>📅 {dateStr}</div>
+        <div className="space-y-2">
+          {timeSlots.map(ts => {
+            const sel = selectedSlot === ts.id;
+            return (
+              <button key={ts.id} onClick={() => setSelectedSlot(ts.id)} data-item-label={ts.label}
+                style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 8, border: `2px solid ${sel ? theme.primaryColor : "#e2e8f0"}`, background: sel ? `${theme.primaryColor}08` : "white", cursor: "pointer" }}>
+                <span style={{ fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? theme.primaryColor : "#374151" }}>{ts.label}</span>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{ts.startTime} - {ts.endTime}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {optional && <button style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Skip — I don't need a tour</button>}
+    </div>
+  );
+}
+
+// ─── Lighting Package Picker ────────────────────────────
+function LightingPackagePreview({ config, theme, onOutput }: { config: Record<string, unknown>; theme: ThemeConfig; onOutput: (o: Record<string, unknown>) => void }) {
+  const title = String(config.title || "Event Lighting");
+  const currency = String(config.currency || "CAD");
+  let packages: Array<{ id: string; name: string; price: number; description: string; includes: string[]; recommended?: boolean }> = [];
+  let addons: Array<{ id: string; name: string; price: number; unit: string; description: string }> = [];
+  try { const raw = config.packages; packages = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  try { const raw = config.addons; addons = typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : []; } catch {}
+  if (packages.length === 0) packages = [
+    { id: "basic", name: "Essential", price: 500, description: "Clean professional lighting", includes: ["8 uplights", "Dance floor lighting", "Setup"], recommended: false },
+    { id: "standard", name: "Ambient", price: 1200, description: "Warm atmosphere with color", includes: ["16 uplights (your color)", "Pin spots", "Dance floor", "Dimming"], recommended: true },
+    { id: "premium", name: "Signature", price: 2500, description: "Full custom transformation", includes: ["24 uplights", "Gobo", "String canopy", "Technician", "Design consult"], recommended: false },
+  ];
+  const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
+  const fmt = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+  return (
+    <div className="space-y-3" data-item-label={title}>
+      <h3 style={{ fontFamily: theme.headlineFont, color: theme.primaryColor }} className="text-lg font-semibold">{title}</h3>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(packages.length, 3)}, 1fr)`, gap: 10 }}>
+        {packages.map(pkg => {
+          const sel = selectedPkg === pkg.id;
+          return (
+            <button key={pkg.id} onClick={() => { setSelectedPkg(pkg.id); onOutput({ selectedLighting: pkg }); }}
+              data-item-label={pkg.name}
+              style={{ padding: 14, borderRadius: theme.borderRadius, border: `2px solid ${sel ? theme.primaryColor : pkg.recommended ? `${theme.primaryColor}60` : "#e2e8f0"}`, background: sel ? `${theme.primaryColor}08` : "white", textAlign: "left", cursor: "pointer", position: "relative" }}>
+              {pkg.recommended && <div style={{ position: "absolute", top: -8, right: 10, background: theme.primaryColor, color: "white", fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>POPULAR</div>}
+              <div style={{ fontSize: 15, fontWeight: 700, color: sel ? theme.primaryColor : "#1f2937" }}>💡 {pkg.name}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: theme.primaryColor, margin: "6px 0" }}>{fmt(pkg.price)}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>{pkg.description}</div>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {pkg.includes.map((inc, i) => (
+                  <li key={i} style={{ fontSize: 11, color: "#374151", padding: "2px 0" }}>✓ {inc}</li>
+                ))}
+              </ul>
+            </button>
+          );
+        })}
+      </div>
+      {addons.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Individual Add-Ons</div>
+          {addons.slice(0, 4).map(a => (
+            <div key={a.id} data-item-label={a.name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9", fontSize: 12 }}>
+              <span style={{ color: "#374151" }}>{a.name}</span>
+              <span style={{ color: theme.primaryColor, fontWeight: 600 }}>{fmt(a.price)}/{a.unit}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GenericWidgetPreview({
   template,
   config,
@@ -2754,6 +3075,27 @@ export function WidgetRenderer({
       break;
     case "add-on-picker":
       content = <AddOnPickerPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "fee-calculator":
+      content = <FeeCalculatorPreview config={widget.config} theme={theme} resolvedInputs={resolvedInputs || {}} onOutput={onOutput || (() => {})} />;
+      break;
+    case "time-block-picker":
+      content = <TimeBlockPickerPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "floor-plan-picker":
+      content = <FloorPlanPickerPreview config={widget.config} theme={theme} resolvedInputs={resolvedInputs || {}} onOutput={onOutput || (() => {})} />;
+      break;
+    case "linen-decor-picker":
+      content = <LinenDecorPickerPreview config={widget.config} theme={theme} resolvedInputs={resolvedInputs || {}} onOutput={onOutput || (() => {})} />;
+      break;
+    case "ceremony-details-picker":
+      content = <CeremonyDetailsPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "site-visit-scheduler":
+      content = <SiteVisitSchedulerPreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
+      break;
+    case "lighting-package-picker":
+      content = <LightingPackagePreview config={widget.config} theme={theme} onOutput={onOutput || (() => {})} />;
       break;
     default:
       content = template ? (

@@ -19,6 +19,13 @@ import { paymentWidgetTemplate } from "./payment-widget";
 import { beveragePackagePickerTemplate } from "./beverage-package-picker";
 import { packageTierPickerTemplate } from "./package-tier-picker";
 import { addOnPickerTemplate } from "./add-on-picker";
+import { feeCalculatorTemplate } from "./fee-calculator";
+import { timeBlockPickerTemplate } from "./time-block-picker";
+import { floorPlanPickerTemplate } from "./floor-plan-picker";
+import { linenDecorPickerTemplate } from "./linen-decor-picker";
+import { ceremonyDetailsPickerTemplate } from "./ceremony-details-picker";
+import { siteVisitSchedulerTemplate } from "./site-visit-scheduler";
+import { lightingPackagePickerTemplate } from "./lighting-package-picker";
 
 // --- Rich metadata for AI selection, search, and catalog ---
 const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
@@ -316,6 +323,14 @@ export const widgetTemplateRegistry: Record<string, WidgetTemplate> = {
   "beverage-package-picker": beveragePackagePickerTemplate,
   "package-tier-picker": packageTierPickerTemplate,
   "add-on-picker": addOnPickerTemplate,
+  "fee-calculator": feeCalculatorTemplate,
+  // --- Event Planning ---
+  "time-block-picker": timeBlockPickerTemplate,
+  "floor-plan-picker": floorPlanPickerTemplate,
+  "linen-decor-picker": linenDecorPickerTemplate,
+  "ceremony-details-picker": ceremonyDetailsPickerTemplate,
+  "site-visit-scheduler": siteVisitSchedulerTemplate,
+  "lighting-package-picker": lightingPackagePickerTemplate,
 };
 
 export const widgetTemplateList: WidgetTemplate[] = Object.values(widgetTemplateRegistry);
@@ -352,9 +367,10 @@ export function getSwappableWidgets(templateId: string): WidgetTemplate[] {
 export const templateCategories = [
   { id: "content", label: "Content", description: "Hero banners, headlines, text, images" },
   { id: "input", label: "Input", description: "Dates, counts, text fields" },
-  { id: "selection", label: "Selection", description: "Products, options, rooms, meals" },
-  { id: "pricing", label: "Pricing", description: "Packages, add-ons, beverages, fees" },
-  { id: "form", label: "Form", description: "Contact forms, data collection" },
+  { id: "selection", label: "Selection", description: "Products, options, rooms, meals, layouts, decor" },
+  { id: "pricing", label: "Pricing", description: "Packages, add-ons, beverages, fees, lighting" },
+  { id: "data-collection", label: "Details", description: "Ceremony details, scheduling, preferences" },
+  { id: "form", label: "Form", description: "Contact forms, text inputs" },
   { id: "transaction", label: "Transaction", description: "Booking, payment, invoice" },
 ] as const;
 
