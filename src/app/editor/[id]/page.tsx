@@ -13,6 +13,7 @@ import { FunnelPreview } from "@/components/preview/FunnelPreview";
 import { PublishModal } from "@/components/editor/PublishModal";
 import { DiagnosticsPanel } from "@/components/editor/DiagnosticsPanel";
 import { AiChatPanel } from "@/components/ai/AiChatPanel";
+import { Tooltip } from "@/components/shared/Tooltip";
 import { useAiStore } from "@/stores/ai-store";
 import { generateFunnelJSX } from "@/lib/jsx-generator";
 
@@ -210,10 +211,10 @@ function EditorPageInner() {
     );
   }
 
-  const tabs: { id: EditorTab; label: string }[] = [
-    { id: "steps", label: "Steps" },
-    { id: "theme", label: "Theme" },
-    { id: "variables", label: "Variables" },
+  const tabs: { id: EditorTab; label: string; tip: string }[] = [
+    { id: "steps", label: "Steps", tip: "Build your funnel's pages and widgets" },
+    { id: "theme", label: "Theme", tip: "Colors, fonts, and navigation layout" },
+    { id: "variables", label: "Variables", tip: "See how data flows between steps (advanced)" },
   ];
 
   return (
@@ -224,36 +225,39 @@ function EditorPageInner() {
         actions={
           <div className="flex items-center gap-3">
             {/* Data mode toggle */}
-            <div className="flex items-center gap-1.5 bg-surface-dim rounded-lg p-0.5">
-              <button
-                onClick={() => setDataMode("mock")}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  dataMode === "mock"
-                    ? "bg-white text-on-surface shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                Mock
-              </button>
-              <button
-                onClick={() => setDataMode("live")}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  dataMode === "live"
-                    ? "bg-white text-on-surface shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface"
-                }`}
-              >
-                Live
-              </button>
-            </div>
+            <Tooltip text={dataMode === "mock" ? "Using sample data for preview" : "Using real venue data from your store"} position="bottom">
+              <div className="flex items-center gap-1.5 bg-surface-dim rounded-lg p-0.5">
+                <button
+                  onClick={() => setDataMode("mock")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    dataMode === "mock"
+                      ? "bg-white text-on-surface shadow-sm"
+                      : "text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  Mock
+                </button>
+                <button
+                  onClick={() => setDataMode("live")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    dataMode === "live"
+                      ? "bg-white text-on-surface shadow-sm"
+                      : "text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  Live
+                </button>
+              </div>
+            </Tooltip>
 
             {/* Save */}
-            <Button
-              size="sm"
-              variant={saveFlash ? "secondary" : "outline"}
-              onClick={handleSave}
-              disabled={!isDirty && !saveFlash}
-            >
+            <Tooltip text={isDirty ? "Save your changes (they're shared with your team)" : "All changes saved"} position="bottom">
+              <Button
+                size="sm"
+                variant={saveFlash ? "secondary" : "outline"}
+                onClick={handleSave}
+                disabled={!isDirty && !saveFlash}
+              >
               {saveFlash ? (
                 <>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -265,6 +269,7 @@ function EditorPageInner() {
                 <>Save{isDirty ? " *" : ""}</>
               )}
             </Button>
+            </Tooltip>
 
             {/* Undo / Redo */}
             <div className="flex items-center border border-outline-variant rounded-lg overflow-hidden">
@@ -318,7 +323,9 @@ function EditorPageInner() {
             </Button>
 
             {/* Publish */}
-            <Button size="sm" onClick={handlePublish}>Publish</Button>
+            <Tooltip text="Generate the final code for your funnel. You'll review it before anything goes live." position="bottom">
+              <Button size="sm" onClick={handlePublish}>Publish</Button>
+            </Tooltip>
           </div>
         }
       />
@@ -333,8 +340,8 @@ function EditorPageInner() {
           {/* Tab bar */}
           <div className="flex border-b border-outline-variant">
             {tabs.map((tab) => (
+              <Tooltip key={tab.id} text={tab.tip} position="bottom">
               <button
-                key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors relative ${
                   activeTab === tab.id
@@ -347,6 +354,7 @@ function EditorPageInner() {
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
                 )}
               </button>
+              </Tooltip>
             ))}
           </div>
 

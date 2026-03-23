@@ -6,6 +6,7 @@ import { WidgetRenderer } from "./WidgetRenderer";
 import { FlowPreview } from "./FlowPreview";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 import { useAiStore } from "@/stores/ai-store";
+import { Tooltip } from "@/components/shared/Tooltip";
 
 // Width thresholds for step rail modes
 const RAIL_MIN = 48;
@@ -84,26 +85,30 @@ export function FunnelPreview() {
   const modeToggle = (
     <div className="flex items-center justify-center gap-1 py-1.5 px-3 bg-white border-b border-gray-200 shrink-0">
       <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-        <button
-          onClick={() => setPreviewMode("step")}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-            previewMode === "step"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          Step
-        </button>
-        <button
-          onClick={() => setPreviewMode("flow")}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-            previewMode === "flow"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          Flow
-        </button>
+        <Tooltip text="Preview one page at a time, like the customer sees it" position="bottom">
+          <button
+            onClick={() => setPreviewMode("step")}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              previewMode === "step"
+                ? "bg-white text-gray-800 shadow-sm"
+                : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            Step
+          </button>
+        </Tooltip>
+        <Tooltip text="See all pages and how they connect. Double-click any widget to edit it with AI." position="bottom">
+          <button
+            onClick={() => setPreviewMode("flow")}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              previewMode === "flow"
+                ? "bg-white text-gray-800 shadow-sm"
+                : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            Flow
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

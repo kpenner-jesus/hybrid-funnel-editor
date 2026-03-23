@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
+import { HelpTip } from "@/components/shared/Tooltip";
 import { THEME_PRESETS, PRESET_CATEGORIES, type ThemePreset } from "@/lib/theme-presets";
 
 function PresetSwatch({ preset, isActive, onClick }: {
@@ -155,7 +156,7 @@ export function ThemeEditor() {
 
         {/* Primary Color */}
         <div className="mb-3">
-          <label className="block text-xs text-on-surface-variant mb-1.5">Primary Color</label>
+          <label className="flex items-center text-xs text-on-surface-variant mb-1.5">Primary Color<HelpTip text="Main brand color — used for buttons, links, and headings" /></label>
           <div className="flex gap-2 items-center">
             <input
               type="color"
@@ -174,7 +175,7 @@ export function ThemeEditor() {
 
         {/* Secondary Color */}
         <div className="mb-3">
-          <label className="block text-xs text-on-surface-variant mb-1.5">Secondary Color</label>
+          <label className="flex items-center text-xs text-on-surface-variant mb-1.5">Secondary Color<HelpTip text="Accent color — used for highlights, badges, and step labels" /></label>
           <div className="flex gap-2 items-center">
             <input
               type="color"
@@ -193,7 +194,7 @@ export function ThemeEditor() {
 
         {/* Surface Color */}
         <div>
-          <label className="block text-xs text-on-surface-variant mb-1.5">Surface Color</label>
+          <label className="flex items-center text-xs text-on-surface-variant mb-1.5">Surface Color<HelpTip text="Background color for the funnel pages" /></label>
           <div className="flex gap-2 items-center">
             <input
               type="color"
@@ -384,8 +385,8 @@ function NavigationLayoutEditor() {
 
   return (
     <div className="space-y-4">
-      <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
-        Navigation Layout
+      <div className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center">
+        Navigation Layout<HelpTip text="Controls how the header, footer, and progress indicators look in the published funnel" />
       </div>
 
       {/* Desktop Header */}
