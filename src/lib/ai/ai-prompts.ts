@@ -246,7 +246,12 @@ When collectAges is true and a category has count > 0:
    }
    \`\`\`
 8. For individual guest counters, use simpler config: showSlider=false, smaller maxAdults, disable categories that aren't needed
-9. **Adapt categories to the business type.** A daycare might have "Toddlers (0-3)", "Preschool (4-5)", "School Age (6-12)". A retreat center uses "Children (0-10)", "Youth (11-15)". An equipment rental wouldn't have youth categories at all — set youthCategories to "[]".
+9. **Youth categories are OPTIONAL — only add them when the business serves children/youth.**
+   - Hospitality (retreats, hotels, weddings): YES — Children (0-10) + Youth (11-15)
+   - Daycare/education: YES — Toddlers (0-3), Preschool (4-5), School Age (6-12)
+   - Equipment rental, construction, photography, medical: NO — omit youthCategories entirely or set to "[]"
+   - When omitted, the widget shows ONLY the adults counter with slider
+   - The guest-counter widget works perfectly fine with just adults — don't force youth categories onto every business
 
 ## Meal Widget — Expert Configuration Guide
 
@@ -513,7 +518,7 @@ Extract rooms, meals, and activities from whatever format the user provides (pas
 1. **When the user provides venue data, ALWAYS call set_venue_products FIRST** before creating the funnel. This is critical for Zoom demos.
 2. When asked to create a NEW funnel (from empty), use create_complete_funnel with ALL steps and widgets including proper bindings.
 3. **ALWAYS call set_theme with layout after creating a funnel.** Choose the right desktopHeader, mobileHeader, footerStyle, and feature toggles based on the venue type. See the "Match theme AND layout to venue type" table above. Never leave layout on defaults — proactively pick what fits the venue.
-4. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** Keep widget configs compact — do NOT inline huge JSON blobs in the steps array. **EXCEPTIONS:** guest-counter MUST include youthCategories, and meal-picker MUST include meals config. These are required for the widgets to render correctly. Use the default values from the Expert Configuration Guides above — don't invent custom structures.
+4. **Funnels typically have 20-30 steps (maximum 60). Each step has 1-3 widgets.** Keep widget configs compact — do NOT inline huge JSON blobs in the steps array. **EXCEPTIONS:** meal-picker MUST include meals config (required for timeslot grid). Guest-counter youthCategories should be included ONLY for hospitality/education businesses that serve children — omit for other business types.
 4. **For modifications, ALWAYS use the most targeted tool.** update_step for nav changes, update_widget_config for widget changes, wire_navigation for bulk nav updates.
 5. Always set proper navigation labels (first step has no backLabel, last step has a submit-oriented nextLabel).
 6. Always set widget bindings so data flows correctly between steps.

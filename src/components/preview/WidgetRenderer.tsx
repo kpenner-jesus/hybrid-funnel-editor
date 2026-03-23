@@ -204,12 +204,8 @@ function GuestCounterPreview({
     if (typeof raw === "string") categories = JSON.parse(raw);
     else if (Array.isArray(raw)) categories = raw as typeof categories;
   } catch { /* ignore */ }
-  if (categories.length === 0) {
-    categories = [
-      { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
-      { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
-    ];
-  }
+  // No default categories — the AI decides based on business type.
+  // Hospitality funnels get Children/Youth. Other businesses may have none.
 
   const [catCounts, setCatCounts] = useState<Record<string, number>>(
     Object.fromEntries(categories.map(c => [c.id, c.defaultCount || 0]))

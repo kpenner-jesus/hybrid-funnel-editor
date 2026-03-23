@@ -1699,12 +1699,8 @@ function generateWidgetInStep(
         if (typeof raw === "string") gcCategories = JSON.parse(raw);
         else if (Array.isArray(raw)) gcCategories = raw as typeof gcCategories;
       } catch {}
-      if (gcCategories.length === 0) {
-        gcCategories = [
-          { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, showSlider: true, sliderMax: 50, enabled: true },
-          { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, showSlider: true, sliderMax: 50, enabled: true },
-        ];
-      }
+      // No default categories — the AI decides based on business type.
+      // If no categories, the counter only shows adults.
       const enabledCats = gcCategories.filter(c => c.enabled !== false);
 
       const gcLines: string[] = [];

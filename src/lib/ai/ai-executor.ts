@@ -167,17 +167,14 @@ export function executeAiToolCall(
               }
             }
 
-            // Auto-populate guest-counter defaults if youthCategories not set
-            if (templateId === "guest-counter" && !((wd.config as Record<string, unknown>)?.youthCategories)) {
-              widget.config.youthCategories = JSON.stringify([
-                { id: "children", name: "Children", ageLabel: "Ages 0-10", minAge: 0, maxAge: 10, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
-                { id: "youth", name: "Youth", ageLabel: "Ages 11-15", minAge: 11, maxAge: 15, min: 0, max: 100, defaultCount: 0, showSlider: true, sliderMax: 50, enabled: true },
-              ]);
-              // Set sensible defaults if not provided
-              if (!widget.config.showSlider) widget.config.showSlider = true;
-              if (!widget.config.sliderMax) widget.config.sliderMax = 200;
-              if (!widget.config.collectAges) widget.config.collectAges = true;
-              if (!widget.config.ageCollectionMode) widget.config.ageCollectionMode = "average";
+            // Auto-populate guest-counter slider defaults (but NOT youth categories — those are business-specific)
+            if (templateId === "guest-counter") {
+              // Only set slider defaults if not explicitly provided by the AI
+              if (widget.config.showSlider === undefined) widget.config.showSlider = true;
+              if (widget.config.sliderMax === undefined) widget.config.sliderMax = 200;
+              // Do NOT auto-add youthCategories — the AI decides based on business type.
+              // Hospitality gets Children/Youth. Equipment rental gets nothing.
+              // The widget renders fine without youthCategories (just shows adults).
             }
 
             stepWidgets.push(widget);
