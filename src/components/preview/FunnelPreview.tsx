@@ -278,6 +278,10 @@ export function FunnelPreview() {
           setPreviewStep(step.id);
           selectStep(step.id);
         }}
+        onDropWidget={(stepId, templateId) => {
+          const { addWidget } = useFunnelStore.getState();
+          addWidget(stepId, templateId);
+        }}
       />
       </div>
     </div>
@@ -294,6 +298,7 @@ function StepRail({
   railWidth,
   showThumbnails,
   onStepClick,
+  onDropWidget,
 }: {
   steps: import("@/lib/types").Step[];
   currentStep: import("@/lib/types").Step;
@@ -302,6 +307,7 @@ function StepRail({
   railWidth: number;
   showThumbnails: boolean;
   onStepClick: (step: import("@/lib/types").Step) => void;
+  onDropWidget?: (stepId: string, templateId: string) => void;
 }) {
   const stepBarRef = useRef<HTMLDivElement>(null);
   const activeStepRef = useRef<HTMLButtonElement>(null);
@@ -337,6 +343,21 @@ function StepRail({
               key={step.id}
               ref={isActive ? activeStepRef : undefined}
               onClick={() => onStepClick(step)}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes("application/widget-template-id")) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                  (e.currentTarget as HTMLElement).style.outline = "2px dashed #2563eb";
+                  (e.currentTarget as HTMLElement).style.outlineOffset = "2px";
+                }
+              }}
+              onDragLeave={(e) => { (e.currentTarget as HTMLElement).style.outline = ""; (e.currentTarget as HTMLElement).style.outlineOffset = ""; }}
+              onDrop={(e) => {
+                const templateId = e.dataTransfer.getData("application/widget-template-id");
+                if (templateId && onDropWidget) { e.preventDefault(); onDropWidget(step.id, templateId); }
+                (e.currentTarget as HTMLElement).style.outline = "";
+                (e.currentTarget as HTMLElement).style.outlineOffset = "";
+              }}
               title={step.title}
               className={`w-full mx-2 px-2 py-2 rounded-lg text-left shrink-0 transition-all ${
                 isActive

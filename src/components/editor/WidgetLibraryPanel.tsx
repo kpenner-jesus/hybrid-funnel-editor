@@ -122,7 +122,21 @@ export function WidgetLibraryPanel() {
             const isExpanded = expandedWidget === template.id;
 
             return (
-              <div key={template.id} className="rounded-xl border border-gray-100 overflow-hidden transition-all hover:border-gray-300">
+              <div key={template.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/widget-template-id", template.id);
+                  e.dataTransfer.setData("text/plain", template.name);
+                  e.dataTransfer.effectAllowed = "copy";
+                  // Custom drag image
+                  const ghost = document.createElement("div");
+                  ghost.textContent = `${template.icon} ${template.name}`;
+                  ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:8px 16px;background:#fff;border:2px solid #006c4b;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;";
+                  document.body.appendChild(ghost);
+                  e.dataTransfer.setDragImage(ghost, 0, 0);
+                  setTimeout(() => document.body.removeChild(ghost), 0);
+                }}
+                className="rounded-xl border border-gray-100 overflow-hidden transition-all hover:border-gray-300 cursor-grab active:cursor-grabbing">
                 {/* Card header — click to expand/collapse preview */}
                 <button
                   onClick={() => setExpandedWidget(isExpanded ? null : template.id)}

@@ -397,6 +397,7 @@ function StepCard({
   onWidgetClick,
   onWidgetDoubleClick,
   onWidgetRightClick,
+  onDropWidget,
   resolveWidgetInputs,
   setWidgetOutput,
   stepRef,
@@ -412,30 +413,66 @@ function StepCard({
   onWidgetClick: (widgetId: string) => void;
   onWidgetDoubleClick?: (widgetId: string, focusedItemLabel?: string) => void;
   onWidgetRightClick?: (e: React.MouseEvent, stepId: string, widgetId: string, templateId: string) => void;
+  onDropWidget?: (stepId: string, templateId: string) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
   stepRef: (el: HTMLDivElement | null) => void;
 }) {
-  const cardBorder = isActive ? theme.primaryColor : borderColor || "#e2e8f0";
+  const [isDragOver, setIsDragOver] = useState(false);
+  const cardBorder = isDragOver ? "#2563eb" : isActive ? theme.primaryColor : borderColor || "#e2e8f0";
 
   return (
     <div
       data-step-card
       ref={stepRef}
       onClick={onStepClick}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("application/widget-template-id")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          setIsDragOver(true);
+        }
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const templateId = e.dataTransfer.getData("application/widget-template-id");
+        if (templateId && onDropWidget) {
+          onDropWidget(step.id, templateId);
+        }
+      }}
       style={{
         width: 380,
-        border: `${isActive ? 3 : 2}px solid ${cardBorder}`,
+        border: `${isDragOver ? 3 : isActive ? 3 : 2}px solid ${cardBorder}`,
         borderRadius: 12,
-        backgroundColor: theme.surfaceColor || "#fff",
-        boxShadow: isActive
+        backgroundColor: isDragOver ? "#eff6ff" : (theme.surfaceColor || "#fff"),
+        boxShadow: isDragOver
+          ? "0 0 0 4px rgba(37,99,235,0.2), 0 8px 20px rgba(37,99,235,0.1)"
+          : isActive
           ? `0 0 0 3px ${theme.primaryColor}30, 0 4px 12px rgba(0,0,0,0.1)`
           : "0 1px 4px rgba(0,0,0,0.06)",
         cursor: "pointer",
         position: "relative",
         flexShrink: 0,
+        transition: "all 0.15s ease",
       }}
     >
+      {/* Drop indicator overlay */}
+      {isDragOver && (
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: 12, zIndex: 20,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backgroundColor: "rgba(37,99,235,0.08)",
+          border: "2px dashed #2563eb",
+          pointerEvents: "none",
+        }}>
+          <div style={{ padding: "8px 16px", borderRadius: 8, backgroundColor: "#2563eb", color: "#fff", fontSize: 12, fontWeight: 700 }}>
+            Drop widget here
+          </div>
+        </div>
+      )}
+
       {/* Badge */}
       <div
         style={{
@@ -800,6 +837,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -843,6 +881,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                         onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
                         resolveWidgetInputs={resolveWidgetInputs}
                         setWidgetOutput={setWidgetOutput}
                         stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -887,6 +926,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                       onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
+                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
                       stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}

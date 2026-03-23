@@ -32,6 +32,7 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(step.title);
+  const [isLibraryDragOver, setIsLibraryDragOver] = useState(false);
   const addWidget = useFunnelStore((s) => s.addWidget);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -57,8 +58,26 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
     <>
       <div ref={setNodeRef} style={style} className="group">
         <div
-          className={`rounded-lg border transition-colors cursor-pointer ${
-            isSelected
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("application/widget-template-id")) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setIsLibraryDragOver(true);
+            }
+          }}
+          onDragLeave={() => setIsLibraryDragOver(false)}
+          onDrop={(e) => {
+            const templateId = e.dataTransfer.getData("application/widget-template-id");
+            if (templateId) {
+              e.preventDefault();
+              setIsLibraryDragOver(false);
+              addWidget(step.id, templateId);
+            }
+          }}
+          className={`rounded-lg border-2 transition-all cursor-pointer ${
+            isLibraryDragOver
+              ? "border-blue-500 bg-blue-50 shadow-md"
+              : isSelected
               ? "border-primary bg-primary-light/40"
               : "border-outline-variant hover:border-primary/50 bg-white"
           }`}
