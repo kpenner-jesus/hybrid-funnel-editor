@@ -114,7 +114,7 @@ export interface ConfigField {
 export interface WidgetTemplate {
   id: string;
   name: string;
-  category: "input" | "display" | "selection" | "form" | "layout";
+  category: "input" | "display" | "selection" | "form" | "layout" | "pricing" | "transaction" | "content";
   description: string;
   icon: string; // emoji or icon identifier
   inputs: TemplateInput[];
@@ -123,6 +123,31 @@ export interface WidgetTemplate {
   configFields: ConfigField[];
   variants: WidgetVariant[];
   rules: BusinessRule[];
+
+  // --- Rich Registry Metadata (for catalog, AI selection, and search) ---
+
+  /** Detailed description for AI — explains WHEN to use this widget and WHY */
+  aiDescription?: string;
+  /** Explicit notes for AI on what NOT to confuse this with */
+  aiConfusionNotes?: string;
+  /** Business scenarios this widget is best for (searchable) */
+  bestFor?: string[];
+  /** Business scenarios this widget should NOT be used for */
+  notFor?: string[];
+  /** System tags for search and filtering (business types, functions, features) */
+  tags?: string[];
+  /** Widget IDs that this widget could be swapped with (for carousel) */
+  swappableWith?: string[];
+  /** What upstream data this widget needs to function correctly */
+  requiresInputs?: string[];
+  /** Complexity level for Joe to understand difficulty */
+  complexity?: "simple" | "moderate" | "complex";
+  /** Which industries commonly use this widget */
+  industries?: string[];
+  /** Pricing model this widget uses (for compound pricing engine) */
+  pricingModel?: "flat" | "per-person" | "per-hour" | "per-person-per-hour" | "per-unit" | "tiered" | "calculated" | "none";
+  /** Subcategory for finer grouping in catalog */
+  subcategory?: string;
 }
 
 // --- Variable Binding ---

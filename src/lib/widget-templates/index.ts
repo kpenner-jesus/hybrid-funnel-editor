@@ -17,30 +17,262 @@ import { textInputTemplate, textareaInputTemplate } from "./text-input";
 import { bookingWidgetTemplate } from "./booking-widget";
 import { paymentWidgetTemplate } from "./payment-widget";
 
+// --- Rich metadata for AI selection, search, and catalog ---
+const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
+  "hero-section": {
+    aiDescription: "Full-width banner image with text overlay. Use as the FIRST widget on the welcome step to create a strong visual impression. Sets the tone for the entire funnel.",
+    aiConfusionNotes: "Do NOT use image-block for hero banners — use hero-section. image-block is for inline photos within content.",
+    bestFor: ["welcome page", "landing page", "first impression", "brand showcase"],
+    notFor: ["inline images", "product photos", "step headers"],
+    tags: ["visual", "branding", "banner", "welcome", "hero", "header"],
+    swappableWith: ["image-block", "headline"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "branding",
+  },
+  "headline": {
+    aiDescription: "Section title text with theme styling. Use to introduce a new section within a step. Pairs well before any selection widget.",
+    aiConfusionNotes: "Do NOT use text-block for headings — use headline. text-block is for body text paragraphs.",
+    bestFor: ["section titles", "step introductions", "visual hierarchy"],
+    notFor: ["body text", "descriptions", "instructions"],
+    tags: ["text", "title", "heading", "section", "label"],
+    swappableWith: ["text-block"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "typography",
+  },
+  "text-block": {
+    aiDescription: "Rich text / HTML content block. Use for descriptions, instructions, promotional copy, or any body text between widgets.",
+    aiConfusionNotes: "Do NOT use headline for body text — use text-block. Do NOT use text-input — that's for user data entry, not display.",
+    bestFor: ["descriptions", "instructions", "promotions", "explanations", "policies"],
+    notFor: ["headings", "user input", "forms"],
+    tags: ["text", "content", "description", "body", "html", "copy"],
+    swappableWith: ["headline"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "typography",
+  },
+  "image-block": {
+    aiDescription: "Inline image with optional caption. Use within a step to show venue/product photos alongside other widgets.",
+    aiConfusionNotes: "Do NOT use hero-section for inline images — use image-block. hero-section is for full-width banners.",
+    bestFor: ["product photos", "venue images", "step illustrations", "visual context"],
+    notFor: ["banners", "hero images", "backgrounds"],
+    tags: ["image", "photo", "picture", "visual", "media"],
+    swappableWith: ["hero-section"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "media",
+  },
+  "date-picker": {
+    aiDescription: "Dual-month date range calendar for selecting start and end dates. Outputs checkIn, checkOut, and nightCount. Use for event dates, stay dates, rental periods, or any date range selection.",
+    aiConfusionNotes: "Do NOT use text-input with type=date — use date-picker for proper calendar UI. Do NOT use for time selection — time-block-picker handles hours.",
+    bestFor: ["event dates", "stay dates", "rental period", "booking dates", "check-in/check-out"],
+    notFor: ["time selection", "appointment scheduling", "single date"],
+    tags: ["date", "calendar", "check-in", "check-out", "range", "duration", "nights", "days"],
+    swappableWith: [],
+    requiresInputs: [],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "scheduling",
+  },
+  "guest-counter": {
+    aiDescription: "Adults + configurable youth/children categories with slider for fast big-number selection, age collection (average or individual). Use for group size, party size, headcount, or any people-counting step.",
+    aiConfusionNotes: "Do NOT use text-input type=number for counting people — use guest-counter for the slider + buttons UI. Do NOT add youth categories for non-people businesses (equipment rental, construction).",
+    bestFor: ["group size", "party size", "headcount", "attendee count", "passengers", "crew size"],
+    notFor: ["product quantities", "equipment counts", "room selection"],
+    tags: ["guests", "adults", "children", "youth", "count", "headcount", "party-size", "group", "slider", "age"],
+    swappableWith: [],
+    requiresInputs: [],
+    complexity: "moderate",
+    industries: ["hospitality", "events", "education", "marine", "aviation", "sports"],
+    pricingModel: "per-person",
+    subcategory: "people",
+  },
+  "text-input": {
+    aiDescription: "Single-line text field for collecting a specific piece of data (organization name, event name, PO number). Outputs to a named variable.",
+    aiConfusionNotes: "Do NOT use for multi-line text — use textarea-input. Do NOT use for structured data — use contact-form for name/email/phone.",
+    bestFor: ["organization name", "event name", "reference number", "custom field"],
+    notFor: ["multi-line notes", "contact details", "descriptions"],
+    tags: ["text", "input", "field", "data", "custom", "name", "reference"],
+    swappableWith: ["textarea-input"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "data-entry",
+  },
+  "textarea-input": {
+    aiDescription: "Multi-line text area for collecting longer text (dietary restrictions, special requests, project notes). Outputs to a named variable.",
+    aiConfusionNotes: "Do NOT use text-block for data entry — text-block is display only. Use textarea-input for user-writable notes.",
+    bestFor: ["dietary restrictions", "special requests", "notes", "additional info", "project description"],
+    notFor: ["single values", "contact details", "short answers"],
+    tags: ["textarea", "notes", "comments", "requests", "dietary", "description", "long-text"],
+    swappableWith: ["text-input"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "data-entry",
+  },
+  "segment-picker": {
+    aiDescription: "TOP-OF-FUNNEL branching widget. Presents service type options (e.g., Wedding, Corporate, Social) where each option routes to a different funnel path. Use ONLY as the first selection when the funnel serves multiple customer segments that need different steps.",
+    aiConfusionNotes: "Do NOT use option-picker for funnel branching — use segment-picker. option-picker is for data collection (retreat type, conference type) without branching. Do NOT use mid-funnel — segment-picker is for the welcome step only.",
+    bestFor: ["customer type selection", "service type branching", "funnel routing", "welcome step"],
+    notFor: ["product selection", "mid-funnel choices", "data collection without branching"],
+    tags: ["segment", "branch", "routing", "funnel", "welcome", "type", "category", "path"],
+    swappableWith: ["option-picker"],
+    complexity: "moderate",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "routing",
+  },
+  "option-picker": {
+    aiDescription: "Multiple-choice card selection for collecting a preference WITHOUT funnel branching. Use for sub-type questions (retreat type, conference type, wedding style) where the answer is recorded but doesn't change the funnel path.",
+    aiConfusionNotes: "Do NOT use for funnel branching — use segment-picker if options need to route to different steps. Do NOT use for product selection with pricing — use category-picker or activity-picker. Do NOT use for beverage packages — use beverage-package-picker for per-person-per-hour pricing.",
+    bestFor: ["sub-type selection", "preference questions", "style choices", "multiple choice"],
+    notFor: ["funnel branching", "product selection with prices", "beverage packages", "add-ons"],
+    tags: ["options", "choice", "cards", "selection", "preference", "type", "style", "multiple-choice"],
+    swappableWith: ["segment-picker", "category-picker"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "choices",
+  },
+  "guest-rooms": {
+    aiDescription: "Room/accommodation selection with image carousel, sale pricing, availability badges, unique inventory (specific room units), quantity pickers, and running subtotal. Use for any accommodation where customers pick room types and quantities.",
+    aiConfusionNotes: "Do NOT use category-picker for rooms — use guest-rooms for the full room selection experience (availability, unique inventory, image carousel). category-picker is for simpler grouped product selection.",
+    bestFor: ["rooms", "cabins", "suites", "villas", "accommodation", "lodging", "beds"],
+    notFor: ["equipment", "meeting rooms", "venue spaces", "non-accommodation products"],
+    tags: ["rooms", "accommodation", "lodging", "hotel", "suite", "cabin", "villa", "availability", "unique-inventory", "carousel"],
+    swappableWith: ["category-picker"],
+    requiresInputs: ["checkIn", "checkOut", "guests"],
+    complexity: "complex",
+    industries: ["hospitality", "resort", "hotel", "retreat", "camp"],
+    pricingModel: "per-unit",
+    subcategory: "accommodation",
+  },
+  "meal-picker": {
+    aiDescription: "Timeslot-based meal grid showing dates as rows and meals as columns with availability bars and timeslot dropdowns. Handles day-specific rules (no breakfast on check-in, no supper on check-out), cascading auto-selection, and kids meal pricing. Use for any multi-day catering selection.",
+    aiConfusionNotes: "Do NOT use category-picker for meals — use meal-picker for the timeslot grid. Do NOT use option-picker — meals need date×meal matrix, not simple cards. Do NOT use for beverage packages — use beverage-package-picker.",
+    bestFor: ["catered meals", "dining", "food service", "buffet", "multi-day catering"],
+    notFor: ["beverages", "bar packages", "single-meal selection", "snack items"],
+    tags: ["meals", "food", "catering", "dining", "breakfast", "lunch", "dinner", "timeslot", "buffet", "per-day"],
+    swappableWith: [],
+    requiresInputs: ["checkIn", "checkOut", "guests"],
+    complexity: "complex",
+    industries: ["hospitality", "retreat", "conference", "camp", "catering"],
+    pricingModel: "per-person",
+    subcategory: "food-beverage",
+  },
+  "activity-picker": {
+    aiDescription: "Activity/experience selection with images, pricing, duration, and quantity pickers. Use for optional add-on experiences, tours, excursions, equipment rentals, or any supplementary services with per-person pricing.",
+    aiConfusionNotes: "Do NOT use category-picker for activities — use activity-picker for the visual card layout with images. Do NOT use option-picker — activities have pricing and quantities. Do NOT confuse with add-on-picker — activities are substantial offerings with images and durations, add-ons are quick toggles.",
+    bestFor: ["activities", "experiences", "tours", "excursions", "adventures", "classes", "equipment-add-ons"],
+    notFor: ["rooms", "meals", "quick add-ons", "venue spaces"],
+    tags: ["activities", "experiences", "tours", "excursions", "adventures", "add-ons", "per-person", "duration", "images"],
+    swappableWith: ["category-picker"],
+    requiresInputs: ["checkIn", "checkOut", "guests"],
+    complexity: "moderate",
+    industries: ["hospitality", "retreat", "resort", "camp", "charter", "tourism"],
+    pricingModel: "per-person",
+    subcategory: "experiences",
+  },
+  "category-picker": {
+    aiDescription: "Grouped product selection for any products organized by category. Shows products with images, prices, tags, availability, and quantity pickers. Use for venue spaces, equipment, meeting rooms, AV gear, or any categorized product catalog.",
+    aiConfusionNotes: "Do NOT use for rooms — use guest-rooms for accommodation (has unique inventory + availability). Do NOT use for meals — use meal-picker for timeslot grids. Do NOT use for quick add-ons — use add-on-picker for toggles. category-picker is for substantial product selection with category grouping.",
+    bestFor: ["venue spaces", "meeting rooms", "equipment", "AV gear", "rental items", "spaces", "products"],
+    notFor: ["accommodation", "meals", "quick add-ons", "simple choices"],
+    tags: ["products", "categories", "equipment", "spaces", "rental", "AV", "meeting-rooms", "venue", "grouped"],
+    swappableWith: ["guest-rooms", "activity-picker"],
+    complexity: "moderate",
+    industries: ["all"],
+    pricingModel: "per-unit",
+    subcategory: "products",
+  },
+  "contact-form": {
+    aiDescription: "Contact information collection form with configurable fields (name, email, phone, company, notes, GDPR consent). Use near the end of the funnel before generating the quote/invoice.",
+    aiConfusionNotes: "Do NOT use text-input for contact details — use contact-form for structured name/email/phone fields. Do NOT use for dietary/notes — add textarea-input separately for those.",
+    bestFor: ["contact details", "customer information", "lead capture", "form submission"],
+    notFor: ["custom fields", "dietary restrictions", "project notes"],
+    tags: ["contact", "form", "name", "email", "phone", "company", "GDPR", "lead", "customer"],
+    swappableWith: [],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "data-collection",
+  },
+  "booking-widget": {
+    aiDescription: "Hidden backend widget that creates the actual booking in Everybooking. Place on the contact step alongside contact-form. Not visible to customers — it syncs selected products to the booking engine.",
+    aiConfusionNotes: "This is NOT a display widget. Do NOT confuse with invoice or payment-widget. booking-widget is invisible and handles the backend sync. Always place it on the same step as contact-form.",
+    bestFor: ["booking creation", "backend sync", "invoice generation trigger"],
+    notFor: ["display", "user interaction", "product selection"],
+    tags: ["booking", "backend", "sync", "hidden", "integration", "API"],
+    swappableWith: [],
+    complexity: "complex",
+    industries: ["all"],
+    pricingModel: "none",
+    subcategory: "integration",
+  },
+  "payment-widget": {
+    aiDescription: "Payment/deposit collection widget showing amount due and payment options. Supports percentage deposit, flat amount, or full payment. Place after the invoice step.",
+    aiConfusionNotes: "Do NOT confuse with invoice — invoice displays the quote, payment-widget collects the money. Do NOT confuse with booking-widget — booking-widget is hidden backend sync.",
+    bestFor: ["deposit collection", "payment", "securing booking", "down payment"],
+    notFor: ["quote display", "invoice", "backend sync"],
+    tags: ["payment", "deposit", "secure", "credit-card", "checkout", "billing"],
+    swappableWith: [],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "calculated",
+    subcategory: "checkout",
+  },
+  "invoice": {
+    aiDescription: "Quote/invoice display widget showing the itemized breakdown of all selections. Uses the Everybooking InvoiceWidget SDK component. Place after contact-form and before payment-widget.",
+    aiConfusionNotes: "Do NOT confuse with payment-widget — invoice DISPLAYS the quote, payment-widget COLLECTS money. Do NOT confuse with fee-calculator — fee-calculator shows mid-funnel fee breakdown, invoice is the final summary.",
+    bestFor: ["quote display", "invoice", "price summary", "booking review", "line items"],
+    notFor: ["payment collection", "mid-funnel pricing", "fee breakdown"],
+    tags: ["invoice", "quote", "summary", "price", "total", "line-items", "review"],
+    swappableWith: [],
+    requiresInputs: ["checkIn", "checkOut", "guests", "selectedRooms", "selectedMeals", "selectedActivities", "contactInfo"],
+    complexity: "simple",
+    industries: ["all"],
+    pricingModel: "calculated",
+    subcategory: "checkout",
+  },
+};
+
+// Apply rich metadata to base templates
+function enrichTemplate(base: WidgetTemplate, meta?: Partial<WidgetTemplate>): WidgetTemplate {
+  if (!meta) return base;
+  return { ...base, ...meta };
+}
+
 export const widgetTemplateRegistry: Record<string, WidgetTemplate> = {
   // --- Content / Layout ---
-  "hero-section": heroSectionTemplate,
-  "headline": headlineTemplate,
-  "text-block": textBlockTemplate,
-  "image-block": imageBlockTemplate,
+  "hero-section": enrichTemplate(heroSectionTemplate, registryMetadata["hero-section"]),
+  "headline": enrichTemplate(headlineTemplate, registryMetadata["headline"]),
+  "text-block": enrichTemplate(textBlockTemplate, registryMetadata["text-block"]),
+  "image-block": enrichTemplate(imageBlockTemplate, registryMetadata["image-block"]),
   // --- Input ---
-  "date-picker": datePickerTemplate,
-  "guest-counter": guestCounterTemplate,
-  "text-input": textInputTemplate,
-  "textarea-input": textareaInputTemplate,
+  "date-picker": enrichTemplate(datePickerTemplate, registryMetadata["date-picker"]),
+  "guest-counter": enrichTemplate(guestCounterTemplate, registryMetadata["guest-counter"]),
+  "text-input": enrichTemplate(textInputTemplate, registryMetadata["text-input"]),
+  "textarea-input": enrichTemplate(textareaInputTemplate, registryMetadata["textarea-input"]),
   // --- Selection ---
-  "segment-picker": segmentPickerTemplate,
-  "option-picker": optionPickerTemplate,
-  "guest-rooms": guestRoomsTemplate,
-  "meal-picker": mealPickerTemplate,
-  "activity-picker": activityPickerTemplate,
-  "category-picker": categoryPickerTemplate,
+  "segment-picker": enrichTemplate(segmentPickerTemplate, registryMetadata["segment-picker"]),
+  "option-picker": enrichTemplate(optionPickerTemplate, registryMetadata["option-picker"]),
+  "guest-rooms": enrichTemplate(guestRoomsTemplate, registryMetadata["guest-rooms"]),
+  "meal-picker": enrichTemplate(mealPickerTemplate, registryMetadata["meal-picker"]),
+  "activity-picker": enrichTemplate(activityPickerTemplate, registryMetadata["activity-picker"]),
+  "category-picker": enrichTemplate(categoryPickerTemplate, registryMetadata["category-picker"]),
   // --- Form ---
-  "contact-form": contactFormTemplate,
-  "booking-widget": bookingWidgetTemplate,
-  "payment-widget": paymentWidgetTemplate,
+  "contact-form": enrichTemplate(contactFormTemplate, registryMetadata["contact-form"]),
+  "booking-widget": enrichTemplate(bookingWidgetTemplate, registryMetadata["booking-widget"]),
+  "payment-widget": enrichTemplate(paymentWidgetTemplate, registryMetadata["payment-widget"]),
   // --- Display ---
-  "invoice": invoiceTemplate,
+  "invoice": enrichTemplate(invoiceTemplate, registryMetadata["invoice"]),
 };
 
 export const widgetTemplateList: WidgetTemplate[] = Object.values(widgetTemplateRegistry);
@@ -49,12 +281,38 @@ export function getTemplate(templateId: string): WidgetTemplate | undefined {
   return widgetTemplateRegistry[templateId];
 }
 
+// Search widgets by tag, name, or description
+export function searchWidgets(query: string, industryFilter?: string): WidgetTemplate[] {
+  const q = query.toLowerCase().trim();
+  if (!q && !industryFilter) return widgetTemplateList;
+  return widgetTemplateList.filter(w => {
+    // Industry filter
+    if (industryFilter && w.industries && !w.industries.includes("all") && !w.industries.includes(industryFilter)) return false;
+    if (!q) return true;
+    // Search across name, description, tags, bestFor
+    const searchable = [
+      w.name, w.description, w.aiDescription || "",
+      ...(w.tags || []), ...(w.bestFor || []),
+      w.subcategory || "",
+    ].join(" ").toLowerCase();
+    return searchable.includes(q);
+  });
+}
+
+// Get widgets that can be swapped with a given widget
+export function getSwappableWidgets(templateId: string): WidgetTemplate[] {
+  const template = widgetTemplateRegistry[templateId];
+  if (!template?.swappableWith?.length) return [];
+  return template.swappableWith.map(id => widgetTemplateRegistry[id]).filter(Boolean);
+}
+
 export const templateCategories = [
-  { id: "layout", label: "Content", description: "Hero, headlines, text, images" },
-  { id: "input", label: "Input", description: "Data entry and text fields" },
-  { id: "selection", label: "Selection", description: "Product and option selection" },
-  { id: "form", label: "Form", description: "Contact forms, booking, payment" },
-  { id: "display", label: "Display", description: "Invoice and data display" },
+  { id: "content", label: "Content", description: "Hero banners, headlines, text, images" },
+  { id: "input", label: "Input", description: "Dates, counts, text fields" },
+  { id: "selection", label: "Selection", description: "Products, options, rooms, meals" },
+  { id: "pricing", label: "Pricing", description: "Packages, add-ons, beverages, fees" },
+  { id: "form", label: "Form", description: "Contact forms, data collection" },
+  { id: "transaction", label: "Transaction", description: "Booking, payment, invoice" },
 ] as const;
 
 export {
