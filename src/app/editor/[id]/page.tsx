@@ -14,10 +14,11 @@ import { PublishModal } from "@/components/editor/PublishModal";
 import { DiagnosticsPanel } from "@/components/editor/DiagnosticsPanel";
 import { AiChatPanel } from "@/components/ai/AiChatPanel";
 import { Tooltip } from "@/components/shared/Tooltip";
+import { WidgetLibraryPanel } from "@/components/editor/WidgetLibraryPanel";
 import { useAiStore } from "@/stores/ai-store";
 import { generateFunnelJSX } from "@/lib/jsx-generator";
 
-type EditorTab = "steps" | "theme" | "variables";
+type EditorTab = "steps" | "theme" | "variables" | "library";
 
 // Error boundary to catch rendering crashes
 class EditorErrorBoundary extends React.Component<
@@ -213,6 +214,7 @@ function EditorPageInner() {
 
   const tabs: { id: EditorTab; label: string; tip: string }[] = [
     { id: "steps", label: "Steps", tip: "Build your funnel's pages and widgets" },
+    { id: "library", label: "Library", tip: "Browse and search all available widgets" },
     { id: "theme", label: "Theme", tip: "Colors, fonts, and navigation layout" },
     { id: "variables", label: "Variables", tip: "See how data flows between steps (advanced)" },
   ];
@@ -373,6 +375,7 @@ function EditorPageInner() {
                 )}
               </div>
             )}
+            {activeTab === "library" && <WidgetLibraryPanel />}
             {activeTab === "theme" && <ThemeEditor />}
             {activeTab === "variables" && <VariableFlow />}
           </div>
