@@ -514,7 +514,25 @@ function BigGuestCounter({ label, value, min, max, onChange }) {
 // ────────────────────────────────────────────────────────────
 
 function generateMealTimeslotGrid(): string {
-  return `function MealTimeslotGrid({ meals, startDate, endDate, adults, currency = 'CAD', apiRef }) {
+  return `function MealTimeslotGrid({ meals, mealProducts, startDate, endDate, adults, currency = 'CAD', apiRef, onSelectionChange }) {
+  // Merge API products with config meals. API products are the source of truth when available.
+  // Config meals are fallback for preview/standalone mode.
+  const effectiveMeals = useMemo(() => {
+    if (mealProducts && mealProducts.length > 0) {
+      // API-driven: build meals from real Everybooking products
+      return mealProducts.filter(m => {
+        const pr = Object.values(m.price || {})?.[0]?.base_price;
+        return pr && pr > 0 && !(m.parameters || []).some(p => p.report_id === 'childage');
+      }).map(m => {
+        const pr = Object.values(m.price || {})?.[0]?.base_price || 0;
+        const ts = (m.timeslots || []).map(t => ({ startTime: t.start_time || t.startTime, endTime: t.end_time || t.endTime }));
+        return { id: m.id, sku: m.sku, name: m.name, adultPrice: parseFloat(pr), timeslots: ts.length > 0 ? ts : [{ startTime: '07:00', endTime: '09:00' }], allowCheckIn: 'selectable', allowMiddle: 'selectable', allowCheckOut: 'selectable', isApiProduct: true };
+      });
+    }
+    // Config-driven fallback (preview mode)
+    return (meals || []).map((m, i) => ({ ...m, id: m.id || i, sku: null, isApiProduct: false }));
+  }, [mealProducts, meals]);
+
   // Build date range array
   const dates = useMemo(() => {
     if (!startDate || !endDate) return [];
@@ -528,6 +546,8 @@ function generateMealTimeslotGrid(): string {
   }, [startDate, endDate]);
 
   const dateCount = dates.length;
+  // Use effectiveMeals (API products when available, config fallback)
+  const ml = effectiveMeals;
 
   // Timeslot selections: key = "dateIdx-mealIdx", value = timeslot label or null
   const [selections, setSelections] = useState({});
@@ -570,19 +590,19 @@ function generateMealTimeslotGrid(): string {
     setSelections(prev => {
       const cur = prev[key];
       if (cur) return { ...prev, [key]: null };
-      return { ...prev, [key]: defaultTimeslot(meals[mealIdx]) || 'selected' };
+      return { ...prev, [key]: defaultTimeslot(ml[mealIdx]) || 'selected' };
     });
   }
 
   // Select all for a date row
   function handleSelectAll(dateIdx) {
-    const allSelected = meals.every((meal, mi) => {
+    const allSelected = ml.every((meal, mi) => {
       const state = cellState(meal, dateIdx);
       if (state === 'unselectable') return true;
       return !!selections[dateIdx + '-' + mi];
     });
     const newSelections = { ...selections };
-    meals.forEach((meal, mi) => {
+    ml.forEach((meal, mi) => {
       const state = cellState(meal, dateIdx);
       if (state === 'unselectable') return;
       const key = dateIdx + '-' + mi;
@@ -597,7 +617,7 @@ function generateMealTimeslotGrid(): string {
 
   // Bar color
   function barColor(dateIdx, mealIdx) {
-    const state = cellState(meals[mealIdx], dateIdx);
+    const state = cellState(ml[mealIdx], dateIdx);
     if (state === 'unselectable') return '#ef4444'; // red
     const key = dateIdx + '-' + mealIdx;
     if (selections[key]) return '#22c55e'; // green
@@ -606,7 +626,7 @@ function generateMealTimeslotGrid(): string {
 
   // Cell display
   function cellDisplay(dateIdx, mealIdx) {
-    const meal = meals[mealIdx];
+    const meal = ml[mealIdx];
     const state = cellState(meal, dateIdx);
     const key = dateIdx + '-' + mealIdx;
     const selected = selections[key];
@@ -622,6 +642,21 @@ function generateMealTimeslotGrid(): string {
 
   const fmtPrice = (p) => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(p);
 
+  // Sync selections back to parent for syncBooking — map selections to product IDs/SKUs
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    const mealSelections = {};
+    Object.entries(selections).forEach(([key, val]) => {
+      if (!val) return;
+      const [, mealIdx] = key.split('-').map(Number);
+      const meal = ml[mealIdx];
+      if (meal && meal.id) {
+        mealSelections[meal.id] = (mealSelections[meal.id] || 0) + 1;
+      }
+    });
+    onSelectionChange(mealSelections);
+  }, [selections, ml, onSelectionChange]);
+
   if (dates.length === 0) {
     return <div className="text-center py-8 text-gray-400 text-sm">Select dates first to see meal options</div>;
   }
@@ -634,12 +669,12 @@ function generateMealTimeslotGrid(): string {
         <span className="text-sm text-gray-600"> for <strong>kids under 10</strong></span>
       </div>
 
-      <table className="w-full border-separate" style={{ borderSpacing: '0 8px', minWidth: Math.min(meals.length * 160 + 100, 640) }}>
+      <table className="w-full border-separate" style={{ borderSpacing: '0 8px', minWidth: Math.min(ml.length * 160 + 100, 640) }}>
         <thead>
           <tr>
             <th className="text-left p-2 text-xs font-medium text-gray-500" style={{ width: '110px', minWidth: '90px' }}>Date</th>
-            {meals.map((meal, mi) => (
-              <th key={mi} className="text-center p-2" style={{ width: (100 / meals.length) + '%' }}>
+            {ml.map((meal, mi) => (
+              <th key={mi} className="text-center p-2" style={{ width: (100 / ml.length) + '%' }}>
                 <div className="flex items-center justify-center gap-1">
                   <span className="font-bold text-sm" style={{ color: '#1f2937' }}>{meal.name}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
@@ -660,7 +695,7 @@ function generateMealTimeslotGrid(): string {
                   <div className="text-sm font-medium text-gray-700">{label}</div>
                   {sub && <div className="text-xs text-gray-400">{sub}</div>}
                 </td>
-                {meals.map((meal, mi) => {
+                {ml.map((meal, mi) => {
                   const bColor = barColor(di, mi);
                   const cell = cellDisplay(di, mi);
                   const state = cellState(meal, di);
@@ -1814,11 +1849,13 @@ function generateWidgetInStep(
       return [
         `            <MealTimeslotGrid`,
         `              meals={${mealsConfigStr}}`,
+        `              mealProducts={mealProducts}`,
         `              startDate={startDate}`,
         `              endDate={endDate}`,
         `              adults={adults}`,
         `              currency="${currency}"`,
         `              apiRef={apiRef}`,
+        `              onSelectionChange={(sel) => setSelectedMeals(sel)}`,
         `            />`,
       ].join("\n");
     }
