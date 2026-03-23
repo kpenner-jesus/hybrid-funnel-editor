@@ -59,4 +59,6 @@ export const beveragePackagePickerTemplate: WidgetTemplate = {
   industries: ["wedding", "events", "hospitality", "catering", "resort", "conference"],
   pricingModel: "per-person-per-hour",
   subcategory: "food-beverage",
+  whyNeeded: "Bar service is a top-3 expense at events. Compound pricing (tier × guests × hours) with overtime rates can't be handled by simple product selection. 58% of couples choose open bar — this widget makes it easy to compare tiers.",
+  workaround: "option-picker can select a tier, but can't calculate per-person-per-hour pricing, can't add overtime rates, and can't show include lists per tier. The quote would be inaccurate.",
 };

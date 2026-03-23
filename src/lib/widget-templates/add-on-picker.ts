@@ -54,4 +54,6 @@ export const addOnPickerTemplate: WidgetTemplate = {
   industries: ["wedding", "events", "hospitality", "conference", "resort", "catering", "charter"],
   pricingModel: "flat",
   subcategory: "extras",
+  whyNeeded: "Add-ons increase per-event revenue by 15-25%. Quick toggles make it easy for customers to add extras (photo booth, uplighting, late-night snacks) without slowing down the quote flow.",
+  workaround: "activity-picker or category-picker can list extras, but they're designed for deeper selection — not quick on/off toggles. The UX is heavier than needed for simple add-ons.",
 };

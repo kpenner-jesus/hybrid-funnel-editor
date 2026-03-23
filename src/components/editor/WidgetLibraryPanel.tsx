@@ -130,37 +130,50 @@ export function WidgetLibraryPanel() {
                   e.dataTransfer.effectAllowed = "copy";
                   // Custom drag image
                   const ghost = document.createElement("div");
-                  ghost.textContent = `${template.icon} ${template.name}`;
+                  ghost.textContent = template.name;
                   ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:8px 16px;background:#fff;border:2px solid #006c4b;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;";
                   document.body.appendChild(ghost);
                   e.dataTransfer.setDragImage(ghost, 0, 0);
                   setTimeout(() => document.body.removeChild(ghost), 0);
                 }}
                 className="rounded-xl border border-gray-100 overflow-hidden transition-all hover:border-gray-300 cursor-grab active:cursor-grabbing">
-                {/* Card header — click to expand/collapse preview */}
+                {/* Card header — 3-column layout: Widget | Why Needed | Workaround */}
                 <button
                   onClick={() => setExpandedWidget(isExpanded ? null : template.id)}
-                  className="w-full text-left p-3 flex items-start gap-2.5 hover:bg-gray-50/50 transition-colors"
+                  className="w-full text-left p-3 hover:bg-gray-50/50 transition-colors"
                 >
-                  <span className="text-xl mt-0.5 shrink-0">{template.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-semibold text-xs text-gray-900">{template.name}</span>
-                      <span className="px-1 py-0.5 rounded text-[8px] font-bold uppercase"
-                        style={{ backgroundColor: cColors.bg, color: cColors.text }}>{cplx}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5">
-                      {template.bestFor ? `Best for: ${template.bestFor.slice(0, 3).join(", ")}` : template.description}
-                    </p>
-                    {/* Tags */}
-                    {template.tags && (
-                      <div className="flex gap-0.5 mt-1 flex-wrap">
-                        {template.tags.slice(0, 3).map(tag => (
-                          <span key={tag} className="px-1 py-0.5 rounded text-[8px] bg-gray-50 text-gray-400">{tag}</span>
-                        ))}
-                      </div>
-                    )}
+                  {/* Widget name + complexity */}
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="font-semibold text-xs text-gray-900">{template.name}</span>
+                    <span className="px-1 py-0.5 rounded text-[8px] font-bold uppercase"
+                      style={{ backgroundColor: cColors.bg, color: cColors.text }}>{cplx}</span>
                   </div>
+
+                  {/* 2-column: Why Needed | Workaround */}
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Why It's Needed</div>
+                      <p className="text-[10px] text-gray-600 leading-tight line-clamp-3">
+                        {template.whyNeeded || template.description}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Workaround</div>
+                      <p className="text-[10px] text-gray-500 leading-tight line-clamp-3">
+                        {template.workaround || "No alternative available."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {template.tags && (
+                    <div className="flex gap-0.5 flex-wrap">
+                      {template.tags.slice(0, 4).map(tag => (
+                        <span key={tag} className="px-1 py-0.5 rounded text-[8px] bg-gray-50 text-gray-400">{tag}</span>
+                      ))}
+                      {(template.tags.length || 0) > 4 && <span className="text-[8px] text-gray-300">+{(template.tags.length || 0) - 4}</span>}
+                    </div>
+                  )}
                   {/* Expand arrow */}
                   <svg className={`w-4 h-4 text-gray-300 transition-transform shrink-0 mt-1 ${isExpanded ? "rotate-180" : ""}`} viewBox="0 0 16 16" fill="none">
                     <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

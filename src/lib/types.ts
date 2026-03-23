@@ -148,6 +148,10 @@ export interface WidgetTemplate {
   pricingModel?: "flat" | "per-person" | "per-hour" | "per-person-per-hour" | "per-unit" | "tiered" | "calculated" | "none";
   /** Subcategory for finer grouping in catalog */
   subcategory?: string;
+  /** Why this widget is needed — business value explanation for Joe */
+  whyNeeded?: string;
+  /** Can we work around not having this widget? What's the alternative? */
+  workaround?: string;
 }
 
 // --- Variable Binding ---

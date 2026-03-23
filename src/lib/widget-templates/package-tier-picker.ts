@@ -68,4 +68,6 @@ export const packageTierPickerTemplate: WidgetTemplate = {
   industries: ["wedding", "events", "hospitality", "conference", "resort", "catering"],
   pricingModel: "per-person",
   subcategory: "packages",
+  whyNeeded: "All-inclusive packages are the #1 way venues and service businesses structure pricing. Comparison columns with feature checklists let customers see exactly what's included at each price point, setting the anchor for the entire quote.",
+  workaround: "option-picker can list tiers but has no comparison columns, no feature checklists, no per-person math, and no 'Popular' highlighting. The customer can't compare what's included vs excluded.",
 };

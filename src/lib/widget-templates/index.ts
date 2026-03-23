@@ -33,6 +33,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "branding",
+    whyNeeded: "First impressions matter. A strong hero banner with the business logo and tagline sets professional expectations and reduces bounce rates on the welcome step.",
+    workaround: "Use image-block + headline as separate widgets. Works but looks less polished — no overlay text on the image.",
   },
   "headline": {
     aiDescription: "Section title text with theme styling. Use to introduce a new section within a step. Pairs well before any selection widget.",
@@ -45,6 +47,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "typography",
+    whyNeeded: "Clear section titles guide customers through each step. Without headings, steps feel like a wall of widgets with no structure.",
+    workaround: "Text-block with bold formatting. Works but doesn't use the theme headline font or sizing.",
   },
   "text-block": {
     aiDescription: "Rich text / HTML content block. Use for descriptions, instructions, promotional copy, or any body text between widgets.",
@@ -57,6 +61,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "typography",
+    whyNeeded: "Descriptions, instructions, and promotional copy give customers context before making selections. Bare widgets without text feel impersonal.",
+    workaround: "Headline widget can hold short text. But no rich formatting, links, or multi-paragraph support.",
   },
   "image-block": {
     aiDescription: "Inline image with optional caption. Use within a step to show venue/product photos alongside other widgets.",
@@ -69,6 +75,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "media",
+    whyNeeded: "Product and venue photos increase conversion. Customers need to see what they're booking — rooms, spaces, equipment.",
+    workaround: "Text descriptions only. Works but dramatically reduces engagement and trust.",
   },
   "date-picker": {
     aiDescription: "Dual-month date range calendar for selecting start and end dates. Outputs checkIn, checkOut, and nightCount. Use for event dates, stay dates, rental periods, or any date range selection.",
@@ -82,6 +90,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "scheduling",
+    whyNeeded: "Every booking and quotation starts with dates. Without date selection, you can't check availability, calculate night counts, or price per-day items.",
+    workaround: "No workaround. Date selection is fundamental to any booking or rental quote.",
   },
   "guest-counter": {
     aiDescription: "Adults + configurable youth/children categories with slider for fast big-number selection, age collection (average or individual). Use for group size, party size, headcount, or any people-counting step.",
@@ -95,6 +105,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["hospitality", "events", "education", "marine", "aviation", "sports"],
     pricingModel: "per-person",
     subcategory: "people",
+    whyNeeded: "Group size drives pricing for meals, activities, rooms, and staffing. Per-person pricing requires accurate headcount. Youth/children categories enable age-based pricing.",
+    workaround: "text-input with type=number collects a count, but no slider for fast big numbers, no youth categories, no age collection for kids meal pricing.",
   },
   "text-input": {
     aiDescription: "Single-line text field for collecting a specific piece of data (organization name, event name, PO number). Outputs to a named variable.",
@@ -107,6 +119,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "data-entry",
+    whyNeeded: "Captures specific data points like organization name, event name, PO number, or any custom field the business needs for their quote.",
+    workaround: "contact-form has a company field, but can't create arbitrary custom fields. No workaround for truly custom data.",
   },
   "textarea-input": {
     aiDescription: "Multi-line text area for collecting longer text (dietary restrictions, special requests, project notes). Outputs to a named variable.",
@@ -119,6 +133,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "data-entry",
+    whyNeeded: "Collects longer text like dietary restrictions, special requests, or project notes that don't fit in a single line. Critical for service businesses that need customer specifications.",
+    workaround: "text-input can collect short text but truncates longer entries. contact-form has a notes field but it's not independently configurable.",
   },
   "segment-picker": {
     aiDescription: "TOP-OF-FUNNEL branching widget. Presents service type options (e.g., Wedding, Corporate, Social) where each option routes to a different funnel path. Use ONLY as the first selection when the funnel serves multiple customer segments that need different steps.",
@@ -131,6 +147,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "routing",
+    whyNeeded: "Multi-segment businesses (weddings + conferences + retreats) need different paths for different customer types. Without branching, everyone sees every step — including irrelevant ones.",
+    workaround: "No workaround. Without segment branching, you'd need separate funnels for each customer type, or force everyone through the same linear path.",
   },
   "option-picker": {
     aiDescription: "Multiple-choice card selection for collecting a preference WITHOUT funnel branching. Use for sub-type questions (retreat type, conference type, wedding style) where the answer is recorded but doesn't change the funnel path.",
@@ -143,6 +161,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "choices",
+    whyNeeded: "Captures customer preferences like event type, style, or sub-category without changing the funnel path. Essential for personalizing the quote.",
+    workaround: "segment-picker can show options but forces funnel branching even when you just need data collection. text-input can collect a typed answer but no visual cards.",
   },
   "guest-rooms": {
     aiDescription: "Room/accommodation selection with image carousel, sale pricing, availability badges, unique inventory (specific room units), quantity pickers, and running subtotal. Use for any accommodation where customers pick room types and quantities.",
@@ -156,6 +176,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["hospitality", "resort", "hotel", "retreat", "camp"],
     pricingModel: "per-unit",
     subcategory: "accommodation",
+    whyNeeded: "Accommodation is often the largest line item. Image carousels, availability badges, unique room inventory, and sale pricing drive bookings and reduce back-and-forth.",
+    workaround: "category-picker can list rooms with prices, but has no availability checking, no unique inventory (specific room assignment), no image carousel, and no sale pricing display.",
   },
   "meal-picker": {
     aiDescription: "Timeslot-based meal grid showing dates as rows and meals as columns with availability bars and timeslot dropdowns. Handles day-specific rules (no breakfast on check-in, no supper on check-out), cascading auto-selection, and kids meal pricing. Use for any multi-day catering selection.",
@@ -169,6 +191,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["hospitality", "retreat", "conference", "camp", "catering"],
     pricingModel: "per-person",
     subcategory: "food-beverage",
+    whyNeeded: "Catering is a top-3 expense for group bookings. The timeslot grid with day rules (no breakfast on check-in, no supper on check-out) prevents overbooking and ensures accurate per-day meal pricing.",
+    workaround: "category-picker can list meal options with flat pricing, but has no date×meal grid, no timeslot selection, no day-specific availability rules, and no kids meal pricing.",
   },
   "activity-picker": {
     aiDescription: "Activity/experience selection with images, pricing, duration, and quantity pickers. Use for optional add-on experiences, tours, excursions, equipment rentals, or any supplementary services with per-person pricing.",
@@ -182,6 +206,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["hospitality", "retreat", "resort", "camp", "charter", "tourism"],
     pricingModel: "per-person",
     subcategory: "experiences",
+    whyNeeded: "Activities and experiences are a major upsell opportunity. Visual cards with images, pricing, and duration make it easy for customers to add extras that increase the quote value.",
+    workaround: "category-picker can list activities but has no image cards, no duration display, and no per-person pricing calculation.",
   },
   "category-picker": {
     aiDescription: "Grouped product selection for any products organized by category. Shows products with images, prices, tags, availability, and quantity pickers. Use for venue spaces, equipment, meeting rooms, AV gear, or any categorized product catalog.",
@@ -194,6 +220,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "per-unit",
     subcategory: "products",
+    whyNeeded: "The universal product selection widget. Any business with categorized inventory (venue spaces, equipment, AV gear, meeting rooms) needs grouped product selection with quantities and pricing.",
+    workaround: "option-picker can show products but has no pricing, no quantities, no category grouping. Multiple option-pickers could partially work but it's clunky.",
   },
   "contact-form": {
     aiDescription: "Contact information collection form with configurable fields (name, email, phone, company, notes, GDPR consent). Use near the end of the funnel before generating the quote/invoice.",
@@ -206,6 +234,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "data-collection",
+    whyNeeded: "Every quote needs customer contact details to follow up. Name, email, and phone are the minimum. Company and GDPR consent are required in many industries.",
+    workaround: "Multiple text-input widgets could collect individual fields, but no structured validation (email format, phone format), no GDPR checkbox, and much more work to set up.",
   },
   "booking-widget": {
     aiDescription: "Hidden backend widget that creates the actual booking in Everybooking. Place on the contact step alongside contact-form. Not visible to customers — it syncs selected products to the booking engine.",
@@ -218,6 +248,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "none",
     subcategory: "integration",
+    whyNeeded: "Connects customer selections to the Everybooking backend to create an actual booking with synced products, pricing, and customer info. Without this, the quote is display-only.",
+    workaround: "No workaround. Without the booking widget, selections can't sync to the backend for invoice generation.",
   },
   "payment-widget": {
     aiDescription: "Payment/deposit collection widget showing amount due and payment options. Supports percentage deposit, flat amount, or full payment. Place after the invoice step.",
@@ -230,6 +262,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "calculated",
     subcategory: "checkout",
+    whyNeeded: "Converts quotes into revenue by collecting deposits or full payment. Without payment collection, the customer must call or email to pay — adding friction and reducing conversion.",
+    workaround: "No workaround. Contact form can collect intent, but actual payment requires a payment widget connected to the booking system.",
   },
   "invoice": {
     aiDescription: "Quote/invoice display widget showing the itemized breakdown of all selections. Uses the Everybooking InvoiceWidget SDK component. Place after contact-form and before payment-widget.",
@@ -243,6 +277,8 @@ const registryMetadata: Record<string, Partial<WidgetTemplate>> = {
     industries: ["all"],
     pricingModel: "calculated",
     subcategory: "checkout",
+    whyNeeded: "The culmination of the funnel — shows the customer their complete itemized quote before payment. Transparency builds trust and reduces support calls about pricing.",
+    workaround: "No workaround. Without an invoice/quote display, customers can't review what they're paying for before committing.",
   },
 };
 
