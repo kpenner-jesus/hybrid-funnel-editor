@@ -738,11 +738,11 @@ export function FlowPreview({ onEditWidget, onGearClick }: { onEditWidget?: (ste
   const [wiredMode, setWiredMode] = useState(false); // Lines from segment option buttons
   const [swapMenu, setSwapMenu] = useState<{ x: number; y: number; stepId: string; widgetId: string; templateId: string } | null>(null);
 
-  // Re-render for SVG after layout settles
+  // Re-render for SVG after layout settles or pan/zoom changes
   useEffect(() => {
-    const t = setTimeout(() => setRenderKey((n) => n + 1), 150);
+    const t = setTimeout(() => setRenderKey((n) => n + 1), 100);
     return () => clearTimeout(t);
-  }, [funnel?.steps.length, zoom]);
+  }, [funnel?.steps.length, zoom, pan.x, pan.y]);
 
   // Pan to center on previewStep when it changes (e.g., from Variables tab click)
   const lastNavigatedStep = useRef<string | null>(null);
@@ -766,6 +766,8 @@ export function FlowPreview({ onEditWidget, onGearClick }: { onEditWidget?: (ste
         y: prev.y + (viewCenterY - stepCenterY),
       }));
       lastNavigatedStep.current = previewStep;
+      // Force SVG re-render after pan settles so connection lines update
+      setTimeout(() => setRenderKey((n) => n + 1), 50);
     }, 200);
     return () => clearTimeout(timer);
   }, [previewStep, zoom]);
