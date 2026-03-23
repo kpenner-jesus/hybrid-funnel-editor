@@ -5,8 +5,15 @@ import { useFunnelStore } from "@/stores/funnel-store";
 import { getDataFlowGraph } from "@/lib/variable-engine";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
 
-export function VariableFlow() {
-  const { funnel } = useFunnelStore();
+interface VariableFlowProps {
+  onNavigateToWidget?: (stepId: string, widgetId: string) => void;
+}
+
+export function VariableFlow({ onNavigateToWidget }: VariableFlowProps) {
+  // Subscribe to funnel AND step/widget changes to ensure re-render on add/remove/move
+  const funnel = useFunnelStore((s) => s.funnel);
+  // Force re-compute when widget count changes
+  const widgetCount = funnel?.steps.reduce((a, s) => a + s.widgets.length, 0) || 0;
 
   if (!funnel) {
     return (
@@ -28,10 +35,44 @@ export function VariableFlow() {
     stepGroups[stepId].push(wn);
   }
 
+  // Find the first writer widget for a variable
+  const findFirstWriter = (varName: string): { stepId: string; widgetId: string } | null => {
+    const writerEdges = edges.filter((e) => e.to === `var:${varName}`);
+    if (writerEdges.length === 0) return null;
+    const writerNodeId = writerEdges[0].from; // e.g., "widget:stepId.widgetId"
+    const match = writerNodeId.match(/^widget:(.+)\.(.+)$/);
+    if (!match) return null;
+    return { stepId: match[1], widgetId: match[2] };
+  };
+
+  // Find the first reader widget for a variable
+  const findFirstReader = (varName: string): { stepId: string; widgetId: string } | null => {
+    const readerEdges = edges.filter((e) => e.from === `var:${varName}`);
+    if (readerEdges.length === 0) return null;
+    const readerNodeId = readerEdges[0].to;
+    const match = readerNodeId.match(/^widget:(.+)\.(.+)$/);
+    if (!match) return null;
+    return { stepId: match[1], widgetId: match[2] };
+  };
+
+  const handleVariableClick = (varName: string) => {
+    if (!onNavigateToWidget) return;
+    // Navigate to first writer, or first reader if no writers
+    const target = findFirstWriter(varName) || findFirstReader(varName);
+    if (target) {
+      onNavigateToWidget(target.stepId, target.widgetId);
+    }
+  };
+
+  const handleWidgetClick = (stepId: string, widgetId: string) => {
+    if (!onNavigateToWidget) return;
+    onNavigateToWidget(stepId, widgetId);
+  };
+
   return (
     <div className="space-y-5">
       <div className="text-xs text-on-surface-variant">
-        Shows how variables flow between steps and widgets in your funnel.
+        Shows how variables flow between steps and widgets. <strong>Click any item to navigate to it in the Flow view.</strong>
       </div>
 
       {/* Variable List */}
@@ -46,15 +87,20 @@ export function VariableFlow() {
             );
             const inputEdges = edges.filter((e) => e.to === `var:${v.name}`);
             const outputEdges = edges.filter((e) => e.from === `var:${v.name}`);
+            const hasTarget = findFirstWriter(v.name) || findFirstReader(v.name);
 
             return (
               <div
                 key={v.name}
-                className={`px-3 py-2 rounded-lg border text-sm ${
+                onClick={() => handleVariableClick(v.name)}
+                className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                  hasTarget ? "cursor-pointer hover:bg-primary/5 hover:border-primary/50" : ""
+                } ${
                   connectedEdges.length > 0
                     ? "border-primary/30 bg-primary-light/20"
                     : "border-outline-variant bg-white"
                 }`}
+                title={hasTarget ? "Click to navigate to this variable in the Flow view" : undefined}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -71,6 +117,9 @@ export function VariableFlow() {
                     )}
                     {connectedEdges.length === 0 && (
                       <span className="text-outline">unused</span>
+                    )}
+                    {hasTarget && (
+                      <span className="text-primary opacity-50">→</span>
                     )}
                   </div>
                 </div>
@@ -102,12 +151,18 @@ export function VariableFlow() {
                       const outEdges = edges.filter((e) => e.from === widgetNodeId);
 
                       return (
-                        <div key={widget.instanceId} className="px-2 py-1.5 rounded bg-white border border-outline-variant/50">
+                        <div
+                          key={widget.instanceId}
+                          onClick={() => handleWidgetClick(step.id, widget.instanceId)}
+                          className="px-2 py-1.5 rounded bg-white border border-outline-variant/50 cursor-pointer hover:bg-primary/5 hover:border-primary/40 transition-colors"
+                          title="Click to navigate to this widget in the Flow view"
+                        >
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm">{template?.icon || "?"}</span>
                             <span className="text-xs font-medium">{template?.name || widget.templateId}</span>
+                            <span className="ml-auto text-primary opacity-50 text-[10px]">→</span>
                           </div>
-                          <div className="flex gap-3 text-[10px]">
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
                             {inEdges.map((e) => (
                               <span key={e.from + e.label} className="text-primary">
                                 &#8592; {e.label}

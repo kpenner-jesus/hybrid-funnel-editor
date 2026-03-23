@@ -744,6 +744,32 @@ export function FlowPreview({ onEditWidget, onGearClick }: { onEditWidget?: (ste
     return () => clearTimeout(t);
   }, [funnel?.steps.length, zoom]);
 
+  // Pan to center on previewStep when it changes (e.g., from Variables tab click)
+  const lastNavigatedStep = useRef<string | null>(null);
+  useEffect(() => {
+    if (!previewStep || previewStep === lastNavigatedStep.current) return;
+    // Wait for DOM to settle then pan to the step
+    const timer = setTimeout(() => {
+      const stepEl = stepRefs.current.get(previewStep);
+      const container = containerRef.current;
+      if (!stepEl || !container) return;
+      const cRect = container.getBoundingClientRect();
+      const sRect = stepEl.getBoundingClientRect();
+      // Calculate where the step currently is relative to the container
+      const stepCenterX = sRect.left + sRect.width / 2 - cRect.left;
+      const stepCenterY = sRect.top + sRect.height / 2 - cRect.top;
+      const viewCenterX = cRect.width / 2;
+      const viewCenterY = cRect.height / 2;
+      // Adjust pan to center the step
+      setPan((prev) => ({
+        x: prev.x + (viewCenterX - stepCenterX),
+        y: prev.y + (viewCenterY - stepCenterY),
+      }));
+      lastNavigatedStep.current = previewStep;
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [previewStep, zoom]);
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     setZoom((prev) => Math.max(0.05, Math.min(1.5, prev + (e.deltaY > 0 ? -0.05 : 0.05))));

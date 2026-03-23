@@ -377,7 +377,15 @@ function EditorPageInner() {
             )}
             {activeTab === "library" && <WidgetLibraryPanel />}
             {activeTab === "theme" && <ThemeEditor />}
-            {activeTab === "variables" && <VariableFlow />}
+            {activeTab === "variables" && (
+              <VariableFlow onNavigateToWidget={(stepId, widgetId) => {
+                const { setPreviewStep, selectStep, selectWidget } = useFunnelStore.getState();
+                setPreviewStep(stepId);
+                selectStep(stepId);
+                selectWidget(widgetId);
+                window.dispatchEvent(new CustomEvent("navigate-to-widget", { detail: { stepId, widgetId } }));
+              }} />
+            )}
           </div>
         </div>
 

@@ -78,6 +78,19 @@ export function FunnelPreview({ onSwitchToSteps }: { onSwitchToSteps?: () => voi
 
   const showThumbnails = railWidth >= RAIL_THUMB;
 
+  // Listen for navigate-to-widget events from Variables tab
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { stepId, widgetId } = (e as CustomEvent).detail;
+      setPreviewMode("flow");
+      setPreviewStep(stepId);
+      selectStep(stepId);
+      selectWidget(widgetId);
+    };
+    window.addEventListener("navigate-to-widget", handler);
+    return () => window.removeEventListener("navigate-to-widget", handler);
+  }, [setPreviewStep, selectStep, selectWidget]);
+
   // Preview mode: "step" (single step) or "flow" (all steps with connections)
   const [previewMode, setPreviewMode] = useState<"step" | "flow">("flow");
 
