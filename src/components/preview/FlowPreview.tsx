@@ -413,12 +413,16 @@ function StepCard({
   onWidgetClick: (widgetId: string) => void;
   onWidgetDoubleClick?: (widgetId: string, focusedItemLabel?: string) => void;
   onWidgetRightClick?: (e: React.MouseEvent, stepId: string, widgetId: string, templateId: string) => void;
-  onDropWidget?: (stepId: string, templateId: string) => void;
+  onDropWidget?: (stepId: string, templateId: string, position?: number) => void;
   resolveWidgetInputs: (widget: WidgetInstance) => Record<string, unknown>;
   setWidgetOutput: (key: string, outputs: Record<string, unknown>) => void;
   stepRef: (el: HTMLDivElement | null) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
+  // Drop position: index where the widget should be inserted, -1 = not dragging
+  const [dropIndex, setDropIndex] = useState(-1);
+  // Reorder drag: which widget is being dragged within this step
+  const [reorderDragId, setReorderDragId] = useState<string | null>(null);
   const cardBorder = isDragOver ? "#2563eb" : isActive ? theme.primaryColor : borderColor || "#e2e8f0";
 
   return (
@@ -433,14 +437,32 @@ function StepCard({
           setIsDragOver(true);
         }
       }}
-      onDragLeave={() => setIsDragOver(false)}
+      onDragLeave={(e) => {
+        // Only reset if leaving the card entirely (not entering a child)
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setIsDragOver(false);
+          setDropIndex(-1);
+        }
+      }}
       onDrop={(e) => {
         e.preventDefault();
         setIsDragOver(false);
         const templateId = e.dataTransfer.getData("application/widget-template-id");
+        const reorderId = e.dataTransfer.getData("application/widget-reorder-id");
         if (templateId && onDropWidget) {
-          onDropWidget(step.id, templateId);
+          // Insert at specific position if we have a dropIndex
+          onDropWidget(step.id, templateId, dropIndex >= 0 ? dropIndex : undefined);
+        } else if (reorderId && reorderId !== "") {
+          // Reorder within step
+          const fromIdx = step.widgets.findIndex(w => w.instanceId === reorderId);
+          const toIdx = dropIndex >= 0 ? dropIndex : step.widgets.length;
+          if (fromIdx >= 0 && fromIdx !== toIdx) {
+            const { reorderWidgets } = useFunnelStore.getState();
+            if (reorderWidgets) reorderWidgets(step.id, fromIdx, toIdx > fromIdx ? toIdx - 1 : toIdx);
+          }
         }
+        setDropIndex(-1);
+        setReorderDragId(null);
       }}
       style={{
         width: 380,
@@ -496,18 +518,52 @@ function StepCard({
           {step.title}
         </h3>
         {step.widgets.length === 0 ? (
-          <div className="text-center py-4 text-gray-300 text-xs border border-dashed border-gray-200 rounded-lg">No widgets</div>
+          <div
+            className="text-center py-4 text-gray-300 text-xs border-2 border-dashed border-gray-200 rounded-lg transition-colors"
+            style={isDragOver ? { borderColor: "#22c55e", backgroundColor: "#f0fdf4" } : {}}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("application/widget-template-id") || e.dataTransfer.types.includes("application/widget-reorder-id")) {
+                e.preventDefault();
+                setDropIndex(0);
+              }
+            }}
+          >
+            {isDragOver ? "Drop widget here" : "No widgets"}
+          </div>
         ) : (
-          step.widgets.map((widget) => {
+          step.widgets.map((widget, widgetIdx) => {
             const isDocked = selectedWidgetId === widget.instanceId;
             const hasItemFocus = isDocked && !!dockedFocusedItem;
-            // Widget-level bg highlight: when docked to widget (no specific item)
             const widgetBgHighlight = isDocked && !hasItemFocus;
+            const showDropBefore = dropIndex === widgetIdx;
+            const showDropAfter = dropIndex === widgetIdx + 1 && widgetIdx === step.widgets.length - 1;
 
             return (
+            <div key={widget.instanceId}>
+              {/* Green insertion bar ABOVE this widget */}
+              {showDropBefore && (
+                <div style={{ height: 4, backgroundColor: "#22c55e", borderRadius: 2, margin: "4px 0", boxShadow: "0 0 8px rgba(34,197,94,0.4)" }} />
+              )}
             <div
-              key={widget.instanceId}
               data-widget-scope={widget.instanceId}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/widget-reorder-id", widget.instanceId);
+                e.dataTransfer.effectAllowed = "move";
+                setReorderDragId(widget.instanceId);
+              }}
+              onDragEnd={() => setReorderDragId(null)}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes("application/widget-template-id") || e.dataTransfer.types.includes("application/widget-reorder-id")) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(true);
+                  // Top half = insert before, bottom half = insert after
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const midY = rect.top + rect.height / 2;
+                  setDropIndex(e.clientY < midY ? widgetIdx : widgetIdx + 1);
+                }
+              }}
               onClick={(e) => { e.stopPropagation(); onWidgetClick(widget.instanceId); }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -568,6 +624,11 @@ function StepCard({
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
               />
+            </div>
+              {/* Green insertion bar AFTER last widget */}
+              {showDropAfter && (
+                <div style={{ height: 4, backgroundColor: "#22c55e", borderRadius: 2, margin: "4px 0", boxShadow: "0 0 8px rgba(34,197,94,0.4)" }} />
+              )}
             </div>
             );
           })
@@ -837,7 +898,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                 onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
-                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
+                onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                 resolveWidgetInputs={resolveWidgetInputs}
                 setWidgetOutput={setWidgetOutput}
                 stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -881,7 +942,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                         onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                         onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
-                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
+                onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                         resolveWidgetInputs={resolveWidgetInputs}
                         setWidgetOutput={setWidgetOutput}
                         stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}
@@ -926,7 +987,7 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                       onWidgetClick={(wid) => { selectStep(stepId); selectWidget(wid); }}
                       onWidgetDoubleClick={(wid, item) => { onEditWidget?.(stepId, wid, item); }}
                 onWidgetRightClick={(e, sId, wId, tId) => setSwapMenu({ x: e.clientX, y: e.clientY, stepId: sId, widgetId: wId, templateId: tId })}
-                onDropWidget={(sId, tId) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId); }}
+                onDropWidget={(sId, tId, pos) => { const { addWidget: aw } = useFunnelStore.getState(); aw(sId, tId, pos); }}
                       resolveWidgetInputs={resolveWidgetInputs}
                       setWidgetOutput={setWidgetOutput}
                       stepRef={(el) => { if (el) stepRefs.current.set(stepId, el); else stepRefs.current.delete(stepId); }}

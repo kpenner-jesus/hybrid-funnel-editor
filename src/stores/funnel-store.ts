@@ -227,8 +227,9 @@ interface FunnelStore {
   updateStep: (stepId: string, updates: Partial<Step>) => void;
 
   // Widget operations
-  addWidget: (stepId: string, templateId: string) => void;
+  addWidget: (stepId: string, templateId: string, position?: number) => void;
   removeWidget: (stepId: string, widgetId: string) => void;
+  reorderWidgets: (stepId: string, fromIndex: number, toIndex: number) => void;
   updateWidgetConfig: (stepId: string, widgetId: string, config: Record<string, unknown>) => void;
   updateWidgetBindings: (stepId: string, widgetId: string, bindings: WidgetInstance["bindings"]) => void;
   updateWidgetVariant: (stepId: string, widgetId: string, variant: string) => void;
@@ -499,7 +500,7 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     set({ funnel: { ...funnel, steps }, isDirty: true });
   },
 
-  addWidget: (stepId, templateId) => {
+  addWidget: (stepId, templateId, position) => {
     const { funnel } = get();
     if (!funnel) return;
     get()._pushHistory();
@@ -516,10 +517,32 @@ export const useFunnelStore = create<FunnelStore>((set, get) => ({
     }
     widget.config = defaultConfig;
 
-    const steps = funnel.steps.map((s) =>
-      s.id === stepId ? { ...s, widgets: [...s.widgets, widget] } : s
-    );
+    const steps = funnel.steps.map((s) => {
+      if (s.id !== stepId) return s;
+      const widgets = [...s.widgets];
+      if (position !== undefined && position >= 0 && position <= widgets.length) {
+        widgets.splice(position, 0, widget);
+      } else {
+        widgets.push(widget);
+      }
+      return { ...s, widgets };
+    });
     set({ funnel: { ...funnel, steps }, isDirty: true, selectedWidgetId: widget.instanceId });
+  },
+
+  reorderWidgets: (stepId, fromIndex, toIndex) => {
+    const { funnel } = get();
+    if (!funnel) return;
+    get()._pushHistory();
+    const steps = funnel.steps.map((s) => {
+      if (s.id !== stepId) return s;
+      const widgets = [...s.widgets];
+      if (fromIndex < 0 || fromIndex >= widgets.length || toIndex < 0 || toIndex >= widgets.length) return s;
+      const [moved] = widgets.splice(fromIndex, 1);
+      widgets.splice(toIndex, 0, moved);
+      return { ...s, widgets };
+    });
+    set({ funnel: { ...funnel, steps }, isDirty: true });
   },
 
   removeWidget: (stepId, widgetId) => {
