@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Tooltip } from "@/components/shared/Tooltip";
 import {
   DndContext,
   closestCenter,
@@ -68,6 +69,7 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
             onClick={() => selectStep(step.id)}
           >
             {/* Drag handle */}
+            <Tooltip text="Drag to reorder this step" position="right">
             <button
               {...attributes}
               {...listeners}
@@ -82,6 +84,7 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
                 <circle cx="11" cy="12" r="1.2" />
               </svg>
             </button>
+            </Tooltip>
 
             <div className="flex-1 min-w-0">
               {isEditingTitle ? (
@@ -128,8 +131,8 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
               )}
               <div className="flex gap-2 mt-0.5 text-[10px] text-on-surface-variant">
                 <span>{step.widgets.length} widget{step.widgets.length !== 1 ? "s" : ""}</span>
-                {inputCount > 0 && <span className="text-primary">&#8592; {inputCount}</span>}
-                {outputCount > 0 && <span className="text-secondary">&#8594; {outputCount}</span>}
+                {inputCount > 0 && <Tooltip text="Data coming in from other steps" position="bottom"><span className="text-primary">&#8592; {inputCount}</span></Tooltip>}
+                {outputCount > 0 && <Tooltip text="Data going out to other steps" position="bottom"><span className="text-secondary">&#8594; {outputCount}</span></Tooltip>}
               </div>
             </div>
 
@@ -194,6 +197,7 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
                   </div>
                 );
               })}
+              <Tooltip text="Add a content block — forms, images, date pickers, and more" position="bottom">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -206,6 +210,7 @@ function SortableStep({ step }: { step: { id: string; title: string; widgets: { 
                 </svg>
                 Add Widget
               </button>
+              </Tooltip>
             </div>
           )}
         </div>

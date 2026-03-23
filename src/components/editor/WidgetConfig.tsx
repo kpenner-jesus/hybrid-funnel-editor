@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { widgetTemplateRegistry } from "@/lib/widget-templates";
+import { HelpTip } from "@/components/shared/Tooltip";
 import type { ConfigField, WidgetTemplate } from "@/lib/types";
 
 // --- Visual Options Editor for segment-picker and option-picker ---
@@ -802,7 +803,7 @@ export function WidgetConfig() {
       {template.variants.length > 1 && (
         <div>
           <label className="block text-xs font-medium text-on-surface-variant mb-1.5">
-            Variant
+            Variant<HelpTip text="Choose a different look or layout for this widget" />
           </label>
           <select
             value={widget.variant}
@@ -880,7 +881,7 @@ export function WidgetConfig() {
 
       {/* Bindings */}
       <div className="pt-2 border-t border-outline-variant">
-        <div className="text-xs font-medium text-on-surface-variant mb-3">Variable Bindings</div>
+        <div className="flex items-center text-xs font-medium text-on-surface-variant mb-3">Variable Bindings<HelpTip text="Connect this widget to data from other steps so information flows through the funnel" /></div>
         <BindingsEditor template={template} bindings={widget.bindings} funnel={funnel} />
       </div>
 
@@ -927,12 +928,12 @@ function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("
         <input type="checkbox" checked={!!step.navigation.hideBack}
           onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, hideBack: e.target.checked || undefined } })}
           className="rounded border-gray-300 text-primary focus:ring-primary" />
-        <span className="text-xs text-on-surface-variant">Hide Back button on this step</span>
+        <span className="flex items-center text-xs text-on-surface-variant">Hide Back button<HelpTip text="Hide the Back button so customers can't go backward past this point. Use after payment or confirmation." /></span>
       </label>
 
       {/* Default Next Step */}
       <div>
-        <label className="block text-xs text-on-surface-variant mb-1">Default Next Step</label>
+        <label className="flex items-center text-xs text-on-surface-variant mb-1">Default Next Step<HelpTip text="Override which page comes next. Normally pages play in order." /></label>
         <select value={step.navigation.next || ""}
           onChange={(e) => updateStep(stepId, { navigation: { ...step.navigation, next: e.target.value || undefined } })}
           className="w-full px-3 py-1.5 text-sm border border-outline-variant rounded-lg focus:outline-none focus:border-primary bg-white">
@@ -946,7 +947,7 @@ function StepNavigationEditor({ stepId, step }: { stepId: string; step: import("
       {/* Conditional Navigation (Multi-Jump) */}
       <div className="pt-2 border-t border-gray-100">
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-medium text-on-surface-variant">Conditional Routing</label>
+          <label className="flex items-center text-xs font-medium text-on-surface-variant">Conditional Routing<HelpTip text="Send customers to different pages based on their earlier choices (e.g., wedding guests go to venue space, corporate guests skip it)" /></label>
           {condRules.length > 0 && (
             <button onClick={() => setShowAdvancedNav(!showAdvancedNav)}
               className="text-[9px] text-gray-400 hover:text-gray-600">

@@ -3,6 +3,7 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { useAiStore } from "@/stores/ai-store";
+import { Tooltip } from "@/components/shared/Tooltip";
 import { WidgetRenderer } from "./WidgetRenderer";
 import type { WidgetInstance, ThemeConfig, Step, FunnelDefinition } from "@/lib/types";
 
@@ -726,13 +727,14 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
         <span className="text-[10px] text-gray-500 w-10 text-center font-mono">{Math.round(zoom * 100)}%</span>
         <button onClick={() => setZoom((z) => Math.min(1.5, z + 0.1))} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-800 text-lg font-bold">+</button>
         <div className="w-px h-5 bg-gray-200" />
+        <Tooltip text="Show connection lines from the actual option buttons instead of step edges" position="bottom">
         <button
           onClick={() => { setWiredMode((w) => !w); setTimeout(() => setRenderKey((n) => n + 1), 50); }}
           className={`px-2 h-7 flex items-center justify-center text-[10px] transition-colors ${
             wiredMode ? "text-blue-600 font-bold" : "text-gray-500 hover:text-gray-800"
           }`}
-          title="Wired: show connection lines from actual buttons"
         >🔌 Wired</button>
+        </Tooltip>
         <div className="w-px h-5 bg-gray-200" />
         <button
           onClick={() => {
@@ -808,7 +810,9 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                   display: "flex", alignItems: "center", justifyContent: "center",
                   minHeight: 80,
                 }}>
-                  ⚠️ DISCONNECTED
+                  <Tooltip text="These pages can't be reached by customers. Connect them using navigation settings or ask AI to fix the wiring." position="right">
+                    <span>⚠️ DISCONNECTED</span>
+                  </Tooltip>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
                   {row.stepIds.map((stepId) => {

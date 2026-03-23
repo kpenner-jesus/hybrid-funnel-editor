@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useAiStore, CLAUDE_MODELS } from "@/stores/ai-store";
+import { HelpTip } from "@/components/shared/Tooltip";
 import type { ClaudeModel, ImageAttachment, FileAttachment } from "@/stores/ai-store";
 import { useFunnelStore } from "@/stores/funnel-store";
 import { AiChatMessage } from "./AiChatMessage";
@@ -460,8 +461,8 @@ export function AiChatPanel() {
           <>
             <span className="text-base">🎯</span>
             <div className="min-w-0">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
-                Editing Widget
+              <div className="flex items-center text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                Editing Widget<HelpTip text="AI is focused on this widget only. Your requests will only change this widget. Click Exit to go back to full funnel mode." />
               </div>
               <div className="text-xs font-semibold text-on-surface truncate max-w-[180px]" title={dockedWidgetLabel || ""}>
                 {dockedWidgetLabel || "Widget"}
@@ -568,7 +569,7 @@ export function AiChatPanel() {
   const modelBar = (
     <div className="px-4 py-2 bg-surface-dim border-b border-outline-variant space-y-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant shrink-0">Model</span>
+        <span className="flex items-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant shrink-0">Model<HelpTip text="Haiku = fast &amp; cheap for simple edits. Sonnet = smart, best balance. Opus = most capable but slower." /></span>
         <select
           value={selectedModel}
           onChange={(e) => setModel(e.target.value as ClaudeModel)}
