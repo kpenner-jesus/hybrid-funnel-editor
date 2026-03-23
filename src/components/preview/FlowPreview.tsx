@@ -449,16 +449,39 @@ function StepCard({
         setIsDragOver(false);
         const templateId = e.dataTransfer.getData("application/widget-template-id");
         const reorderId = e.dataTransfer.getData("application/widget-reorder-id");
+        const sourceStepId = e.dataTransfer.getData("application/widget-source-step");
         if (templateId && onDropWidget) {
-          // Insert at specific position if we have a dropIndex
+          // Library drop: insert at specific position
           onDropWidget(step.id, templateId, dropIndex >= 0 ? dropIndex : undefined);
         } else if (reorderId && reorderId !== "") {
-          // Reorder within step
-          const fromIdx = step.widgets.findIndex(w => w.instanceId === reorderId);
-          const toIdx = dropIndex >= 0 ? dropIndex : step.widgets.length;
-          if (fromIdx >= 0 && fromIdx !== toIdx) {
-            const { reorderWidgets } = useFunnelStore.getState();
-            if (reorderWidgets) reorderWidgets(step.id, fromIdx, toIdx > fromIdx ? toIdx - 1 : toIdx);
+          const store = useFunnelStore.getState();
+          const currentFunnel = store.funnel;
+          if (sourceStepId && sourceStepId !== step.id && currentFunnel) {
+            // Cross-step move: find widget, remove from source, add to target
+            const srcStep = currentFunnel.steps.find(s => s.id === sourceStepId);
+            const widgetToMove = srcStep?.widgets.find(w => w.instanceId === reorderId);
+            if (widgetToMove) {
+              // Push undo history once for the compound operation
+              store._pushHistory();
+              // Remove from source step
+              const srcWidgets = srcStep!.widgets.filter(w => w.instanceId !== reorderId);
+              store.updateStep(sourceStepId, { widgets: srcWidgets });
+              // Add to target step at position
+              const tgtStep = useFunnelStore.getState().funnel?.steps.find(s => s.id === step.id);
+              if (tgtStep) {
+                const pos = dropIndex >= 0 ? dropIndex : tgtStep.widgets.length;
+                const tgtWidgets = [...tgtStep.widgets];
+                tgtWidgets.splice(pos, 0, widgetToMove);
+                store.updateStep(step.id, { widgets: tgtWidgets });
+              }
+            }
+          } else {
+            // Same-step reorder
+            const fromIdx = step.widgets.findIndex(w => w.instanceId === reorderId);
+            const toIdx = dropIndex >= 0 ? dropIndex : step.widgets.length;
+            if (fromIdx >= 0 && fromIdx !== toIdx) {
+              store.reorderWidgets(step.id, fromIdx, toIdx > fromIdx ? toIdx - 1 : toIdx);
+            }
           }
         }
         setDropIndex(-1);
@@ -549,8 +572,18 @@ function StepCard({
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData("application/widget-reorder-id", widget.instanceId);
+                e.dataTransfer.setData("application/widget-source-step", step.id);
+                e.dataTransfer.setData("application/widget-template-type", widget.templateId);
                 e.dataTransfer.effectAllowed = "move";
                 setReorderDragId(widget.instanceId);
+                // Custom ghost
+                const ghost = document.createElement("div");
+                const tpl = widgetTemplateRegistry[widget.templateId];
+                ghost.textContent = `${tpl?.icon || "📦"} ${tpl?.name || widget.templateId}`;
+                ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:6px 14px;background:#fff;border:2px solid #f59e0b;border-radius:10px;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);white-space:nowrap;";
+                document.body.appendChild(ghost);
+                e.dataTransfer.setDragImage(ghost, 0, 0);
+                setTimeout(() => document.body.removeChild(ghost), 0);
               }}
               onDragEnd={() => setReorderDragId(null)}
               onDragOver={(e) => {
@@ -577,9 +610,24 @@ function StepCard({
                 const focusedItem = itemEl?.getAttribute("data-item-label") || undefined;
                 onWidgetDoubleClick?.(widget.instanceId, focusedItem);
               }}
-              className="relative"
+              className="relative group/widget"
               style={{ borderRadius: "8px" }}
             >
+              {/* Hover delete button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const { removeWidget: rw } = useFunnelStore.getState();
+                  rw(step.id, widget.instanceId);
+                }}
+                className="absolute -top-2 -right-2 z-20 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/widget:opacity-100 transition-opacity shadow-sm hover:bg-red-600 hover:scale-110"
+                title="Delete this widget"
+              >
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+
               {/* Widget-level highlight overlay — renders ON TOP of the widget content */}
               {widgetBgHighlight && (
                 <div
@@ -1054,6 +1102,17 @@ export function FlowPreview({ onEditWidget }: { onEditWidget?: (stepId: string, 
                 ))
               )}
               <div className="border-t border-gray-100 mt-1 pt-1">
+                <button
+                  onClick={() => {
+                    const { removeWidget: rw } = useFunnelStore.getState();
+                    rw(swapMenu.stepId, swapMenu.widgetId);
+                    setSwapMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-[10px] text-red-500 hover:bg-red-50 flex items-center gap-1.5 font-medium"
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  Delete widget
+                </button>
                 <button
                   onClick={() => setSwapMenu(null)}
                   className="w-full text-left px-3 py-1.5 text-[10px] text-gray-400 hover:bg-gray-50"
