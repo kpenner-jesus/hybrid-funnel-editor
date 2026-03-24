@@ -1272,8 +1272,9 @@ function generateMainFunnel(
     } else if (catInfo.roomCatIds.length > 1) {
       lines.push(`      setRoomProducts([${catInfo.roomCatIds.map(id => `...(cats.find(c => c.id === ${id})?.products || [])`).join(", ")}]);`);
     } else {
-      lines.push(`      console.warn('[Funnel] No categoryId configured for rooms');`);
-      lines.push(`      setRoomProducts([]);`);
+      // No categoryId configured — use name-based fallback to find rooms/cabins/suites
+      lines.push(`      const roomCat = cats.find(c => /room|cabin|suite|accommodation|lodge|villa/i.test(c.name));`);
+      lines.push(`      if (roomCat) setRoomProducts(roomCat.products || []);`);
     }
   }
   if (hasMeals) {
@@ -1282,7 +1283,9 @@ function generateMainFunnel(
     } else if (catInfo.mealCatIds.length > 1) {
       lines.push(`      setMealProducts([${catInfo.mealCatIds.map(id => `...(cats.find(c => c.id === ${id})?.products || [])`).join(", ")}]);`);
     } else {
-      lines.push(`      setMealProducts([]);`);
+      // No categoryId configured — use name-based fallback to find meals
+      lines.push(`      const mealCat = cats.find(c => /meal|food|catering|dining|breakfast|lunch|dinner/i.test(c.name));`);
+      lines.push(`      if (mealCat) setMealProducts(mealCat.products || []);`);
     }
   }
   // Meeting meal products — use configured category ID from widget config
@@ -1299,7 +1302,9 @@ function generateMainFunnel(
     } else if (catInfo.activityCatIds.length > 1) {
       lines.push(`      setActivityProducts([${catInfo.activityCatIds.map(id => `...(cats.find(c => c.id === ${id})?.products || [])`).join(", ")}]);`);
     } else {
-      lines.push(`      setActivityProducts([]);`);
+      // No categoryId configured — use name-based fallback to find activities
+      lines.push(`      const actCat = cats.find(c => /activit|experience|tour|excursion|adventure|recreation/i.test(c.name));`);
+      lines.push(`      if (actCat) setActivityProducts(actCat.products || []);`);
     }
   }
 
